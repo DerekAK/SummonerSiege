@@ -2,10 +2,12 @@ using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
 using System;
+using Unity.VisualScripting;
 
 public class EnemyAI : MonoBehaviour
 {
 
+    [SerializeField] private Animator _anim;
     private Coroutine idleCoroutine;
     private Transform playerTransform;
     private EnemyState currentEnemyState;
@@ -60,6 +62,7 @@ public class EnemyAI : MonoBehaviour
             case EnemyState.Roaming:
                 //call this every state 
                 Roam();
+                _anim.SetBool("IsRoaming", true);
                 break;
             case EnemyState.Aggro:
                 //call this every frame because its changing its destination every frame
