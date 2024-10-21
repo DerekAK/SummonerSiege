@@ -63,10 +63,15 @@ public class EnemyAI : MonoBehaviour
                 //call this every state 
                 Roam();
                 _anim.SetBool("IsRoaming", true);
+                _anim.SetBool("IsChasing", false);
+                _anim.SetBool("IsIdle", false);
                 break;
             case EnemyState.Aggro:
                 //call this every frame because its changing its destination every frame
                 Chase();
+                _anim.SetBool("IsChasing", true);
+                _anim.SetBool("IsRoaming", false);
+                _anim.SetBool("IsIdle", false);
                 break;
             case EnemyState.Attacking:
                 Attack();
