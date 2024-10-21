@@ -6,7 +6,6 @@ using Unity.VisualScripting;
 
 public class EnemyAI : MonoBehaviour
 {
-
     [SerializeField] private Animator _anim;
     private Coroutine idleCoroutine;
     private Transform playerTransform;
@@ -55,7 +54,11 @@ public class EnemyAI : MonoBehaviour
         switch(currentEnemyState){
             case EnemyState.Idle:
                 // can't call this every frame because will start multiple coroutines
+                _anim.SetBool("IsIdle", true);
+                _anim.SetBool("IsChasing", false);
+                _anim.SetBool("IsRoaming", false);
                 if(idleCoroutine == null){
+                    Debug.Log("Idle Coroutine is null, so start a new one. This should run everytime roaming stops");
                     idleCoroutine = StartCoroutine(IdleCoroutine());
                 }
                 break;
