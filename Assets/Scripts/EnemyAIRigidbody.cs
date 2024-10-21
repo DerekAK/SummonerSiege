@@ -113,7 +113,7 @@ public class EnemyAI : MonoBehaviour
         float roamingRange = UnityEngine.Random.Range(minRoamingRange, maxRoamingRange);
         Vector3 newPos = startPosition + (randDir * roamingRange);
         
-        RaycastHit hit;
+        RaycastHit hit; //this is to determine the exact y coordinate of the xz coordinate determined by newpos
         if (Physics.Raycast(new Vector3(newPos.x, 100f, newPos.z), Vector3.down, out hit, Mathf.Infinity))
         {   
             //Debug.DrawRay(new Vector3(newPos.x, 100f, newPos.z), Vector3.down * 200f, Color.red, 3f);
