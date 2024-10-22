@@ -4,6 +4,11 @@ using System.Collections;
 using System;
 using Unity.VisualScripting;
 
+
+// idea
+// what do we have to call in the update() function? -> just 
+
+
 public class EnemyAI : MonoBehaviour
 {
     [SerializeField] private Animator _anim;
@@ -83,24 +88,26 @@ public class EnemyAI : MonoBehaviour
     }
     IEnumerator IdleCoroutine()
     {
-        // Wait for a random duration before moving to a new position
+        // start idling time
         float idleTime = UnityEngine.Random.Range(minIdleTime, maxIdleTime);
         Debug.Log("Enemy is idling for " + idleTime + " seconds.");
         yield return new WaitForSeconds(idleTime);
-        roamPosition = GetNewRoamingPosition();
-        currentEnemyState = EnemyState.Roaming;
+        //finished idling for idleTime
+        //transition from roaming to idling
+        currentEnemyState = EnemyState.Roaming; //for debugging purposes
         idleCoroutine = null;
-        Debug.Log("End Coroutine");
+        roamPosition = GetNewRoamingPosition();
+        Roam();
     }
     private void Roam(){
         Debug.Log("Enemy is Roaming.");
         agent.SetDestination(roamPosition);
-        if (Vector3.Distance(transform.position, roamPosition) < 3f){
+        if (Vector3.Distance(transform.position, roamPosition) < 1f){
             Debug.Log("Arrived at roaming position");
-            currentEnemyState = EnemyState.Idle;
-        }
-        else{
-            //Debug.Log("Walking");
+            
+            //transition from roaming back to idle
+            currentEnemyState = EnemyState.Idle; //for debugging purposes
+            
         }
     }
     private void Chase(){
