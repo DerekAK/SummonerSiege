@@ -11,112 +11,119 @@ using Unity.VisualScripting;
 
 public class EnemyAI : MonoBehaviour
 {
-    [SerializeField] private Animator _anim;
+    //[SerializeField] private Animator _anim;
+    private Animator _anim;
     private Coroutine idleCoroutine;
     private Transform playerTransform;
     private EnemyState currentEnemyState;
-    [SerializeField] private NavMeshAgent agent;
+    //[SerializeField] private NavMeshAgent agent;
+    private NavMeshAgent agent;
+    private SphereCollider aggroCollider;
 
     [SerializeField] private float attackRange;
-    //[SerializeField] private float aggroDistance;
+    [SerializeField] private float aggroDistance;
 
     //for character roaming
     private Vector3 startPosition;
     private Vector4 roamPosition;
-    [SerializeField] private float minRoamingRange = 10f;
+    [SerializeField] private float minRoamingRange = 15f;
     [SerializeField] private float maxRoamingRange = 70f;
     [SerializeField] private int minIdleTime = 5;
     [SerializeField] private int maxIdleTime = 20;
+    [SerializeField] private int roamingSpeed = 10;
+    [SerializeField] private int chasingSpeed = 15;
 
-    private enum EnemyState{Idle, Roaming, Aggro, Attacking}
+    private enum EnemyState{Idle=0, Roaming=1, Aggro=2, Attacking=3}
     private void Start(){
+        _anim = GetComponent<Animator>();
+        agent = GetComponent<NavMeshAgent>();
+        aggroCollider = GetComponent<SphereCollider>();
+
+        Debug.Log(aggroCollider.radius);
+
+        aggroCollider.radius = aggroDistance;
+
         playerTransform = GameManager.Instance.getPlayerTransform();
-        currentEnemyState = EnemyState.Idle;
+        currentEnemyState = EnemyState.Idle; //for debugging purposes
         startPosition = transform.position;
-        roamPosition = GetNewRoamingPosition();
+
+        //start idling
+        if (idleCoroutine != null){
+            StopCoroutine(idleCoroutine);
+            idleCoroutine = null;
+        }
+        idleCoroutine = StartCoroutine(IdleCoroutine());
+    }
+
+    private void Update(){
+        if(currentEnemyState == EnemyState.Aggro){
+            Chase();
+        }
+        Debug.Log("Current Enemy State: " +  currentEnemyState);
+        _anim.SetInteger("EnemyState", (int)currentEnemyState);
     }
 
     private void OnTriggerEnter(Collider other){ //using triggers for player detection for computation optimization
         if(other.CompareTag("Player")){
-            if (idleCoroutine != null){
-                Debug.Log("THIS IS GOOD");
+            if (idleCoroutine != null){ //enemy was idling when it senses the player
                 StopCoroutine(idleCoroutine);
+                idleCoroutine = null;
             }
+            agent.speed = chasingSpeed;
             currentEnemyState = EnemyState.Aggro;
+            //need to call chase every frame (in Update()), so instead we're just going to set isChasing to true, and use that in Update()
         }
     }
     private void OnTriggerExit(Collider other){
         if(other.CompareTag("Player")){
-            idleCoroutine = null;
-            currentEnemyState = EnemyState.Idle;
-        }
-    }
-    private void Update(){
-        DecideEnemyActionandAnimation();
-        //Debug.Log(Vector3.Distance(transform.position, playerTransform.position));
-    }
-    private void DecideEnemyActionandAnimation(){
-        switch(currentEnemyState){
-            case EnemyState.Idle:
-                // can't call this every frame because will start multiple coroutines
-                _anim.SetBool("IsIdle", true);
-                _anim.SetBool("IsChasing", false);
-                _anim.SetBool("IsRoaming", false);
-                if(idleCoroutine == null){
-                    Debug.Log("Idle Coroutine is null, so start a new one. This should run everytime roaming stops");
-                    idleCoroutine = StartCoroutine(IdleCoroutine());
-                }
-                break;
-            case EnemyState.Roaming:
-                //call this every state 
-                Roam();
-                _anim.SetBool("IsRoaming", true);
-                _anim.SetBool("IsChasing", false);
-                _anim.SetBool("IsIdle", false);
-                break;
-            case EnemyState.Aggro:
-                //call this every frame because its changing its destination every frame
-                Chase();
-                _anim.SetBool("IsChasing", true);
-                _anim.SetBool("IsRoaming", false);
-                _anim.SetBool("IsIdle", false);
-                break;
-            case EnemyState.Attacking:
-                Attack();
-                break;
+            if (idleCoroutine != null){ //should never happen, because shouldn't be idle and chasing at same time, and this is when its chasing
+                Debug.Log("THIS SHOULD NEVER HAPPEN 1!");
+                StopCoroutine(idleCoroutine);
+                idleCoroutine = null;
+            }
+            Roam();
         }
     }
     IEnumerator IdleCoroutine()
     {
-        // start idling time
         float idleTime = UnityEngine.Random.Range(minIdleTime, maxIdleTime);
-        Debug.Log("Enemy is idling for " + idleTime + " seconds.");
+        //Debug.Log("Enemy is idling for " + idleTime + " seconds.");
         yield return new WaitForSeconds(idleTime);
-        //finished idling for idleTime
-        //transition from roaming to idling
-        currentEnemyState = EnemyState.Roaming; //for debugging purposes
         idleCoroutine = null;
-        roamPosition = GetNewRoamingPosition();
         Roam();
     }
     private void Roam(){
+        agent.speed = roamingSpeed;
+        currentEnemyState = EnemyState.Roaming;
+        roamPosition = GetNewRoamingPosition();
         Debug.Log("Enemy is Roaming.");
         agent.SetDestination(roamPosition);
-        if (Vector3.Distance(transform.position, roamPosition) < 1f){
+        InvokeRepeating(nameof(checkArrivalRoamingPosition), 0f, 0.5f); //this is to prevent doing it in update
+    }
+
+    private void checkArrivalRoamingPosition(){
+        if (Vector3.Distance(transform.position, roamPosition) < 5f){
             Debug.Log("Arrived at roaming position");
+            CancelInvoke(nameof(checkArrivalRoamingPosition));
             
             //transition from roaming back to idle
             currentEnemyState = EnemyState.Idle; //for debugging purposes
-            
+            if (idleCoroutine != null){ //just to make sure no other coroutine is occurring, should never happen
+                Debug.Log("THIS SHOULD NEVER HAPPEN!2");
+                StopCoroutine(idleCoroutine);
+                idleCoroutine = null; 
+            }
+            idleCoroutine = StartCoroutine(IdleCoroutine());
+            currentEnemyState = EnemyState.Idle;
         }
     }
     private void Chase(){
-        Debug.Log("Enemy is Chasing.");
         if(Vector3.Distance(transform.position, playerTransform.position) > attackRange){
             agent.SetDestination(playerTransform.position);
         }
         else{ //inside attack range
-            currentEnemyState = EnemyState.Attacking;
+            currentEnemyState = EnemyState.Attacking; //for debugging purposes only
+            Attack();
         }
     }
     private void Attack(){
