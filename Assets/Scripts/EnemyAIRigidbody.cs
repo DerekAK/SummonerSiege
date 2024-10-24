@@ -3,6 +3,8 @@ using UnityEngine.AI;
 using System.Collections;
 using System;
 using Unity.VisualScripting;
+using UnityEngine.UIElements;
+using System.Diagnostics.CodeAnalysis;
 
 
 // idea
@@ -14,11 +16,21 @@ public class EnemyAI : MonoBehaviour
     //[SerializeField] private Animator _anim;
     private Animator _anim;
     private Coroutine idleCoroutine;
+    private Coroutine attackCoroutine;
     private Transform playerTransform;
+    [SerializeField] private LayerMask playerL;
     private EnemyState currentEnemyState;
     //[SerializeField] private NavMeshAgent agent;
-    private NavMeshAgent agent;
-    private SphereCollider aggroCollider;
+    private NavMeshAgent _agent;
+    private SphereCollider _aggroCollider;
+    [SerializeField] private Transform attackCenter;
+    [SerializeField] private int attackCenterBoxRadius;
+    private float kickDelay = 0.5f; //this is how long the kicking animation has to play before it switches. if too low, will just do a bitch kick
+    //keep in mind that this might become a problem if during the coroutine, the player is able to escape the enemyspherecollider, because it goes to 
+    //aggro state but the player is already out of the sphere, so will be forever in an aggro state.
+
+    //[SerializeField] private string rightToePath;
+    //private SphereCollider _legCollider;
 
     [SerializeField] private float attackRange;
     [SerializeField] private float aggroDistance;
@@ -34,14 +46,14 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] private int chasingSpeed = 15;
 
     private enum EnemyState{Idle=0, Roaming=1, Aggro=2, Attacking=3}
+    //private enum MeleeAttack{Punch=0, Kick=1}
+
     private void Start(){
         _anim = GetComponent<Animator>();
-        agent = GetComponent<NavMeshAgent>();
-        aggroCollider = GetComponent<SphereCollider>();
-
-        Debug.Log(aggroCollider.radius);
-
-        aggroCollider.radius = aggroDistance;
+        _agent = GetComponent<NavMeshAgent>();
+        _aggroCollider = GetComponent<SphereCollider>();
+        //_legCollider = transform.Find(rightToePath).GetComponent<SphereCollider>(); //This will come up with an error if rightToePath is wrong
+        _aggroCollider.radius = aggroDistance;
 
         playerTransform = GameManager.Instance.getPlayerTransform();
         currentEnemyState = EnemyState.Idle; //for debugging purposes
@@ -55,23 +67,36 @@ public class EnemyAI : MonoBehaviour
         idleCoroutine = StartCoroutine(IdleCoroutine());
     }
 
+    void OnDrawGizmos()
+    {
+        if (attackCenter != null)
+        {
+            Gizmos.color = Color.red;
+            // Draw a wireframe box to represent the OverlapBox area
+            //this sets the origin of the next gizmos command to attackcenter.position, with the rotation of the attack center, and a scale of one (no scaling)
+            Gizmos.matrix = Matrix4x4.TRS(attackCenter.position, attackCenter.rotation, Vector3.one); 
+            Gizmos.DrawWireCube(Vector3.zero, Vector3.one*attackCenterBoxRadius);  // Use the box size and center position
+        }
+    }
+
     private void Update(){
         if(currentEnemyState == EnemyState.Aggro){
             Chase();
         }
         Debug.Log("Current Enemy State: " +  currentEnemyState);
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
+        //Debug.Log("Current distance from enemy: " + Vector3.Distance(transform.position, playerTransform.position));
+        //Debug.DrawLine(transform.position, playerTransform.position, Color.red);
     }
 
-    private void OnTriggerEnter(Collider other){ //using triggers for player detection for computation optimization
+    private void OnTriggerEnter(Collider other){ //using triggers for player detection for computation optimization, need to set sphere collider to a trigger
         if(other.CompareTag("Player")){
             if (idleCoroutine != null){ //enemy was idling when it senses the player
                 StopCoroutine(idleCoroutine);
                 idleCoroutine = null;
             }
-            agent.speed = chasingSpeed;
+            _agent.speed = chasingSpeed;
             currentEnemyState = EnemyState.Aggro;
-            //need to call chase every frame (in Update()), so instead we're just going to set isChasing to true, and use that in Update()
         }
     }
     private void OnTriggerExit(Collider other){
@@ -93,16 +118,16 @@ public class EnemyAI : MonoBehaviour
         Roam();
     }
     private void Roam(){
-        agent.speed = roamingSpeed;
+        _agent.speed = roamingSpeed;
         currentEnemyState = EnemyState.Roaming;
         roamPosition = GetNewRoamingPosition();
         Debug.Log("Enemy is Roaming.");
-        agent.SetDestination(roamPosition);
+        _agent.SetDestination(roamPosition);
         InvokeRepeating(nameof(checkArrivalRoamingPosition), 0f, 0.5f); //this is to prevent doing it in update
     }
 
     private void checkArrivalRoamingPosition(){
-        if (Vector3.Distance(transform.position, roamPosition) < 5f){
+        if (Vector3.Distance(transform.position, roamPosition) < 3f){
             Debug.Log("Arrived at roaming position");
             CancelInvoke(nameof(checkArrivalRoamingPosition));
             
@@ -119,15 +144,45 @@ public class EnemyAI : MonoBehaviour
     }
     private void Chase(){
         if(Vector3.Distance(transform.position, playerTransform.position) > attackRange){
-            agent.SetDestination(playerTransform.position);
+            _agent.SetDestination(playerTransform.position);
         }
         else{ //inside attack range
-            currentEnemyState = EnemyState.Attacking; //for debugging purposes only
+            _agent.ResetPath(); //this is to get it to stop moving
             Attack();
         }
     }
     private void Attack(){
+        currentEnemyState = EnemyState.Attacking; //sets the attacking animation, which will trigger TrackHits() at frame 10 I believe
+        //this is interesting, im learning how to make combat harder and more interesting. In other words, there needs to be enough time in between the 
+        //the animation starting and it triggering the event for the player to dodge it or block it or something, and the player needs to be able to roll 
+        //out of the way of the overlapbox, so make sure that the overlapbox isn't too large, but then if its too small, the enemy needs to only trigger Attack()
+        //when its super close to the character.
         Debug.Log("Enemy is Attacking.");
+        if (attackCoroutine != null){
+            StopCoroutine(attackCoroutine);
+            attackCoroutine = null;
+        }
+        attackCoroutine = StartCoroutine(AttackCoroutine(kickDelay));
+    }
+    IEnumerator AttackCoroutine(float delay){
+        yield return new WaitForSeconds(delay);
+        attackCoroutine = null;
+        currentEnemyState = EnemyState.Aggro; //don't just want to call Chase() here, because Chase() needs to be called in Update() every frame
+    }
+    private void TrackHits(){ //triggered by animation event
+        Debug.Log("HERHERHEHREHRE");
+        Collider[] hitColliders = Physics.OverlapBox(attackCenter.position, Vector3.one * attackCenterBoxRadius, attackCenter.rotation, playerL);
+        
+        foreach (Collider hitCollider in hitColliders)
+        {
+            Debug.Log("Hit: " + hitCollider.name);
+            Rigidbody rb = hitCollider.gameObject.GetComponent<Rigidbody>();
+            Vector3 direction = (attackCenter.position-transform.position).normalized;
+            rb.velocity = Vector3.zero;
+            rb.AddForce(direction*30f, ForceMode.Impulse);
+            Debug.Log(direction*30f);
+            Debug.DrawRay(transform.position, direction, Color.red, 3f);
+        }
     }
 
     private Vector3 GetNewRoamingPosition(){
