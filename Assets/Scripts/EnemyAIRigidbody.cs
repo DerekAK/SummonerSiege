@@ -1,11 +1,7 @@
 using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
-
-
-// idea
-// what do we have to call in the update() function? -> just 
-
+using System.Collections.Generic;
 
 public class EnemyAI : MonoBehaviour
 {
@@ -13,7 +9,7 @@ public class EnemyAI : MonoBehaviour
     private Animator _anim;
     private Coroutine idleCoroutine;
     private Coroutine attackCoroutine;
-    private Transform playerTransform;
+    private List<Transform> players;
     [SerializeField] private LayerMask playerL;
     private EnemyState currentEnemyState;
     //[SerializeField] private NavMeshAgent agent;
@@ -24,13 +20,8 @@ public class EnemyAI : MonoBehaviour
     private float kickDelay = 0.5f; //this is how long the kicking animation has to play before it switches. if too low, will just do a bitch kick
     //keep in mind that this might become a problem if during the coroutine, the player is able to escape the enemyspherecollider, because it goes to 
     //aggro state but the player is already out of the sphere, so will be forever in an aggro state.
-
-    //[SerializeField] private string rightToePath;
-    //private SphereCollider _legCollider;
-
     [SerializeField] private float attackRange;
     [SerializeField] private float aggroDistance;
-
     //for character roaming
     private Vector3 startPosition;
     private Vector4 roamPosition;
@@ -40,8 +31,6 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] private int maxIdleTime = 20;
     [SerializeField] private int roamingSpeed = 10;
     [SerializeField] private int chasingSpeed = 15;
-
-    [SerializeField] private Transform cube;
 
     private enum EnemyState{Idle=0, Roaming=1, Aggro=2, Attacking=3}
     //private enum MeleeAttack{Punch=0, Kick=1}
@@ -53,7 +42,7 @@ public class EnemyAI : MonoBehaviour
         //_legCollider = transform.Find(rightToePath).GetComponent<SphereCollider>(); //This will come up with an error if rightToePath is wrong
         _aggroCollider.radius = aggroDistance;
 
-        playerTransform = GameManager.Instance.getPlayerTransform();
+        players = GameManager.Instance.getPlayerTransforms();
         currentEnemyState = EnemyState.Idle; //for debugging purposes
         startPosition = transform.position;
 
@@ -98,11 +87,17 @@ public class EnemyAI : MonoBehaviour
         }
     }
     private void OnTriggerExit(Collider other){
+        Debug.Log("EXITED AGGRO RANGE!");
         if(other.CompareTag("Player")){
             if (idleCoroutine != null){ //should never happen, because shouldn't be idle and chasing at same time, and this is when its chasing
                 Debug.Log("THIS SHOULD NEVER HAPPEN 1!");
                 StopCoroutine(idleCoroutine);
                 idleCoroutine = null;
+            }
+            if(attackCoroutine != null){
+                Debug.Log("Here!");
+                StopCoroutine(attackCoroutine);
+                attackCoroutine = null;
             }
             Roam();
         }
@@ -141,12 +136,16 @@ public class EnemyAI : MonoBehaviour
         }
     }
     private void Chase(){
-        if(Vector3.Distance(transform.position, cube.position) > attackRange){
-            _agent.SetDestination(cube.position);
-        }
-        else{ //inside attack range
-            _agent.ResetPath(); //this is to get it to stop moving
-            Attack();
+        if(players != null){
+            Debug.Log(players.Count);
+
+            if(Vector3.Distance(transform.position, players[0].position) > attackRange){
+                _agent.SetDestination(players[0].position);
+            }
+            else{ //inside attack range
+                _agent.ResetPath(); //this is to get it to stop moving
+                Attack();
+            }
         }
     }
     private void Attack(){
