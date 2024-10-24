@@ -1,10 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
-using System;
-using Unity.VisualScripting;
-using UnityEngine.UIElements;
-using System.Diagnostics.CodeAnalysis;
 
 
 // idea
@@ -44,6 +40,8 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] private int maxIdleTime = 20;
     [SerializeField] private int roamingSpeed = 10;
     [SerializeField] private int chasingSpeed = 15;
+
+    [SerializeField] private Transform cube;
 
     private enum EnemyState{Idle=0, Roaming=1, Aggro=2, Attacking=3}
     //private enum MeleeAttack{Punch=0, Kick=1}
@@ -143,8 +141,8 @@ public class EnemyAI : MonoBehaviour
         }
     }
     private void Chase(){
-        if(Vector3.Distance(transform.position, playerTransform.position) > attackRange){
-            _agent.SetDestination(playerTransform.position);
+        if(Vector3.Distance(transform.position, cube.position) > attackRange){
+            _agent.SetDestination(cube.position);
         }
         else{ //inside attack range
             _agent.ResetPath(); //this is to get it to stop moving
@@ -170,7 +168,6 @@ public class EnemyAI : MonoBehaviour
         currentEnemyState = EnemyState.Aggro; //don't just want to call Chase() here, because Chase() needs to be called in Update() every frame
     }
     private void TrackHits(){ //triggered by animation event
-        Debug.Log("HERHERHEHREHRE");
         Collider[] hitColliders = Physics.OverlapBox(attackCenter.position, Vector3.one * attackCenterBoxRadius, attackCenter.rotation, playerL);
         
         foreach (Collider hitCollider in hitColliders)
@@ -178,9 +175,9 @@ public class EnemyAI : MonoBehaviour
             Debug.Log("Hit: " + hitCollider.name);
             Rigidbody rb = hitCollider.gameObject.GetComponent<Rigidbody>();
             Vector3 direction = (attackCenter.position-transform.position).normalized;
-            rb.velocity = Vector3.zero;
-            rb.AddForce(direction*30f, ForceMode.Impulse);
-            Debug.Log(direction*30f);
+            rb.AddForce(new Vector3(direction.x*3000f, 1000f, direction.z*3000f), ForceMode.Impulse);
+
+            //rb.AddForce(direction*30f, ForceMode.VelocityChange);
             Debug.DrawRay(transform.position, direction, Color.red, 3f);
         }
     }
