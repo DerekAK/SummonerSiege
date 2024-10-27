@@ -17,6 +17,7 @@ public class EnemyAI : MonoBehaviour
     private SphereCollider _aggroCollider;
     [SerializeField] private Transform attackCenter;
     [SerializeField] private int attackCenterBoxRadius;
+    [SerializeField] private int attackForceMultiplier;
     private float kickDelay = 0.5f; //this is how long the kicking animation has to play before it switches. if too low, will just do a bitch kick
     //keep in mind that this might become a problem if during the coroutine, the player is able to escape the enemyspherecollider, because it goes to 
     //aggro state but the player is already out of the sphere, so will be forever in an aggro state.
@@ -174,7 +175,7 @@ public class EnemyAI : MonoBehaviour
             Debug.Log("Hit: " + hitCollider.name);
             Rigidbody rb = hitCollider.gameObject.GetComponent<Rigidbody>();
             Vector3 direction = (attackCenter.position-transform.position).normalized;
-            rb.AddForce(new Vector3(direction.x*3000f, 1000f, direction.z*3000f), ForceMode.Impulse);
+            rb.AddForce(new Vector3(direction.x*attackForceMultiplier, attackForceMultiplier/3, direction.z*attackForceMultiplier), ForceMode.Impulse);
 
             //rb.AddForce(direction*30f, ForceMode.VelocityChange);
             Debug.DrawRay(transform.position, direction, Color.red, 3f);
