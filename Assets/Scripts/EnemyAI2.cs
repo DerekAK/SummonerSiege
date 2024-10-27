@@ -43,18 +43,15 @@ public class EnemyAI2 : MonoBehaviour
         Debug.DrawLine(transform.position, new Vector3(transform.position.x, transform.position.y+enemyHeight, transform.position.z), Color.red, 10f);
         attackCenterBoxRadius = enemyHeight/2; 
     }
-
     private void Start(){
         playersInGame = GameManager.Instance.getPlayerTransforms();
         startPosition = transform.position;
         //can set to idle immediately because spawnscript will ensure no enemy is spawned in with a player in its aggrosphere
         Idle();
     }
-
     private void Update(){
         Debug.Log("Count of inRange Players: " + playersInRangeOfEnemy.Count);
     }
-
     private void OnTriggerEnter(Collider other){ //using triggers for player detection for computation optimization, need to set sphere collider to a trigger
         if(other.CompareTag("Player")){
             playersInRangeOfEnemy.Add(other.transform);
@@ -64,7 +61,6 @@ public class EnemyAI2 : MonoBehaviour
             }
         }
     }
-
     private void BecomeAlert(){
         //Debug.Log("Become Alert");
         /*
