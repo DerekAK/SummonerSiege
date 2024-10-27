@@ -139,7 +139,6 @@ public class EnemyAI2 : MonoBehaviour
             }
         } 
     }
-
     private void Chase(Transform player, AttackType attack){
         //Debug.Log("Chasing");
         currentEnemyState = EnemyState.Chasing;
@@ -175,14 +174,9 @@ public class EnemyAI2 : MonoBehaviour
     private IEnumerator AttackCoroutine(){ //this is just temporary. We do not want a coroutine for attacking but instead an animator event that has an event
     // for trigger trackhits() and also for triggering becomealert() at the end of the animation
         yield return new WaitForSeconds(1);
-        
-        // now after an attack, what situation/state do we want the enemy to go back to? We want it to becomealert again. If you go through the code
-        // this will make sense. essentially, this will allow the player to literally hide behind obstacles in between attacks depending on how long the attack takes.
-        // also, this will make it so that the player is still in the list of playersinRange, so the enemy could potentially go right back to chasing him if he's in sight
-        // however, he could have also left the range if hes super fast, and calling becomealert() again would potentially make the enemy go back to idle in that case
-        // if he was the only player in the list, which is exactly what we want.
-        // BecomeAlert();
-        // StopCoroutine(AttackCoroutine());
+        if(currentPlayerTarget){ //this means that player current target is still in range, so want to continue to pursue him
+            Chase(currentPlayerTarget, AttackType.Melee);
+        }
     }
 
     private void Idle(){
