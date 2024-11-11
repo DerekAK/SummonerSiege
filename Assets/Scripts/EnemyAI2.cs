@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
+using System;
 
 public class EnemyAI2 : MonoBehaviour
 {    
@@ -19,6 +20,7 @@ public class EnemyAI2 : MonoBehaviour
     private Coroutine chaseCoroutine;
     private float attackCenterBoxRadius;
     private float enemyHeight;
+    private Transform _rightHand;
     [SerializeField] private LayerMask obstacleL;
     [SerializeField] private LayerMask playerL;
     [SerializeField] private Transform attackCenter;
@@ -33,13 +35,21 @@ public class EnemyAI2 : MonoBehaviour
     [SerializeField] private int attackForceMultiplier;
     private enum EnemyState{Idle=0, Roaming=1, Alert=2, Chasing=3, Attacking=4} //need an animation for each state, since animation is determined by this
     private enum AttackType{Melee=0, Medium=1, Long=2}
+
+    public event EventHandler<AttackEventArgs> AttackEvent;
+    public class AttackEventArgs : EventArgs{
+        public Transform playerTransform;
+        public Transform rightHandTransform;
+    }
     
     private void Awake(){
         _anim = GetComponent<Animator>();
         _agent = GetComponent<NavMeshAgent>();
         _aggroCollider = GetComponent<SphereCollider>();
         _aggroCollider.radius = aggroDistance;
+        _rightHand = transform.Find("RiggedEarthGuardian/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:RightShoulder/mixamorig:RightArm/mixamorig:RightForeArm/mixamorig:RightHand/mixamorig:RightHandIndex1/mixamorig:RightHandIndex2");
         enemyHeight = GetComponent<CapsuleCollider>().height * transform.localScale.y;
+        Debug.Log(_rightHand);
         Debug.DrawLine(transform.position, new Vector3(transform.position.x, transform.position.y+enemyHeight, transform.position.z), Color.red, 10f);
         attackCenterBoxRadius = enemyHeight/2; 
     }
@@ -75,46 +85,46 @@ public class EnemyAI2 : MonoBehaviour
             StopCoroutine(idleCoroutine);
             idleCoroutine = null;
         }
-
-        //fully transition from roaming to alert, and will make sure that enemy won't go back to idle 
-        CancelInvoke(nameof(checkArrivalRoamingPosition));
-
         if (alertCoroutine != null){ //this actually does happen, in the case of multiple enemies in sphere and targeted one exits the sphere
             StopCoroutine(alertCoroutine);
             alertCoroutine = null;
         }
+
+        //fully transition from roaming to alert, and will make sure that enemy won't go back to idle 
+        CancelInvoke(nameof(checkArrivalRoamingPosition));
+
         alertCoroutine = StartCoroutine(AlertCoroutine());
     }
     private IEnumerator AlertCoroutine(){
+        Debug.Log("STARTING ALERT COUROTINE!");
         _agent.ResetPath();
         yield return new WaitForSeconds(3);
-        while (playersInRangeOfEnemy.Count > 0) { 
+        if (playersInRangeOfEnemy.Count > 0) { 
             Debug.Log("This should be running for as long as there are players in range");
             // if(currentEnemyState == EnemyState.Alert){ //this is to make sure that this will only try to detect players if the enemy is not chasing or attacking
             //     TryDetectPlayer();
             // }
-            if(currentPlayerTarget == null){
+            while(currentPlayerTarget == null){
                 Debug.Log("Current player Target is null");
                 TryDetectPlayer();
             }
-            //can i instead check if the enemy has a current targeted player. That way, it will retarget to a different player if current player exits sphere collider
-            yield return null; // Wait for the next frame
         }
         //Debug.Log("This should run when there are no enemies in range");
         //if come from chasing the player to no more players in range
-        if(chaseCoroutine != null){
-            StopCoroutine(chaseCoroutine);
-            chaseCoroutine = null;
+        else{    
+            if(chaseCoroutine != null){
+                StopCoroutine(chaseCoroutine);
+                chaseCoroutine = null;
+            }
+            alertCoroutine = null;
+            //transitions directly from chasing to idle in this case if no enemies are present
+            Idle();
         }
-        alertCoroutine = null;
-        //transitions directly from chasing to idle in this case if no enemies are present
-        Idle();
-
     }
     private void TryDetectPlayer(){
         foreach(Transform player in playersInRangeOfEnemy){
             Vector3 directionToPlayer = player.position - eyes.position;
-            if (!Physics.Raycast(transform.position, directionToPlayer.normalized, out RaycastHit hit, directionToPlayer.magnitude, obstacleL))
+            if (!Physics.Raycast(eyes.position, directionToPlayer.normalized, out RaycastHit hit, directionToPlayer.magnitude, obstacleL))
             {
                 // No obstacle, clear line of sight
                 Debug.Log("DETECTED PLAYER: " + player.name);
@@ -157,6 +167,8 @@ public class EnemyAI2 : MonoBehaviour
             yield return null;
         }
         //in attack range
+        //this is with new attacksystem
+        AttackEvent(this, new AttackEventArgs{playerTransform = currentPlayerTarget, rightHandTransform = _rightHand});
         Attack();
         chaseCoroutine = null;
     }
@@ -173,6 +185,10 @@ public class EnemyAI2 : MonoBehaviour
         if(currentPlayerTarget){ //this means that player current target is still in range, so want to continue to pursue him
             Chase(currentPlayerTarget, AttackType.Melee);
         }
+        else{
+            Debug.Log("BECOME ALERT");
+            BecomeAlert();
+        }
     }
 
     private void Idle(){
@@ -187,7 +203,7 @@ public class EnemyAI2 : MonoBehaviour
         idleCoroutine = StartCoroutine(IdleCoroutine());
     }
     IEnumerator IdleCoroutine(){
-        float idleTime = Random.Range(minIdleTime, maxIdleTime);
+        float idleTime = UnityEngine.Random.Range(minIdleTime, maxIdleTime);
         yield return new WaitForSeconds(idleTime);
         idleCoroutine = null;
         Roam();
