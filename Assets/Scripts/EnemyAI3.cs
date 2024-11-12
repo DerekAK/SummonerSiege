@@ -9,6 +9,7 @@ public class EnemyAI3 : MonoBehaviour
     //enemy will get stuck if enemy is raised on box because of nav mesh navigation
     //if player is in air and in the 2nd tier, it will jump after them and then be out of nav mesh
     //it will do its attacks even if there isn't a clear line of sight, which it shouldn't. it should first walk until there is a clear line of sight.
+    //boudler throw is at the player's transform, not the player's eyes.
     private Rigidbody _rb;
     private NavMeshAgent _agent;
     private Animator _anim;

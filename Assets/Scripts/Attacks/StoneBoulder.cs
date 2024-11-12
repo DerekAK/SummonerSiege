@@ -64,7 +64,7 @@ public class StoneBoulder : BaseAttackScript
             playerPosition = lastSeenTargetPosition;
         }
         else{playerPosition = e.PlayerTransform.position;}
-        Vector3 directionToPlayer = (playerPosition - e.InstantiateTransform.position).normalized;
+        Vector3 directionToPlayer = (playerPosition+(Vector3.up*10) - e.InstantiateTransform.position).normalized;
         _rbStone.AddForce(directionToPlayer * _rbForceMultiplier, ForceMode.Impulse);
     }
 }
