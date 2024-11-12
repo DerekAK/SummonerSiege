@@ -2,8 +2,14 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
+using System;
 public class EnemyAI3 : MonoBehaviour
 {
+    //current problems so far:
+    //enemy will get stuck if enemy is raised on box because of nav mesh navigation
+    //if player is in air and in the 2nd tier, it will jump after them and then be out of nav mesh
+    //it will do its attacks even if there isn't a clear line of sight, which it shouldn't. it should first walk until there is a clear line of sight.
+    private Rigidbody _rb;
     private NavMeshAgent _agent;
     private Animator _anim;
     private AnimatorOverrideController _animOverrider;
@@ -11,6 +17,7 @@ public class EnemyAI3 : MonoBehaviour
     private List<Transform> playersInGame;
     private List<Transform> playersInRangeOfEnemy = new List<Transform>();
     private Transform currentPlayerTarget;
+    private Vector3 lastSeenTargetPosition;
     private EnemyState currentEnemyState;
     private Vector3 startPosition;
     private Vector3 roamPosition;
@@ -31,15 +38,25 @@ public class EnemyAI3 : MonoBehaviour
     [SerializeField] private int maxIdleTime = 20;
     [SerializeField] private int roamingSpeed = 10;
     [SerializeField] private int chasingSpeed = 15;
-    [SerializeField] private float attackForceMultiplier = 1000f;
     private enum EnemyState{Idle = 0, Roaming = 1, Alert = 2, Chasing = 3, Attack1 = 4, Attack2 = 5, Attack3 = 6, StareDown = 7} //need an animation for each state, since animation is determined by this
-    private enum AttackType{Attack1=1, Attack2=2, Attack3=3} //Generally, 1 is for melee, 2 is for medium, 3 is for far
-
     [SerializeField] private BaseAttackScript attack1;
     [SerializeField] private BaseAttackScript attack2;
     [SerializeField] private BaseAttackScript attack3;
 
+    //idea for this is that the animation triggers a function which invokes one of these events. 
+    public class AttackEvent : EventArgs{
+        public Transform PlayerTransform{ get;set;}
+        public Transform InstantiateTransform{ get;set;}
+        public Vector3 LastSeenTargetPos{ get;set;}
+        public Transform AttackCenterForward{ get;set;}
+        public LayerMask PlayerL{get;set;}
+    }
+    public event EventHandler<AttackEvent> Attack1Event;
+    public event EventHandler<AttackEvent> Attack2Event;
+    public event EventHandler<AttackEvent> Attack3Event;
+
     private void Awake(){
+        _rb = GetComponent<Rigidbody>();
         _anim = GetComponent<Animator>();
         _animOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
         _agent = GetComponent<NavMeshAgent>();
@@ -47,16 +64,17 @@ public class EnemyAI3 : MonoBehaviour
         _aggroCollider.radius = (aggroDistance-1)/transform.localScale.y;
         _rightHand = transform.Find("RiggedEarthGuardian/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:RightShoulder/mixamorig:RightArm/mixamorig:RightForeArm/mixamorig:RightHand/mixamorig:RightHandIndex1/mixamorig:RightHandIndex2");
         enemyHeight = GetComponent<CapsuleCollider>().height * transform.localScale.y;
-        Debug.Log(_rightHand);
-        Debug.DrawLine(transform.position, new Vector3(transform.position.x, transform.position.y+enemyHeight, transform.position.z), Color.red, 10f);
         attackCenterBoxRadius = enemyHeight/2; 
-        _agent.stoppingDistance = 20f; //THIS IS REALLY IMPORTANT TO GET RIGHT
+        _agent.stoppingDistance = 5f; //THIS IS REALLY IMPORTANT TO GET RIGHT
+
+        attack1.SetAnimationClip(_animOverrider);
+        attack1.ProvideInstance(this);
+        attack2.SetAnimationClip(_animOverrider);
+        attack2.ProvideInstance(this);
+        attack3.SetAnimationClip(_animOverrider);
+        attack3.ProvideInstance(this);
     }
     private void Start(){
-        attack1.SetAnimationClip(_animOverrider);
-        attack2.SetAnimationClip(_animOverrider);
-        attack3.SetAnimationClip(_animOverrider);
-
         playersInGame = GameManager.Instance.getPlayerTransforms();
         startPosition = transform.position;
         //can set to idle immediately because spawnscript will ensure no enemy is spawned in with a player in its aggrosphere
@@ -141,6 +159,7 @@ public class EnemyAI3 : MonoBehaviour
             if (!Physics.Raycast(eyes.position, directionToPlayer.normalized, out RaycastHit hit, directionToPlayer.magnitude, obstacleL))
             {
                 // No obstacle, clear line of sight
+                Debug.DrawRay(eyes.position, directionToPlayer, Color.red, 10f);
                 Debug.Log("DETECTED PLAYER: " + player.name);
                 currentPlayerTarget = player; 
 
@@ -155,23 +174,22 @@ public class EnemyAI3 : MonoBehaviour
         currentEnemyState = EnemyState.StareDown;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
 
-        //check if the currentplayertarget still exists, otherwise need to go back to being alert
+        //check if the currentplayertarget still exists, otherwise need to go back to being alert. This is important because this is what each attack goes back to, 
         if(currentPlayerTarget){
             float rotationDuration = 2f; 
-            
-            Vector3 directionToPlayer = (currentPlayerTarget.position - transform.position).normalized;
-
-            Quaternion targetRotation = Quaternion.LookRotation(directionToPlayer);
             float timeElapsed = 0f;
             while (timeElapsed < rotationDuration)
             {
-                directionToPlayer = (currentPlayerTarget.position - transform.position).normalized;
-                targetRotation = Quaternion.LookRotation(directionToPlayer);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, timeElapsed / rotationDuration);
-                timeElapsed += Time.deltaTime;
-                yield return null;
+                if(currentPlayerTarget){
+                    transform.LookAt(new Vector3(currentPlayerTarget.position.x, transform.position.y, currentPlayerTarget.position.z));
+                    timeElapsed += Time.deltaTime;
+                    yield return null;
+                }
+                else{
+                    BecomeAlert();
+                    yield break;
+                }
             }
-            transform.rotation = targetRotation;
             if(currentPlayerTarget){
                 DecideAttack();
             }
@@ -199,19 +217,20 @@ public class EnemyAI3 : MonoBehaviour
 
         float playerProximityRatio = distanceToPlayer/aggroDistance; //always <= 1
         Debug.Log(playerProximityRatio);
+        lastSeenTargetPosition = currentPlayerTarget.position; //possible that when call executeattack(), especially for attack3's, the animation will start playing only if there is a currentplayertarget, but the executeattack might have a bit of delay in which time the currentplayertarget could exit the aggrosphere. 
 
         if(playerProximityRatio < 0.33f){
             Chase();
         }
         else if(playerProximityRatio < 0.66){
             currentEnemyState = EnemyState.Attack2;
-            _anim.SetInteger("EnemyState", (int)currentEnemyState);
-            attack2.ExecuteAttack(currentPlayerTarget, _rightHand);
+            _anim.SetInteger("EnemyState", (int)currentEnemyState); //animation will carry out the attack
+            // attack2.ExecuteAttack(currentPlayerTarget,transform, _rightHand);
         }
         else{
-            currentEnemyState = EnemyState.Attack3;
+            currentEnemyState = EnemyState.Attack3; //animation will carry out the attack
             _anim.SetInteger("EnemyState", (int)currentEnemyState);
-            attack3.ExecuteAttack(currentPlayerTarget, _rightHand);
+            // attack3.ExecuteAttack(currentPlayerTarget, transform, _rightHand);
         }
     }
     private void Chase(){
@@ -238,7 +257,7 @@ public class EnemyAI3 : MonoBehaviour
         }
         currentEnemyState = EnemyState.Attack1;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
-        attack1.ExecuteAttack(currentPlayerTarget, _rightHand);; //will call BecomeAlert()
+        //attack1.ExecuteAttack(currentPlayerTarget, transform, _rightHand);; //will call BecomeAlert()
         chaseCoroutine = null;
     }
     private void OnTriggerExit(Collider other){
@@ -249,20 +268,6 @@ public class EnemyAI3 : MonoBehaviour
                 currentPlayerTarget = null;
             }
         } 
-    }
-    private void TrackHits(){ //triggered by animation event
-        Collider[] hitColliders = Physics.OverlapBox(attackCenter.position, Vector3.one * attackCenterBoxRadius, attackCenter.rotation, playerL);
-        
-        foreach (Collider hitCollider in hitColliders)
-        {
-            //Debug.Log("Hit: " + hitCollider.name);
-            Rigidbody rb = hitCollider.gameObject.GetComponent<Rigidbody>();
-            Vector3 direction = (attackCenter.position-transform.position).normalized;
-            rb.AddForce(new Vector3(direction.x*attackForceMultiplier, attackForceMultiplier/3, direction.z*attackForceMultiplier), ForceMode.Impulse);
-
-            //rb.AddForce(direction*30f, ForceMode.VelocityChange);
-            Debug.DrawRay(transform.position, direction, Color.red, 3f);
-        }
     }
     private Vector3 GetNewRoamingPosition(){
         Vector3 randDir = new Vector3(UnityEngine.Random.Range(-1f, 1f), 0, UnityEngine.Random.Range(-1f, 1f)).normalized;
@@ -282,17 +287,6 @@ public class EnemyAI3 : MonoBehaviour
             }
         }
         return startPosition;
-    }
-    void OnDrawGizmos()
-    {
-        if (attackCenter != null)
-        {
-            Gizmos.color = Color.red;
-            // Draw a wireframe box to represent the OverlapBox area
-            //this sets the origin of the next gizmos command to attackcenter.position, with the rotation of the attack center, and a scale of one (no scaling)
-            Gizmos.matrix = Matrix4x4.TRS(attackCenter.position, attackCenter.rotation, Vector3.one); 
-            Gizmos.DrawWireCube(Vector3.zero, Vector3.one*attackCenterBoxRadius);  // Use the box size and center position
-        }
     }
     private void CancelIdle(){
         //fully transition from idle
@@ -315,8 +309,13 @@ public class EnemyAI3 : MonoBehaviour
             chaseCoroutine = null;
         }
     }
-
-    public Animator GetAnimator(){
-        return _anim;
+    private void AnimationEvent1(){
+        Attack1Event?.Invoke(this, new AttackEvent{PlayerTransform=currentPlayerTarget, InstantiateTransform=_rightHand, LastSeenTargetPos=lastSeenTargetPosition, AttackCenterForward=attackCenter, PlayerL=playerL});
+    }
+    private void AnimationEvent2(){
+        Attack2Event?.Invoke(this, new AttackEvent{PlayerTransform=currentPlayerTarget, InstantiateTransform=_rightHand, LastSeenTargetPos=lastSeenTargetPosition, AttackCenterForward=attackCenter, PlayerL=playerL});
+    }
+    private void AnimationEvent3(){
+        Attack3Event?.Invoke(this, new AttackEvent{PlayerTransform=currentPlayerTarget, InstantiateTransform=_rightHand, LastSeenTargetPos=lastSeenTargetPosition, AttackCenterForward=attackCenter, PlayerL=playerL});
     }
 }
