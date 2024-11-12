@@ -171,31 +171,42 @@ public class EnemyAI3 : MonoBehaviour
         }
     }
     IEnumerator StareDownRival(){ //this is to look at the player before you attack them, and pause for a bit
+        _agent.ResetPath();
         CancelAlert();
         currentEnemyState = EnemyState.StareDown;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
 
+        //time to transition between anmation states
+        yield return new WaitForSeconds(0.1f);
         //check if the currentplayertarget still exists, otherwise need to go back to being alert. This is important because this is what each attack goes back to, 
         if(currentPlayerTarget){
-            float rotationDuration = 2f; 
-            float timeElapsed = 0f;
-            while (timeElapsed < rotationDuration)
-            {
-                if(currentPlayerTarget){
-                    transform.LookAt(new Vector3(currentPlayerTarget.position.x, transform.position.y, currentPlayerTarget.position.z));
-                    timeElapsed += Time.deltaTime;
-                    yield return null;
+            bool isCurrentPlayerVisible = IsVisible();
+            if (isCurrentPlayerVisible){
+                float rotationDuration = 1f; 
+                float timeElapsed = 0f;
+                while (timeElapsed < rotationDuration)
+                {
+                    if(currentPlayerTarget){
+                        transform.LookAt(new Vector3(currentPlayerTarget.position.x, transform.position.y, currentPlayerTarget.position.z));
+                        timeElapsed += Time.deltaTime;
+                        yield return null;
+                    }
+                    else{
+                        BecomeAlert();
+                        yield break;
+                    }
+                }
+                if(currentPlayerTarget){ //could get out of range after rotate
+                    DecideAttack();
                 }
                 else{
                     BecomeAlert();
-                    yield break;
                 }
             }
-            if(currentPlayerTarget){
-                DecideAttack();
-            }
             else{
-                BecomeAlert();
+                Debug.Log("CHASE UNTIL VISIBLE!");
+                //chase currTarget until he's visible, and then decide attack
+                StartCoroutine(ChaseUntilVisible());
             }
         }
         else{
@@ -203,8 +214,28 @@ public class EnemyAI3 : MonoBehaviour
             BecomeAlert();  //goes from staredown to alert if there is no current player targeted. This is because there still might be people in range of him
         }
     }
+    private IEnumerator ChaseUntilVisible(){
+        currentEnemyState = EnemyState.Chasing;
+        _anim.SetInteger("EnemyState", (int)currentEnemyState);
+        _agent.speed = chasingSpeed;
+        while(currentPlayerTarget && !IsVisible()){
+            _agent.SetDestination(currentPlayerTarget.position);
+            yield return null;
+        }
+        if(!currentPlayerTarget){
+            BecomeAlert();
+            yield break;
+        }
+        //reached here means currtarget still exists and we have made eye contact with him
+        else{StartCoroutine(StareDownRival());}
+    }
+    private bool IsVisible(){
+        Vector3 directionToPlayer = currentPlayerTarget.position - eyes.position;
+        if (!Physics.Raycast(eyes.position, directionToPlayer.normalized, out RaycastHit hit, directionToPlayer.magnitude, obstacleL)){return true;}
+        return false;
+    }
     private void DecideAttack(){
-
+        //these steps are necessary if coming from chasing until visible
         Debug.Log("DECIDE ATTACK!");
         // turn towards the player
         // what information do we need to decide the attack?

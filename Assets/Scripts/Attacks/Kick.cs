@@ -5,7 +5,7 @@ public class Kick : BaseAttackScript
     [SerializeField] private AnimationClip clip;
     private EnemyAI3 parentScript;
     private float attackRadius = 10f;
-    private float forceMultiplier = 2000f;
+    private float forceMultiplier = 500f;
     private Transform _attackCenter;
 
     private void Start(){

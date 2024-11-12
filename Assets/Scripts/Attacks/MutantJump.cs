@@ -11,7 +11,7 @@ public class MutantJump : BaseAttackScript
     private Rigidbody _rbEnemy;
     private float jumpUpDuration = 1f;
     private float jumpDownDuration = 0.5f;
-    private float attackRadius = 10;
+    private float attackRadius = 20;
     private float forceMultiplier = 1000f;
     private Transform attackCenter;
     
@@ -32,8 +32,9 @@ public class MutantJump : BaseAttackScript
     private IEnumerator RotateAndJumpUp(Transform enemyTransform, Transform playerTransform) //this should run for the amount of time between the two attackanimations (in jumpduration)
     {
         _agentEnemy.enabled = false;
-        Vector3 destination = playerTransform.position + Vector3.up * 30f;
+        Vector3 endDestination = playerTransform.position + Vector3.up * 30f;
         Vector3 origin = enemyTransform.position;
+        Vector3 destination = origin + (endDestination - origin)* 0.8f;
 
         float elapsedTime = 0f;
 
