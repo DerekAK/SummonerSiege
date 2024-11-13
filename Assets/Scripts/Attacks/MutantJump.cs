@@ -5,33 +5,40 @@ using UnityEngine.AI;
 public class MutantJump : BaseAttackScript
 {
     [SerializeField] private AnimationClip clip; //3 animations
-    private EnemyAI3 parentScript;
-    private NavMeshAgent _agentEnemy;
+    private EnemyAI3 _enemyScript;
+    private NavMeshAgent _agent;
+    private Animator _anim;
+    private AnimatorOverrideController _overrider;
+    private Rigidbody _rb;
     private Coroutine rotateJumpCoroutine;
-    private Rigidbody _rbEnemy;
     private float jumpUpDuration = 1f;
     private float jumpDownDuration = 0.5f;
-    private float attackRadius = 20;
-    private float forceMultiplier = 1000f;
+    private float attackRadius = 10f;
+    private float forceMultiplier = 50f;
     private Transform attackCenter;
     
-    private void Start(){
-        parentScript.Attack2Event += ExecuteAttack;
-        _agentEnemy = parentScript.GetComponent<NavMeshAgent>();
-        _rbEnemy = parentScript.GetComponent<Rigidbody>();
-        attackCenter = parentScript.transform;
+    private void Awake(){
+        _enemyScript = GetComponent<EnemyAI3>();
+        _anim = GetComponent<Animator>();
+        _overrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
+        _agent = GetComponent<NavMeshAgent>();
+        _rb = GetComponent<Rigidbody>();
     }
-    public override void SetAnimationClip(AnimatorOverrideController overrideController){overrideController[ph2] = clip;}
-    public override void ProvideInstance(EnemyAI3 script){parentScript = script;}
+    private void Start(){
+        Debug.Log("START");
+        _enemyScript.Attack2Event += ExecuteAttack;
+        _overrider[ph2] = clip;
+        attackCenter = transform;
+    }
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ //in this case, its the start of the jump
-        _rbEnemy.useGravity = false;
-        parentScript.Attack2Event -= ExecuteAttack;
-        parentScript.Attack2Event += CrashDown;
-        rotateJumpCoroutine = StartCoroutine(RotateAndJumpUp(parentScript.transform, e.PlayerTransform));
+        _rb.useGravity = false;
+        _enemyScript.Attack2Event -= ExecuteAttack;
+        _enemyScript.Attack2Event += CrashDown;
+        rotateJumpCoroutine = StartCoroutine(RotateAndJumpUp(transform, e.PlayerTransform));
     }
     private IEnumerator RotateAndJumpUp(Transform enemyTransform, Transform playerTransform) //this should run for the amount of time between the two attackanimations (in jumpduration)
     {
-        _agentEnemy.enabled = false;
+        _agent.enabled = false;
         Vector3 endDestination = playerTransform.position + Vector3.up * 30f;
         Vector3 origin = enemyTransform.position;
         Vector3 destination = origin + (endDestination - origin)* 0.8f;
@@ -54,10 +61,10 @@ public class MutantJump : BaseAttackScript
     }
 
     private void CrashDown(object sender, EnemyAI3.AttackEvent e){ //in this case, its the end of the jump
-        parentScript.Attack2Event -= CrashDown;
-        parentScript.Attack2Event += TrackHits;
+        _enemyScript.Attack2Event -= CrashDown;
+        _enemyScript.Attack2Event += TrackHits;
         StopCoroutine(rotateJumpCoroutine);
-        StartCoroutine(JumpDown(parentScript.transform, e.PlayerTransform));
+        StartCoroutine(JumpDown(transform, e.PlayerTransform));
     }
 
     private IEnumerator JumpDown(Transform enemyTransform, Transform playerTransform){
@@ -73,14 +80,14 @@ public class MutantJump : BaseAttackScript
             elapsedTime += Time.deltaTime;
             yield return null;
         }
-        _rbEnemy.useGravity = true;
-        _agentEnemy.enabled = true;
+        _rb.useGravity = true;
+        _agent.enabled = true;
     }
 
     private void TrackHits(object sender, EnemyAI3.AttackEvent e){ 
         
-        parentScript.Attack2Event -= TrackHits;
-        parentScript.Attack2Event += ExecuteAttack;
+        _enemyScript.Attack2Event -= TrackHits;
+        _enemyScript.Attack2Event += ExecuteAttack;
         
         Collider[] hitColliders = Physics.OverlapBox(attackCenter.position, Vector3.one * attackRadius, attackCenter.rotation, e.PlayerL);
         

@@ -3,30 +3,35 @@ using UnityEngine;
 public class Kick : BaseAttackScript
 {
     [SerializeField] private AnimationClip clip;
-    private EnemyAI3 parentScript;
+    private EnemyAI3 _enemyScript;
+    private Animator _anim;
+    private AnimatorOverrideController _overrider;
     private float attackRadius = 10f;
-    private float forceMultiplier = 500f;
+    private float forceMultiplier = 50f;
     private Transform _attackCenter;
 
-    private void Start(){
-        parentScript.Attack1Event += ExecuteAttack;
+    private void Awake(){
+        _enemyScript = GetComponent<EnemyAI3>();
+        _anim = GetComponent<Animator>();
+        _overrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
     }
-    public override void SetAnimationClip(AnimatorOverrideController overrideController){overrideController[ph1] = clip;}
-    public override void ProvideInstance(EnemyAI3 script){parentScript = script;}
+    private void Start(){
+        _enemyScript.Attack1Event += ExecuteAttack;
+        _overrider[ph1] = clip;
+    }
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ 
         _attackCenter = e.AttackCenterForward; //for gizmos purpose
         Vector3 attackCenter = e.AttackCenterForward.position;
         
-        Collider[] hitColliders = Physics.OverlapBox(attackCenter, Vector3.one * attackRadius, parentScript.transform.rotation, e.PlayerL);
+        Collider[] hitColliders = Physics.OverlapBox(attackCenter, Vector3.one * attackRadius, transform.rotation, e.PlayerL);
         
         foreach (Collider hitCollider in hitColliders)
         {
             Rigidbody rb = hitCollider.gameObject.GetComponent<Rigidbody>();
-            Vector3 direction = (attackCenter-parentScript.transform.position).normalized;
+            Vector3 direction = (attackCenter-transform.position).normalized;
             rb.AddForce(new Vector3(direction.x*forceMultiplier, forceMultiplier/3, direction.z*forceMultiplier), ForceMode.Impulse);
             Debug.DrawRay(transform.position, direction, Color.red, 3f);
         }
-
     }
     void OnDrawGizmos()
     {

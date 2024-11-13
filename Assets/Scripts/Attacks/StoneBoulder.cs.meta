@@ -3,7 +3,10 @@ guid: b5d28d29031994db3987940d3125bfeb
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - pfStoneBoulder: {fileID: 1992794823047981850, guid: b0b6870324f2d4332bc03fb6cd469334,
+      type: 3}
+  - clip: {fileID: 7400000, guid: 7953e0274ba8043b2a97f78010e22d29, type: 2}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

@@ -10,6 +10,7 @@ public class EnemyAI3 : MonoBehaviour
     //if player is in air and in the 2nd tier, it will jump after them and then be out of nav mesh
     //it will do its attacks even if there isn't a clear line of sight, which it shouldn't. it should first walk until there is a clear line of sight.
     //boudler throw is at the player's transform, not the player's eyes.
+
     private Rigidbody _rb;
     private NavMeshAgent _agent;
     private Animator _anim;
@@ -32,6 +33,7 @@ public class EnemyAI3 : MonoBehaviour
     [SerializeField] private LayerMask playerL;
     [SerializeField] private Transform attackCenter;
     [SerializeField] private Transform eyes;
+    [SerializeField] private Transform feet;
     [SerializeField] private float aggroDistance = 70f;
     [SerializeField] private float minRoamingRange = 50f;
     [SerializeField] private float maxRoamingRange = 70f;
@@ -40,9 +42,6 @@ public class EnemyAI3 : MonoBehaviour
     [SerializeField] private int roamingSpeed = 10;
     [SerializeField] private int chasingSpeed = 15;
     private enum EnemyState{Idle = 0, Roaming = 1, Alert = 2, Chasing = 3, Attack1 = 4, Attack2 = 5, Attack3 = 6, StareDown = 7} //need an animation for each state, since animation is determined by this
-    [SerializeField] private BaseAttackScript attack1;
-    [SerializeField] private BaseAttackScript attack2;
-    [SerializeField] private BaseAttackScript attack3;
 
     //idea for this is that the animation triggers a function which invokes one of these events. 
     public class AttackEvent : EventArgs{
@@ -57,27 +56,24 @@ public class EnemyAI3 : MonoBehaviour
     public event EventHandler<AttackEvent> Attack3Event;
 
     private void Awake(){
+        Debug.Log(gameObject.name);
         _rb = GetComponent<Rigidbody>();
         _anim = GetComponent<Animator>();
         _animOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
         _agent = GetComponent<NavMeshAgent>();
         _aggroCollider = GetComponent<SphereCollider>();
         _aggroCollider.radius = (aggroDistance-1)/transform.localScale.y;
-        _rightHand = transform.Find("RiggedEarthGuardian/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:RightShoulder/mixamorig:RightArm/mixamorig:RightForeArm/mixamorig:RightHand/mixamorig:RightHandIndex1/mixamorig:RightHandIndex2");
         enemyHeight = GetComponent<CapsuleCollider>().height * transform.localScale.y;
         attackCenterBoxRadius = enemyHeight/2; 
         _agent.stoppingDistance = 5f; //THIS IS REALLY IMPORTANT TO GET RIGHT
-
-        attack1.SetAnimationClip(_animOverrider);
-        attack1.ProvideInstance(this);
-        attack2.SetAnimationClip(_animOverrider);
-        attack2.ProvideInstance(this);
-        attack3.SetAnimationClip(_animOverrider);
-        attack3.ProvideInstance(this);
+        _agent.angularSpeed = 1000f;
+        _agent.acceleration = 200f;
+        _agent.radius = 0.1f;
+        _rightHand = transform.Find(transform.GetChild(0).name + "/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:RightShoulder/mixamorig:RightArm/mixamorig:RightForeArm/mixamorig:RightHand/mixamorig:RightHandIndex1/mixamorig:RightHandIndex2");
     }
     private void Start(){
         playersInGame = GameManager.Instance.getPlayerTransforms();
-        startPosition = transform.position;
+        startPosition = feet.position;
         //can set to idle immediately because spawnscript will ensure no enemy is spawned in with a player in its aggrosphere
         Idle();
     }
@@ -187,7 +183,7 @@ public class EnemyAI3 : MonoBehaviour
                 while (timeElapsed < rotationDuration)
                 {
                     if(currentPlayerTarget){
-                        transform.LookAt(new Vector3(currentPlayerTarget.position.x, transform.position.y, currentPlayerTarget.position.z));
+                        transform.LookAt(new Vector3(currentPlayerTarget.position.x, feet.position.y, currentPlayerTarget.position.z));
                         timeElapsed += Time.deltaTime;
                         yield return null;
                     }
@@ -242,7 +238,7 @@ public class EnemyAI3 : MonoBehaviour
         // player speed, player distance, what else?
 
         //tmp strat is just distance
-        float distanceToPlayer = Vector3.Distance(transform.position, currentPlayerTarget.position);
+        float distanceToPlayer = Vector3.Distance(feet.position, currentPlayerTarget.position);
         //3 cases, based on ratio compared to aggrodistance
         Debug.Log("Distanceplayer: " + distanceToPlayer);
         Debug.Log("AggroDistance: " + aggroDistance);
@@ -287,10 +283,14 @@ public class EnemyAI3 : MonoBehaviour
                 yield break;
             }
         }
-        currentEnemyState = EnemyState.Attack1;
-        _anim.SetInteger("EnemyState", (int)currentEnemyState);
-        //attack1.ExecuteAttack(currentPlayerTarget, transform, _rightHand);; //will call BecomeAlert()
-        chaseCoroutine = null;
+        if(currentPlayerTarget){
+            currentEnemyState = EnemyState.Attack1;
+            _anim.SetInteger("EnemyState", (int)currentEnemyState);
+            //attack1.ExecuteAttack(currentPlayerTarget, transform, _rightHand);; //will call BecomeAlert()
+            
+        }
+        else{BecomeAlert();}
+        CancelChase();
     }
     private void OnTriggerExit(Collider other){
         if(other.CompareTag("Player")){
