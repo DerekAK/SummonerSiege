@@ -4,7 +4,7 @@ using UnityEngine;
 public class GameManager : MonoBehaviour
 {
     // Start is called before the first frame update
-    public static GameManager Instance;
+    public static GameManager Instance {get; private set;}
     [SerializeField] private Transform playerPrefab; // Reference to the player's Transform
     private List<Transform> players = new List<Transform>();
     [SerializeField] private int numPlayers;

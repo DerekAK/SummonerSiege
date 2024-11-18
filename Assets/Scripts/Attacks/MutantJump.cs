@@ -93,11 +93,27 @@ public class MutantJump : BaseAttackScript
         
         foreach (Collider hitCollider in hitColliders)
         {
+            NavMeshAgent agent;
+            if((agent = hitCollider.gameObject.GetComponent<NavMeshAgent>()) != null){
+                agent.enabled = false;
+            }
+
             Rigidbody rb = hitCollider.gameObject.GetComponent<Rigidbody>();
-            Vector3 direction = (e.PlayerTransform.position-attackCenter.position).normalized;
-            rb.AddForce(new Vector3(direction.x*forceMultiplier, forceMultiplier/3, direction.z*forceMultiplier), ForceMode.Impulse);
+            //Vector3 direction = (e.PlayerTransform.position-attackCenter.position).normalized;
+            Vector3 direction = Vector3.up;
+            //rb.AddForce(new Vector3(direction.x*forceMultiplier, forceMultiplier/3, direction.z*forceMultiplier), ForceMode.Impulse);
+            rb.AddForce(direction*forceMultiplier, ForceMode.Impulse);
             Debug.DrawRay(transform.position, direction, Color.red, 3f);
+
+            StartCoroutine(EnableAgent(hitCollider.gameObject));
         }
+    }
+    private IEnumerator EnableAgent(GameObject gameObject){
+        yield return new WaitForSeconds(0.2f);
+        NavMeshAgent agent;
+            if((agent = gameObject.GetComponent<NavMeshAgent>()) != null){
+                agent.enabled = true;
+            }
     }
     void OnDrawGizmos()
     {

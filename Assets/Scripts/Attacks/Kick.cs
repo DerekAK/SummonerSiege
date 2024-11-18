@@ -1,4 +1,6 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.AI;
 
 public class Kick : BaseAttackScript
 {
@@ -7,7 +9,7 @@ public class Kick : BaseAttackScript
     private Animator _anim;
     private AnimatorOverrideController _overrider;
     private float attackRadius = 10f;
-    private float forceMultiplier = 50f;
+    private float forceMultiplier = 50000f;
     private Transform _attackCenter;
 
     private void Awake(){
@@ -27,11 +29,20 @@ public class Kick : BaseAttackScript
         
         foreach (Collider hitCollider in hitColliders)
         {
+            NavMeshAgent agent;
+            if((agent = hitCollider.gameObject.GetComponent<NavMeshAgent>()) != null){
+                agent.enabled = false;
+            }
             Rigidbody rb = hitCollider.gameObject.GetComponent<Rigidbody>();
             Vector3 direction = (attackCenter-transform.position).normalized;
             rb.AddForce(new Vector3(direction.x*forceMultiplier, forceMultiplier/3, direction.z*forceMultiplier), ForceMode.Impulse);
             Debug.DrawRay(transform.position, direction, Color.red, 3f);
+            StartCoroutine(EnableAgent(hitCollider.gameObject));
         }
+    }
+    private IEnumerator EnableAgent(GameObject gameObject){
+        yield return new WaitForSeconds(0.05f);
+        gameObject.GetComponent<NavMeshAgent>().enabled = true;
     }
     void OnDrawGizmos()
     {
