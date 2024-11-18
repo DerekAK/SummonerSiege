@@ -1,7 +1,4 @@
-using System;
-using System.Runtime.InteropServices;
 using UnityEngine;
-using UnityEngine.Scripting.APIUpdating;
 
 public class ThirdPersonMovementScript : MonoBehaviour
 {
@@ -12,7 +9,7 @@ public class ThirdPersonMovementScript : MonoBehaviour
     [Tooltip("Useful for rough ground")][SerializeField] private float groundedOffset = -0.14f;
 
     [Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
-    [SerializeField] private float groundedRadius = 0.28f;
+    [SerializeField] private float groundedRadius = 0.5f;
     private float _verticalVelocity;
     [SerializeField] private float gravity = -10f;
     [SerializeField] private float jumpHeight = 5f;
@@ -21,8 +18,11 @@ public class ThirdPersonMovementScript : MonoBehaviour
     [SerializeField] private float rotationSpeed = 3f;
     [SerializeField] private float rotationSmoothTime = 0.12f;
     private float _targetRotation = 0.0f;
+    private enum PlayerState{Idle = 0, Walking = 1, Running = 2, Jumping=3, Falling=4}
+    private PlayerState currentPlayerState;
 
     private CharacterController _characterController;
+    private Animator _anim;
     
     
     //camera shit
@@ -42,6 +42,7 @@ public class ThirdPersonMovementScript : MonoBehaviour
             _mainCamera = GameObject.FindGameObjectWithTag("MainCamera");
         }
         _characterController = GetComponent<CharacterController>();
+        _anim = GetComponent<Animator>();
     }
     private void Start(){
         _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
@@ -70,10 +71,36 @@ public class ThirdPersonMovementScript : MonoBehaviour
         else{_verticalVelocity += gravity * Time.deltaTime;}
     }
     private void Move(){
-        float moveSpeed = GameInput.Instance.SprintingPressed()? runningSpeed : walkingSpeed;
+        float moveSpeed;
+        if(GameInput.Instance.SprintingPressed()){
+            moveSpeed = runningSpeed;
+        }
+        else{
+            moveSpeed = walkingSpeed;
+        }
         Vector2 moveDir = GameInput.Instance.GetPlayerMovementVectorNormalized() * moveSpeed;
+        
+        bool isMoving = moveDir != Vector2.zero;
+        if(isMoving){
+            if(GameInput.Instance.SprintingPressed()){ //running
+                if(isGrounded){currentPlayerState = PlayerState.Running;}
+                moveSpeed = runningSpeed;
+            }
+            else{ //walking
+                if(isGrounded){currentPlayerState = PlayerState.Walking;}
+                moveSpeed = walkingSpeed;
+            }
+        }
+        else{ //player is not moving
+            moveSpeed = 0.0f;
+            if(isGrounded){currentPlayerState = PlayerState.Idle;}
+        }
 
-        if(moveDir == Vector2.zero){moveSpeed = 0.0f;}
+        if(_verticalVelocity < 0 && !isGrounded){currentPlayerState = PlayerState.Falling;}
+        
+        if(_verticalVelocity > 0){currentPlayerState = PlayerState.Jumping;}//is jumping
+
+        _anim.SetInteger("PlayerState", (int)currentPlayerState);
 
         Vector3 inputDirection = new Vector3(GameInput.Instance.GetPlayerMovementVectorNormalized().x, 0.0f, GameInput.Instance.GetPlayerMovementVectorNormalized().y).normalized;
         if (moveDir != Vector2.zero){
@@ -86,13 +113,10 @@ public class ThirdPersonMovementScript : MonoBehaviour
             transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
         }
 
-
         Vector3 targetDirection = Quaternion.Euler(0.0f, _targetRotation, 0.0f) * Vector3.forward;
 
         _characterController.Move(targetDirection.normalized * (moveSpeed * Time.deltaTime) +
                              new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
-        
-        //_characterController.Move(new Vector3(moveDir.x, _verticalVelocity, moveDir.y) * Time.deltaTime);
     }
     
     private void LateUpdate()
@@ -113,7 +137,7 @@ public class ThirdPersonMovementScript : MonoBehaviour
         if (GameInput.Instance.GetPlayerLookVectorNormalized().sqrMagnitude >= _threshold)
         {
             _cinemachineTargetYaw += GameInput.Instance.GetPlayerLookVectorNormalized().x * 1.2f;
-            _cinemachineTargetPitch += GameInput.Instance.GetPlayerLookVectorNormalized().y * -1.2f;
+            _cinemachineTargetPitch += GameInput.Instance.GetPlayerLookVectorNormalized().y * 1.2f;
         }
 
         // Clamp our rotations so our values are limited 360 degrees
