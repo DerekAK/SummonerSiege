@@ -12,9 +12,6 @@ public class MageShockWave : BaseAttackScript
         _enemyScript = GetComponent<EnemyAI3>();
         clipToOverride = "Attack" +  attackType.ToString() + " Placeholder";
     }
-    private void Start(){
-        _enemyScript.AnimationAttackEvent += ExecuteAttack;
-    }
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
         _enemyScript.AnimationAttackEvent += EndRotation;

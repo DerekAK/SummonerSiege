@@ -7,6 +7,7 @@ public class EnemyAI3 : MonoBehaviour
 {
     private bool isAttacking;
     private bool hasMelee, hasMedium, hasLong;
+    private int countMeleeInRow, countMediumInRow, countLongInRow = 0;
     private List<BaseAttackScript> meleeAttacks, mediumAttacks, longAttacks;
     private Rigidbody _rb;
     private NavMeshAgent _agent;
@@ -188,7 +189,7 @@ public class EnemyAI3 : MonoBehaviour
             {
                 // No obstacle, clear line of sight
                 Debug.DrawRay(eyes.position, directionToTarget, Color.red, 10f);
-                Debug.Log("DETECTED PLAYER: " + target.name);
+                //Debug.Log("DETECTED PLAYER: " + target.name);
                 currentTarget = target; 
 
                 CancelAlert(); //this is to fully transition from alert to attacking
@@ -198,43 +199,45 @@ public class EnemyAI3 : MonoBehaviour
         }
     }
     IEnumerator StareDownRival(BaseAttackScript decidedAttack){ //this is to look at the player before you attack them, and pause for a bit
+        Debug.Log("CountMeleeInRow: " + countMeleeInRow + "     CountMediumInRow: " + countMediumInRow + "       CountLongInRow: " + countLongInRow);
         _agent.ResetPath();
         currentEnemyState = EnemyState.DecideAttack;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
-
-        //time to transition between anmation states
         yield return new WaitForSeconds(0.1f);
-        //check if the currentplayertarget still exists, otherwise need to go back to being alert. This is important because this is what each attack goes back to, 
+
         if(currentTarget){
+            bool isChainAttack;
+            if(decidedAttack){isChainAttack = true;}
+            else{isChainAttack = UnityEngine.Random.value < enemyInfo.GetChainProbability();}
+            float waitTime = enemyInfo.GetWaitTimeAfterAttack();
+            float chaseGiveUpTime = enemyInfo.GetChaseGiveUpTime();
+            if(isChainAttack){
+                waitTime = 0f;
+                chaseGiveUpTime = 2f;
+            }
+            float elapsedTime = 0f;
+            while(elapsedTime < waitTime){
+                if(currentTarget){transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));}
+                else{
+                    BecomeAlert();
+                    yield break;
+                }
+                elapsedTime += Time.deltaTime;
+                yield return null;
+            }
+            transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
             bool isCurrentPlayerVisible = IsVisible();
             if (isCurrentPlayerVisible){
                 transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
                 //we have rotated towards the current target after a time, and the current target exists, so we are safe to decide an attack
                 
-                bool isChainAttack = UnityEngine.Random.value < enemyInfo.GetChainProbability();
-                float waitTime = enemyInfo.GetWaitTimeAfterAttack();
-                float chaseGiveUpTime = enemyInfo.GetChaseGiveUpTime();
-                if(isChainAttack){
-                    waitTime = 0f;
-                    chaseGiveUpTime = 2f;
-                }
-                float elapsedTime = 0f;
-                while(elapsedTime < waitTime){
-                    if(currentTarget){transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));}
-                    else{
-                        BecomeAlert();
-                        yield break;
-                    }
-                    elapsedTime += Time.deltaTime;
-                    yield return null;
-                }
-                transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
-                
                 BaseAttackScript attackChosen;
                 if(decidedAttack){attackChosen = decidedAttack;}
                 else{attackChosen = DecideAttack();}
+                Debug.Log("ASGDHNOUAJWGDNAOWJDGNSAS:   " + attackChosen);
                 attackChosen.HandleAnimation();
                 AnimationAttackEvent += attackChosen.ExecuteAttack;
+
                 switch(attackChosen.GetAttackType()){
                     case 1: //for melee
                         Chase(chaseGiveUpTime);
@@ -242,11 +245,16 @@ public class EnemyAI3 : MonoBehaviour
                     case 2: //for medium
                         currentEnemyState = EnemyState.MediumAttack;
                         _anim.SetInteger("EnemyState", (int)currentEnemyState);
+                        countMediumInRow ++;
+                        countLongInRow =0;
+                        countMeleeInRow =0;
                         break;
                     case 3: // for long range
-                        Debug.Log("This was chosen! " + attackChosen.gameObject.name);
                         currentEnemyState = EnemyState.LongRangeAttack;
                         _anim.SetInteger("EnemyState", (int)currentEnemyState);
+                        countLongInRow ++;
+                        countMediumInRow =0;
+                        countMeleeInRow =0;
                         break;
                 }
             }
@@ -313,8 +321,10 @@ public class EnemyAI3 : MonoBehaviour
         float randomValue = UnityEngine.Random.value;
         float cumulativeWeight = 0f;
         foreach (var attack in filteredAttacks){
+            Debug.Log(attack);
             cumulativeWeight += attack.GetAttackWeight();
             if (randomValue <= cumulativeWeight){
+                Debug.Log("Chosen Attack:", attack);
                 return attack; // Selected attack
             }
         }
@@ -327,7 +337,7 @@ public class EnemyAI3 : MonoBehaviour
     private IEnumerator ChaseCoroutine(float chaseTime){
         //need to give a few frames for thenavmesh to calculate the path to the player, otherwise remaining distance will be zero
         _agent.SetDestination(currentTarget.position);
-        yield return new WaitForSeconds(0.1f);
+        yield return new WaitForSeconds(0.3f);
         if(_agent.remainingDistance < _agent.stoppingDistance){
             currentEnemyState = EnemyState.MeleeAttack;
             _anim.SetInteger("EnemyState", (int)currentEnemyState); 
@@ -354,7 +364,10 @@ public class EnemyAI3 : MonoBehaviour
             if(currentTarget){
                 if(elapsedTime < chaseTime){
                     currentEnemyState = EnemyState.MeleeAttack;
-                    _anim.SetInteger("EnemyState", (int)currentEnemyState);        
+                    _anim.SetInteger("EnemyState", (int)currentEnemyState);
+                    countMeleeInRow ++;
+                    countLongInRow =0;
+                    countMediumInRow =0;        
                 }
                 else{
                     if(hasMedium){

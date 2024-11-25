@@ -15,16 +15,17 @@ public class StoneBoulder : BaseAttackScript
     //first attacks are only called with current player target, but for one attack that triggers multiple animation events that depend on current player target like this one, need this 
     private Coroutine rotateCoroutine;
     private Transform _rightHand;
+    private EnemySpecificInfo enemyInfo;
 
     private void Awake(){
         _enemyScript = GetComponent<EnemyAI3>();
         clipToOverride = "Attack" +  attackType.ToString() + " Placeholder";
-        Debug.Log(clipToOverride);
-        EnemySpecificInfo enemyInfo = GetComponent<EnemySpecificInfo>();
+        enemyInfo = GetComponent<EnemySpecificInfo>();
+    }
+    private void Start(){
         _rightHand = enemyInfo.GetRightHandTransform();
     }
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ //can be null here 
-        Debug.Log("EXECUTE ATTACK FOR StoneBoulder!");
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
         _enemyScript.AnimationAttackEvent += PickUpBoulder;
         hasThrownBoulder = false;
@@ -54,7 +55,6 @@ public class StoneBoulder : BaseAttackScript
 
     private void ReleaseBoulder(object sender, EnemyAI3.AttackEvent e){ //subscriber to the Attack3 event in enemyai3script
         _enemyScript.AnimationAttackEvent -= ReleaseBoulder;
-        Debug.Log("RELEASE BOULDER!");
         hasThrownBoulder = true;
         StopCoroutine(rotateCoroutine);
         currBoulder.GetComponent<SphereCollider>().enabled = true;
