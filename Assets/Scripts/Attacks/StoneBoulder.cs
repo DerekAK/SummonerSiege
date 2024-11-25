@@ -1,13 +1,11 @@
+using System;
 using System.Collections;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class StoneBoulder : BaseAttackScript
 {
     [SerializeField] private Transform pfStoneBoulder;
-    [SerializeField] private AnimationClip clip;
-    private AnimatorOverrideController _overrider;
-    private Animator _anim;
+    //[SerializeField] private AnimationClip clip;
     private EnemyAI3 _enemyScript; //all should have, because these are events 
     private Rigidbody rbStone;
     private float rbStoneMass;
@@ -15,54 +13,47 @@ public class StoneBoulder : BaseAttackScript
     private Transform currBoulder;
     private bool hasThrownBoulder;
     //first attacks are only called with current player target, but for one attack that triggers multiple animation events that depend on current player target like this one, need this 
-    private Vector3 lastSeenTargetPosition; 
     private Coroutine rotateCoroutine;
-    private float forceMultiplier;
+    private Transform _rightHand;
 
     private void Awake(){
         _enemyScript = GetComponent<EnemyAI3>();
-        _anim = GetComponent<Animator>();
-        _overrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
-    }
-    private void Start(){
-        _enemyScript.Attack3Event += ExecuteAttack;
-        _overrider[ph3] = clip;
+        clipToOverride = "Attack" +  attackType.ToString() + " Placeholder";
+        Debug.Log(clipToOverride);
+        EnemySpecificInfo enemyInfo = GetComponent<EnemySpecificInfo>();
+        _rightHand = enemyInfo.GetRightHandTransform();
     }
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ //can be null here 
-        _enemyScript.Attack3Event -= ExecuteAttack;
-        _enemyScript.Attack3Event += ReleaseBoulder;
-        lastSeenTargetPosition = e.LastSeenTargetPos;
+        Debug.Log("EXECUTE ATTACK FOR StoneBoulder!");
+        _enemyScript.AnimationAttackEvent -= ExecuteAttack;
+        _enemyScript.AnimationAttackEvent += PickUpBoulder;
         hasThrownBoulder = false;
+        rotateCoroutine = StartCoroutine(RotateTowardsPlayerUntilThrown(e.TargetTransform));
+    }
+    private IEnumerator RotateTowardsPlayerUntilThrown(Transform targetTransform)
+    {
+        // Keep rotating towards the player until hasThrownBoulder is true
+        while (!hasThrownBoulder)
+        {
+            transform.LookAt(new Vector3(targetTransform.position.x, transform.position.y, targetTransform.position.z));
+            yield return null;
+        }
+    }
+    private void PickUpBoulder(object sender, EnemyAI3.AttackEvent e){
+        _enemyScript.AnimationAttackEvent -= PickUpBoulder;
+        _enemyScript.AnimationAttackEvent += ReleaseBoulder;
         if(currBoulder){Destroy(currBoulder.gameObject);}
-        Transform projectileInstantiation = e.InstantiateTransform;
-        currBoulder = Instantiate(pfStoneBoulder, projectileInstantiation.position, Quaternion.identity);
-        currBoulder.SetParent(projectileInstantiation);
+        currBoulder = Instantiate(pfStoneBoulder, _rightHand.position, Quaternion.identity);
+        currBoulder.SetParent(_rightHand);
         rbStone = currBoulder.GetComponent<Rigidbody>();
         rbStoneMass = rbStone.mass;
         rbThrowForceMultiplier = rbStoneMass * 120;
         rbStone.isKinematic = true;
         currBoulder.GetComponent<SphereCollider>().enabled = false;
-        rotateCoroutine = StartCoroutine(RotateTowardsPlayerUntilThrown(e.PlayerTransform));
     }
-    private IEnumerator RotateTowardsPlayerUntilThrown(Transform playerTransform)
-    {
-        // Keep rotating towards the player until hasThrownBoulder is true
-        while (!hasThrownBoulder)
-        {
-            if(playerTransform == null){
-                transform.LookAt(new Vector3(lastSeenTargetPosition.x, transform.position.y, lastSeenTargetPosition.z));
-                yield return null;
-            }
-            else{
-                transform.LookAt(new Vector3(playerTransform.position.x, transform.position.y, playerTransform.position.z));
-                lastSeenTargetPosition = playerTransform.position;
-                yield return null;
-            }
-        }
-    }
+
     private void ReleaseBoulder(object sender, EnemyAI3.AttackEvent e){ //subscriber to the Attack3 event in enemyai3script
-        _enemyScript.Attack3Event -= ReleaseBoulder;
-        _enemyScript.Attack3Event += ExecuteAttack;
+        _enemyScript.AnimationAttackEvent -= ReleaseBoulder;
         Debug.Log("RELEASE BOULDER!");
         hasThrownBoulder = true;
         StopCoroutine(rotateCoroutine);
@@ -70,12 +61,9 @@ public class StoneBoulder : BaseAttackScript
         rbStone.isKinematic = false;
         currBoulder.SetParent(null);
         Vector3 playerPosition;
-        if (e.PlayerTransform == null) {//can be null because might have moved out of range after ExecuteAttack();
-            playerPosition = lastSeenTargetPosition;
-        }
-        else{playerPosition = e.PlayerTransform.position;}
+        playerPosition = e.TargetTransform.position;
         float distanceToPlayer = Vector3.Distance(playerPosition, transform.position);
-        Vector3 directionToPlayer = (playerPosition+(Vector3.up*(distanceToPlayer/6.6f)) - e.InstantiateTransform.position).normalized;
+        Vector3 directionToPlayer = (playerPosition+(Vector3.up*(distanceToPlayer/10f)) - _rightHand.position).normalized;
         rbStone.AddForce(directionToPlayer * rbThrowForceMultiplier, ForceMode.Impulse);
     }
 }

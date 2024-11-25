@@ -4,28 +4,22 @@ using UnityEngine.AI;
 
 public class Kick : BaseAttackScript
 {
-    [SerializeField] private AnimationClip clip;
     private EnemyAI3 _enemyScript;
-    private Animator _anim;
-    private AnimatorOverrideController _overrider;
     private float attackRadius = 10f;
     private float forceMultiplier = 50000f;
     private Transform _attackCenter;
 
     private void Awake(){
         _enemyScript = GetComponent<EnemyAI3>();
-        _anim = GetComponent<Animator>();
-        _overrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
+        clipToOverride = "Attack" +  attackType.ToString() + " Placeholder";
     }
-    private void Start(){
-        _enemyScript.Attack1Event += ExecuteAttack;
-        _overrider[ph1] = clip;
-    }
+    
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ 
+        _enemyScript.AnimationAttackEvent -= ExecuteAttack;
         _attackCenter = e.AttackCenterForward; //for gizmos purpose
         Vector3 attackCenter = e.AttackCenterForward.position;
         
-        Collider[] hitColliders = Physics.OverlapBox(attackCenter, Vector3.one * attackRadius, transform.rotation, e.PlayerL);
+        Collider[] hitColliders = Physics.OverlapBox(attackCenter, Vector3.one * attackRadius, transform.rotation, e.TargetL);
         
         foreach (Collider hitCollider in hitColliders)
         {

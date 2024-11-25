@@ -1,46 +1,48 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
-
 public class MutantJump : BaseAttackScript
 {
-    [SerializeField] private AnimationClip clip; //3 animations
     private EnemyAI3 _enemyScript;
     private NavMeshAgent _agent;
-    private Animator _anim;
-    private AnimatorOverrideController _overrider;
     private Rigidbody _rb;
-    private Coroutine rotateJumpCoroutine;
+    private Coroutine jumpCoroutine;
     private float jumpUpDuration = 1f;
-    private float jumpDownDuration = 0.5f;
+    private float jumpDownDuration = 0.2f;
     private float attackRadius = 10f;
     private float forceMultiplier = 50f;
     private Transform attackCenter;
+    private bool endRotate;
     
     private void Awake(){
         _enemyScript = GetComponent<EnemyAI3>();
-        _anim = GetComponent<Animator>();
-        _overrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
         _agent = GetComponent<NavMeshAgent>();
         _rb = GetComponent<Rigidbody>();
-    }
-    private void Start(){
-        Debug.Log("START");
-        _enemyScript.Attack2Event += ExecuteAttack;
-        _overrider[ph2] = clip;
         attackCenter = transform;
+        clipToOverride = "Attack" +  attackType.ToString() + " Placeholder";
     }
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ //in this case, its the start of the jump
+        Debug.Log("EXECUTE ATTACK FOR MUTANT JUMP!");
+        endRotate = false;
+        _enemyScript.AnimationAttackEvent -= ExecuteAttack;
+        _enemyScript.AnimationAttackEvent += CrashDown;
         _rb.useGravity = false;
-        _enemyScript.Attack2Event -= ExecuteAttack;
-        _enemyScript.Attack2Event += CrashDown;
-        rotateJumpCoroutine = StartCoroutine(RotateAndJumpUp(transform, e.PlayerTransform));
+        jumpCoroutine = StartCoroutine(JumpUp(e.TargetTransform));
+        StartCoroutine(RotateTowardsPlayer(e.TargetTransform));
     }
-    private IEnumerator RotateAndJumpUp(Transform enemyTransform, Transform playerTransform) //this should run for the amount of time between the two attackanimations (in jumpduration)
+    private IEnumerator RotateTowardsPlayer(Transform playerTransform){
+        while(!endRotate){
+            Debug.Log("ROTATE COROUTINE IS HAOOENING IN MUTANT JUMP!");
+            transform.LookAt(new Vector3(playerTransform.position.x, transform.position.y, playerTransform.position.z));
+            yield return null;
+        }
+        yield break;
+    }
+    private IEnumerator JumpUp(Transform playerTransform) //this should run for the amount of time between the two attackanimations (in jumpduration)
     {
         _agent.enabled = false;
         Vector3 endDestination = playerTransform.position + Vector3.up * 30f;
-        Vector3 origin = enemyTransform.position;
+        Vector3 origin = transform.position;
         Vector3 destination = origin + (endDestination - origin)* 0.8f;
 
         float elapsedTime = 0f;
@@ -50,21 +52,19 @@ public class MutantJump : BaseAttackScript
             // Interpolate horizontal position only
             float t = elapsedTime / jumpUpDuration;
             Vector3 newPosition = Vector3.Lerp(origin, destination, t);
-            enemyTransform.position = newPosition;
-
-            // Rotate towards player
-            enemyTransform.LookAt(new Vector3(playerTransform.position.x, enemyTransform.position.y, playerTransform.position.z));
-
+            transform.position = newPosition;
             elapsedTime += Time.deltaTime;
             yield return null;
         }
+        yield break;
     }
 
     private void CrashDown(object sender, EnemyAI3.AttackEvent e){ //in this case, its the end of the jump
-        _enemyScript.Attack2Event -= CrashDown;
-        _enemyScript.Attack2Event += TrackHits;
-        StopCoroutine(rotateJumpCoroutine);
-        StartCoroutine(JumpDown(transform, e.PlayerTransform));
+        endRotate = true;
+        _enemyScript.AnimationAttackEvent -= CrashDown;
+        _enemyScript.AnimationAttackEvent += TrackHits;
+        StopCoroutine(jumpCoroutine);
+        StartCoroutine(JumpDown(transform, e.TargetTransform));
     }
 
     private IEnumerator JumpDown(Transform enemyTransform, Transform playerTransform){
@@ -76,7 +76,6 @@ public class MutantJump : BaseAttackScript
             float t = elapsedTime / jumpDownDuration;
             Vector3 newPosition = Vector3.Lerp(start, end, t);
             enemyTransform.position = newPosition;
-            enemyTransform.LookAt(new Vector3(playerTransform.position.x, enemyTransform.position.y, playerTransform.position.z));
             elapsedTime += Time.deltaTime;
             yield return null;
         }
@@ -85,14 +84,9 @@ public class MutantJump : BaseAttackScript
     }
 
     private void TrackHits(object sender, EnemyAI3.AttackEvent e){ 
-        
-        _enemyScript.Attack2Event -= TrackHits;
-        _enemyScript.Attack2Event += ExecuteAttack;
-        
-        Collider[] hitColliders = Physics.OverlapBox(attackCenter.position, Vector3.one * attackRadius, attackCenter.rotation, e.PlayerL);
-        
-        foreach (Collider hitCollider in hitColliders)
-        {
+        _enemyScript.AnimationAttackEvent -= TrackHits;
+        Collider[] hitColliders = Physics.OverlapBox(attackCenter.position, Vector3.one * attackRadius, attackCenter.rotation, e.TargetL);
+        foreach (Collider hitCollider in hitColliders){
             NavMeshAgent agent;
             if((agent = hitCollider.gameObject.GetComponent<NavMeshAgent>()) != null){
                 agent.enabled = false;
@@ -111,9 +105,9 @@ public class MutantJump : BaseAttackScript
     private IEnumerator EnableAgent(GameObject gameObject){
         yield return new WaitForSeconds(0.2f);
         NavMeshAgent agent;
-            if((agent = gameObject.GetComponent<NavMeshAgent>()) != null){
-                agent.enabled = true;
-            }
+        if((agent = gameObject.GetComponent<NavMeshAgent>()) != null){
+            agent.enabled = true;
+        }
     }
     void OnDrawGizmos()
     {

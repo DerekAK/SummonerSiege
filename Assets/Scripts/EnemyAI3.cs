@@ -5,21 +5,19 @@ using System.Collections;
 using System;
 public class EnemyAI3 : MonoBehaviour
 {
-    //current problems so far:
-    //enemy will get stuck if enemy is raised on box because of nav mesh navigation
-    //if player is in air and in the 2nd tier, it will jump after them and then be out of nav mesh
-    //it will do its attacks even if there isn't a clear line of sight, which it shouldn't. it should first walk until there is a clear line of sight.
-    //boudler throw is at the player's transform, not the player's eyes.
-
+    private bool isAttacking;
+    private bool hasMelee, hasMedium, hasLong;
+    private List<BaseAttackScript> meleeAttacks, mediumAttacks, longAttacks;
     private Rigidbody _rb;
     private NavMeshAgent _agent;
     private Animator _anim;
-    private AnimatorOverrideController _animOverrider;
+    private AnimatorOverrideController _templateOverrider;
+    private AnimatorOverrideController _copyOverrider;
     private SphereCollider _aggroCollider;
     private List<Transform> playersInGame;
-    private List<Transform> playersInRangeOfEnemy = new List<Transform>();
-    private Transform currentPlayerTarget;
-    private Vector3 lastSeenTargetPosition;
+    private List<Transform> targetsInRangeOfEnemy = new List<Transform>();
+    private List<BaseAttackScript> attackScripts;
+    private Transform currentTarget;
     private EnemyState currentEnemyState;
     private Vector3 startPosition;
     private Vector3 roamPosition;
@@ -28,9 +26,13 @@ public class EnemyAI3 : MonoBehaviour
     private Coroutine chaseCoroutine;
     private float attackCenterBoxRadius;
     private float enemyHeight;
-    private Transform _rightHand;
     [SerializeField] private LayerMask obstacleL;
     [SerializeField] private LayerMask playerL;
+    [SerializeField] private LayerMask enemyL;
+    private LayerMask targetL;
+    [SerializeField] private string playerTag = "Player";
+    [SerializeField] private string enemyTag = "Enemy";
+    private string targetTag;
     [SerializeField] private Transform attackCenter;
     [SerializeField] private Transform eyes;
     [SerializeField] private Transform feet;
@@ -41,35 +43,42 @@ public class EnemyAI3 : MonoBehaviour
     [SerializeField] private int maxIdleTime = 20;
     [SerializeField] private int roamingSpeed = 10;
     [SerializeField] private int chasingSpeed = 15;
-    private enum EnemyState{Idle = 0, Roaming = 1, Alert = 2, Chasing = 3, Attack1 = 4, Attack2 = 5, Attack3 = 6, StareDown = 7} //need an animation for each state, since animation is determined by this
+    private EnemySpecificInfo enemyInfo;
+    private enum EnemyState{Idle = 0, Roaming = 1, Alert = 2, Chasing = 3, DecideAttack = 4, MeleeAttack = 5, MediumAttack = 6, LongRangeAttack = 7}
 
-    //idea for this is that the animation triggers a function which invokes one of these events. 
     public class AttackEvent : EventArgs{
-        public Transform PlayerTransform{ get;set;}
-        public Transform InstantiateTransform{ get;set;}
-        public Vector3 LastSeenTargetPos{ get;set;}
+        public Transform TargetTransform{ get;set;}
         public Transform AttackCenterForward{ get;set;}
-        public LayerMask PlayerL{get;set;}
+        public LayerMask TargetL{get;set;}
     }
-    public event EventHandler<AttackEvent> Attack1Event;
-    public event EventHandler<AttackEvent> Attack2Event;
-    public event EventHandler<AttackEvent> Attack3Event;
+    //events to subscribe to
+    public event EventHandler<AttackEvent> AnimationAttackEvent;
 
     private void Awake(){
-        Debug.Log(gameObject.name);
+        HandleAnimation(); //sets up a unique copy of the animatorOverrider for each enemy instance
         _rb = GetComponent<Rigidbody>();
         _anim = GetComponent<Animator>();
-        _animOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
         _agent = GetComponent<NavMeshAgent>();
         _aggroCollider = GetComponent<SphereCollider>();
         _aggroCollider.radius = (aggroDistance-1)/transform.localScale.y;
         enemyHeight = GetComponent<CapsuleCollider>().height * transform.localScale.y;
         attackCenterBoxRadius = enemyHeight/2; 
-        _agent.stoppingDistance = 5f; //THIS IS REALLY IMPORTANT TO GET RIGHT
+        _agent.stoppingDistance = 10f; //THIS IS REALLY IMPORTANT TO GET RIGHT
         _agent.angularSpeed = 1000f;
         _agent.acceleration = 200f;
         _agent.radius = 0.1f;
-        _rightHand = transform.Find(transform.GetChild(0).name + "/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:RightShoulder/mixamorig:RightArm/mixamorig:RightForeArm/mixamorig:RightHand/mixamorig:RightHandIndex1/mixamorig:RightHandIndex2");
+        targetTag = playerTag;
+        targetL = playerL;
+        enemyInfo = GetComponent<EnemySpecificInfo>();
+        attackScripts = new List<BaseAttackScript>(GetComponents<BaseAttackScript>());
+    }
+
+    //every enemy instance will get it's own overrider copy
+    private void HandleAnimation(){
+        _anim = GetComponent<Animator>();
+        _templateOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
+        _copyOverrider = new AnimatorOverrideController(_templateOverrider);
+        _anim.runtimeAnimatorController = _copyOverrider;
     }
     private void Start(){
         playersInGame = GameManager.Instance.getPlayerTransforms();
@@ -78,14 +87,14 @@ public class EnemyAI3 : MonoBehaviour
         Idle();
     }
     private void Update(){
-        Debug.Log("Count of inRange Players: " + playersInRangeOfEnemy.Count);
+        Debug.Log("Count of inRange Targets: " + targetsInRangeOfEnemy.Count);
     }
     private void Idle(){
         _agent.ResetPath();
         currentEnemyState = EnemyState.Idle;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
-        CancelIdle();
-        CancelAlert();
+        //CancelIdle();
+        //CancelAlert();
         idleCoroutine = StartCoroutine(IdleCoroutine());
     }
     IEnumerator IdleCoroutine(){
@@ -96,7 +105,6 @@ public class EnemyAI3 : MonoBehaviour
     }
 
     private void Roam(){
-        //Debug.Log("Roam!");
         currentEnemyState = EnemyState.Roaming;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
         _agent.speed = roamingSpeed;
@@ -104,7 +112,6 @@ public class EnemyAI3 : MonoBehaviour
         _agent.SetDestination(roamPosition);
         InvokeRepeating(nameof(checkArrivalRoamingPosition), 0.5f, 0.5f); //this is to prevent doing it in update
     }
-
     private void checkArrivalRoamingPosition(){
         if (_agent.remainingDistance <= _agent.stoppingDistance){
             CancelInvoke(nameof(checkArrivalRoamingPosition));
@@ -112,14 +119,39 @@ public class EnemyAI3 : MonoBehaviour
         }
     }
     private void OnTriggerEnter(Collider other){ //using triggers for player detection for computation optimization, need to set sphere collider to a trigger
-        if(other.CompareTag("Player")){
-            playersInRangeOfEnemy.Add(other.transform);
-            Debug.Log("Got IN range!");
+        if(other.CompareTag(targetTag)){
+            targetsInRangeOfEnemy.Add(other.transform);
             if(currentEnemyState == EnemyState.Idle || currentEnemyState == EnemyState.Roaming){ //only want to become alert if previously idle or roaming, because could be chasing, attacking etc.
                 BecomeAlert();
             }
         }
     }
+    private void OnTriggerExit(Collider other){ //can either be in alert, chasing, decideattack or attacking state
+        if(other.CompareTag(targetTag)){
+            targetsInRangeOfEnemy.Remove(other.transform); //will remove from list regardless, that way can check later on in waitstopattacking
+            if(other.transform == currentTarget){
+                if(!isAttacking){ //safe to remove current target
+                    currentTarget = null;
+                }
+                else{ //not safe to remove current target since most attacks depend on currTarget transform, so need to wait until not attacking
+                    StartCoroutine(WaitStopAttacking());
+                }
+            }
+            //could just be a target that is not currently being aggroed
+        }  
+    }
+    private IEnumerator WaitStopAttacking(){
+        while(isAttacking){
+            yield return null;
+        }
+        //in decide attack at this point, so need to have a conditional in decide attack if currenttarget exists or not, but that should be the only place possible for it to become null
+        if(!targetsInRangeOfEnemy.Contains(currentTarget)){
+            currentTarget = null;
+        }
+        //else, keep current target, because this means that current target went out of aggrosphere when enemy was attacking and came back in during same time, so still in aggro sphere
+        yield break;
+    }
+
     private void BecomeAlert(){
         _agent.ResetPath(); 
         currentEnemyState = EnemyState.Alert;
@@ -135,171 +167,214 @@ public class EnemyAI3 : MonoBehaviour
     //dont want to start a new while loop if there already is a current player target. so if only players in range, don't want to necessarily start detecting bc might have currtarget. if only there's no currtarget, could be that theres no people in range
     private IEnumerator AlertCoroutine(){
         yield return new WaitForSeconds(3f);
-        if(playersInRangeOfEnemy.Count > 0 && currentPlayerTarget == null){ //need to check if currentPlayerTarget is null because don't want to target a different player after each attack, since each attack will potentially go back to alert state
-            while(playersInRangeOfEnemy.Count > 0 && currentPlayerTarget == null){
+        if(targetsInRangeOfEnemy.Count > 0){ //need to check if currentPlayerTarget is null because don't want to target a different player after each attack, since each attack will potentially go back to alert state
+            while(targetsInRangeOfEnemy.Count > 0 && currentTarget == null){
                 TryDetectPlayer(); //this will cancel alertocourotine if finds a player, so will not go back to being idle
                 yield return null;
             }
             yield return new WaitForSeconds(0.5f);
             Idle();
         }
-        else if(playersInRangeOfEnemy.Count > 0 && currentPlayerTarget){ //people in range but already have a target
-            StartCoroutine(StareDownRival());
-        }
         else{ //no one in range
             Idle();
         }
     }
     private void TryDetectPlayer(){
-        foreach(Transform player in playersInRangeOfEnemy){
-            Vector3 directionToPlayer = player.position - eyes.position;
-            if (!Physics.Raycast(eyes.position, directionToPlayer.normalized, out RaycastHit hit, directionToPlayer.magnitude, obstacleL))
+        foreach(Transform target in targetsInRangeOfEnemy){
+            Vector3 directionToTarget;
+            if(target.CompareTag(playerTag)){directionToTarget = target.GetComponent<ThirdPersonMovementScript>().GetEyesTransform().position - eyes.position;}
+            else{directionToTarget = target.GetComponent<EnemyAI3>().GetEyesTransform().position - eyes.position;}
+            if (!Physics.Raycast(eyes.position, directionToTarget.normalized, out RaycastHit hit, directionToTarget.magnitude, obstacleL))
             {
                 // No obstacle, clear line of sight
-                Debug.DrawRay(eyes.position, directionToPlayer, Color.red, 10f);
-                Debug.Log("DETECTED PLAYER: " + player.name);
-                currentPlayerTarget = player; 
+                Debug.DrawRay(eyes.position, directionToTarget, Color.red, 10f);
+                Debug.Log("DETECTED PLAYER: " + target.name);
+                currentTarget = target; 
 
                 CancelAlert(); //this is to fully transition from alert to attacking
-                StartCoroutine(StareDownRival());
+                StartCoroutine(StareDownRival(null));
                 break;
             }
         }
     }
-    IEnumerator StareDownRival(){ //this is to look at the player before you attack them, and pause for a bit
+    IEnumerator StareDownRival(BaseAttackScript decidedAttack){ //this is to look at the player before you attack them, and pause for a bit
         _agent.ResetPath();
-        CancelAlert();
-        currentEnemyState = EnemyState.StareDown;
+        currentEnemyState = EnemyState.DecideAttack;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
 
         //time to transition between anmation states
         yield return new WaitForSeconds(0.1f);
         //check if the currentplayertarget still exists, otherwise need to go back to being alert. This is important because this is what each attack goes back to, 
-        if(currentPlayerTarget){
+        if(currentTarget){
             bool isCurrentPlayerVisible = IsVisible();
             if (isCurrentPlayerVisible){
-                float rotationDuration = 1f; 
-                float timeElapsed = 0f;
-                while (timeElapsed < rotationDuration)
-                {
-                    if(currentPlayerTarget){
-                        transform.LookAt(new Vector3(currentPlayerTarget.position.x, feet.position.y, currentPlayerTarget.position.z));
-                        timeElapsed += Time.deltaTime;
-                        yield return null;
-                    }
+                transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
+                //we have rotated towards the current target after a time, and the current target exists, so we are safe to decide an attack
+                
+                BaseAttackScript attackChosen;
+                if(decidedAttack){attackChosen = decidedAttack;}
+                else{attackChosen = DecideAttack();}
+                
+                Debug.Log("FUCKING SHIT");
+                Debug.Log(attackChosen);
+                Debug.Log(enemyInfo.GetChainProbability());
+                bool isChainAttack = UnityEngine.Random.value < enemyInfo.GetChainProbability();
+                attackChosen.HandleAnimation();
+                float waitTime = 0f;
+                float chaseGiveUpTime = 3f;
+                if(!isChainAttack){
+                    Debug.Log("NOT CHAIN ATTACK");
+                    waitTime = enemyInfo.GetWaitTimeAfterAttack();
+                    chaseGiveUpTime = enemyInfo.GetChaseGiveUpTime();
+                }
+                else{Debug.Log("YES CHAIN ATTACK");}
+                float elapsedTime = 0f;
+                while(elapsedTime < waitTime){
+                    if(currentTarget){transform.LookAt(currentTarget.position);}
                     else{
                         BecomeAlert();
                         yield break;
                     }
+                    elapsedTime += Time.deltaTime;
+                    yield return null;
                 }
-                if(currentPlayerTarget){ //could get out of range after rotate
-                    DecideAttack();
-                }
-                else{
-                    BecomeAlert();
+                AnimationAttackEvent += attackChosen.ExecuteAttack;
+                switch(attackChosen.GetAttackType()){
+                    case 1: //for melee
+                        Chase(chaseGiveUpTime);
+                        break;
+                    case 2: //for medium
+                        currentEnemyState = EnemyState.MediumAttack;
+                        _anim.SetInteger("EnemyState", (int)currentEnemyState);
+                        break;
+                    case 3: // for long range
+                        Debug.Log("This was chosen! " + attackChosen.gameObject.name);
+                        currentEnemyState = EnemyState.LongRangeAttack;
+                        _anim.SetInteger("EnemyState", (int)currentEnemyState);
+                        break;
                 }
             }
             else{
                 Debug.Log("CHASE UNTIL VISIBLE!");
-                //chase currTarget until he's visible, and then decide attack
                 StartCoroutine(ChaseUntilVisible());
-            }
-        }
-        else{
-            yield return new WaitForSeconds(0.5f);
-            BecomeAlert();  //goes from staredown to alert if there is no current player targeted. This is because there still might be people in range of him
-        }
-    }
-    private IEnumerator ChaseUntilVisible(){
-        currentEnemyState = EnemyState.Chasing;
-        _anim.SetInteger("EnemyState", (int)currentEnemyState);
-        _agent.speed = chasingSpeed;
-        while(currentPlayerTarget && !IsVisible()){
-            _agent.SetDestination(currentPlayerTarget.position);
-            yield return null;
-        }
-        if(!currentPlayerTarget){
-            BecomeAlert();
-            yield break;
-        }
-        //reached here means currtarget still exists and we have made eye contact with him
-        else{StartCoroutine(StareDownRival());}
-    }
-    private bool IsVisible(){
-        Vector3 directionToPlayer = currentPlayerTarget.position - eyes.position;
-        if (!Physics.Raycast(eyes.position, directionToPlayer.normalized, out RaycastHit hit, directionToPlayer.magnitude, obstacleL)){return true;}
-        return false;
-    }
-    private void DecideAttack(){
-        //these steps are necessary if coming from chasing until visible
-        Debug.Log("DECIDE ATTACK!");
-        // turn towards the player
-        // what information do we need to decide the attack?
-        // player speed, player distance, what else?
-
-        //tmp strat is just distance
-        float distanceToPlayer = Vector3.Distance(feet.position, currentPlayerTarget.position);
-        //3 cases, based on ratio compared to aggrodistance
-        Debug.Log("Distanceplayer: " + distanceToPlayer);
-        Debug.Log("AggroDistance: " + aggroDistance);
-
-        float playerProximityRatio = distanceToPlayer/aggroDistance; //always <= 1
-        Debug.Log(playerProximityRatio);
-        lastSeenTargetPosition = currentPlayerTarget.position; //possible that when call executeattack(), especially for attack3's, the animation will start playing only if there is a currentplayertarget, but the executeattack might have a bit of delay in which time the currentplayertarget could exit the aggrosphere. 
-
-        if(playerProximityRatio < 0.33f){
-            Chase();
-        }
-        else if(playerProximityRatio < 0.66){
-            currentEnemyState = EnemyState.Attack2;
-            _anim.SetInteger("EnemyState", (int)currentEnemyState); //animation will carry out the attack
-            // attack2.ExecuteAttack(currentPlayerTarget,transform, _rightHand);
-        }
-        else{
-            currentEnemyState = EnemyState.Attack3; //animation will carry out the attack
-            _anim.SetInteger("EnemyState", (int)currentEnemyState);
-            // attack3.ExecuteAttack(currentPlayerTarget, transform, _rightHand);
-        }
-    }
-    private void Chase(){
-        currentEnemyState = EnemyState.Chasing;
-        _anim.SetInteger("EnemyState", (int)currentEnemyState);
-        CancelChase();
-        _agent.speed = chasingSpeed;
-        chaseCoroutine = StartCoroutine(ChaseCoroutine());
-    }
-    private IEnumerator ChaseCoroutine(){
-        //need to give a few frames for thenavmesh to calculate the path to the player, otherwise remaining distance will be zero
-        _agent.SetDestination(currentPlayerTarget.position);
-        yield return new WaitForSeconds(0.5f);
-        while(_agent.remainingDistance > _agent.stoppingDistance){
-            if(currentPlayerTarget){
-                _agent.SetDestination(currentPlayerTarget.position);
-                yield return null;
-            }
-            else{
-                BecomeAlert();
-                CancelChase();
                 yield break;
             }
         }
-        if(currentPlayerTarget){
-            currentEnemyState = EnemyState.Attack1;
-            _anim.SetInteger("EnemyState", (int)currentEnemyState);
-            //attack1.ExecuteAttack(currentPlayerTarget, transform, _rightHand);; //will call BecomeAlert()
-            
+        else{
+            BecomeAlert();  //goes from staredown to alert if there is no current player targeted. This is because there still might be people in range of him
+            yield break;
         }
-        else{BecomeAlert();}
-        CancelChase();
     }
-    private void OnTriggerExit(Collider other){
-        if(other.CompareTag("Player")){
-            playersInRangeOfEnemy.Remove(other.transform);
-            Debug.Log("Got OUT range!");
-            if (other.transform == currentPlayerTarget){
-                currentPlayerTarget = null;
+    private BaseAttackScript DecideAttack(){
+        float distanceToPlayer = Vector3.Distance(feet.position, currentTarget.position);
+        float playerProximityRatio = distanceToPlayer/aggroDistance; //always <= 1
+
+        meleeAttacks = attackScripts.FindAll(attack => attack.GetAttackType() == 1);
+        mediumAttacks = attackScripts.FindAll(attack => attack.GetAttackType() == 2);
+        longAttacks = attackScripts.FindAll(attack => attack.GetAttackType() == 3);
+        hasMelee = meleeAttacks.Count > 0;
+        hasMedium = mediumAttacks.Count > 0;
+        hasLong = longAttacks.Count > 0;
+        Debug.Log("hasMelee"+ hasMelee);
+        Debug.Log("hasMedium"+ hasMedium);
+        Debug.Log("hasLong"+ hasLong);
+
+        if(playerProximityRatio < 0.33f){
+            if(hasMelee){
+                return GetAttack(meleeAttacks);
             }
-        } 
+            else if(hasMedium){
+                return GetAttack(mediumAttacks);
+            }
+            else{
+                return GetAttack(longAttacks);
+            }
+        }
+        else if(playerProximityRatio < 0.66){
+            if(hasMedium){
+                return GetAttack(mediumAttacks);
+            }   
+            else if(hasLong){ //second priority is long range
+                return GetAttack(longAttacks);
+            }
+            else{
+                return GetAttack(meleeAttacks);
+            }
+        }
+        else{
+            if(hasLong){
+                return GetAttack(longAttacks);
+            }
+            else if(hasMedium){
+                return GetAttack(mediumAttacks);
+            }
+            else{
+                return GetAttack(meleeAttacks);
+            } 
+        }
+    }
+    private BaseAttackScript GetAttack(List<BaseAttackScript> filteredAttacks){
+        float randomValue = UnityEngine.Random.value;
+        float cumulativeWeight = 0f;
+        foreach (var attack in filteredAttacks){
+            cumulativeWeight += attack.GetAttackWeight();
+            if (randomValue <= cumulativeWeight){
+                return attack; // Selected attack
+            }
+        }
+        return null;
+    }
+    private void Chase(float chaseTime){
+        _agent.speed = chasingSpeed;
+        chaseCoroutine = StartCoroutine(ChaseCoroutine(chaseTime));
+    }
+    private IEnumerator ChaseCoroutine(float chaseTime){
+        //need to give a few frames for thenavmesh to calculate the path to the player, otherwise remaining distance will be zero
+        _agent.SetDestination(currentTarget.position);
+        yield return new WaitForSeconds(0.1f);
+        if(_agent.remainingDistance < _agent.stoppingDistance){
+            currentEnemyState = EnemyState.MeleeAttack;
+            _anim.SetInteger("EnemyState", (int)currentEnemyState); 
+        }
+        else{
+            currentEnemyState = EnemyState.Chasing;
+            _anim.SetInteger("EnemyState", (int)currentEnemyState);
+            float elapsedTime = 0f;
+
+            while(_agent.remainingDistance > _agent.stoppingDistance && elapsedTime < chaseTime){
+                if(currentTarget){
+                    _agent.SetDestination(currentTarget.position);
+                    elapsedTime += Time.deltaTime;
+                    yield return null;
+                }
+                else{
+                    BecomeAlert();
+                    CancelChase();
+                    yield break;
+                }
+            }
+            // either in range of target or have to give up chasing after specified time
+            Debug.Log("REACHED HERE");
+            if(currentTarget){
+                if(elapsedTime < chaseTime){
+                    currentEnemyState = EnemyState.MeleeAttack;
+                    _anim.SetInteger("EnemyState", (int)currentEnemyState);        
+                }
+                else{
+                    if(hasMedium){
+                        StartCoroutine(StareDownRival(GetAttack(mediumAttacks)));
+                    }
+                    else if(hasLong){
+                        StartCoroutine(StareDownRival(GetAttack(longAttacks)));
+                    }
+                    else{
+                        StartCoroutine(StareDownRival(null));
+                    }
+                }
+            }
+            else{BecomeAlert();}
+            CancelChase();
+        }
     }
     private Vector3 GetNewRoamingPosition(){
         Vector3 randDir = new Vector3(UnityEngine.Random.Range(-1f, 1f), 0, UnityEngine.Random.Range(-1f, 1f)).normalized;
@@ -341,13 +416,38 @@ public class EnemyAI3 : MonoBehaviour
             chaseCoroutine = null;
         }
     }
-    private void AnimationEvent1(){
-        Attack1Event?.Invoke(this, new AttackEvent{PlayerTransform=currentPlayerTarget, InstantiateTransform=_rightHand, LastSeenTargetPos=lastSeenTargetPosition, AttackCenterForward=attackCenter, PlayerL=playerL});
+    private IEnumerator ChaseUntilVisible(){
+        currentEnemyState = EnemyState.Chasing;
+        _anim.SetInteger("EnemyState", (int)currentEnemyState);
+        _agent.speed = chasingSpeed;
+        while(currentTarget && !IsVisible()){
+            _agent.SetDestination(currentTarget.position);
+            yield return null;
+        }
+        if(!currentTarget){
+            BecomeAlert();
+            yield break;
+        }
+        //reached here means currtarget still exists and we have made eye contact with him
+        else{StartCoroutine(StareDownRival(null));}
     }
-    private void AnimationEvent2(){
-        Attack2Event?.Invoke(this, new AttackEvent{PlayerTransform=currentPlayerTarget, InstantiateTransform=_rightHand, LastSeenTargetPos=lastSeenTargetPosition, AttackCenterForward=attackCenter, PlayerL=playerL});
+    private bool IsVisible(){
+
+        Vector3 directionToTarget;
+        if(currentTarget.CompareTag(playerTag)){directionToTarget = currentTarget.GetComponent<ThirdPersonMovementScript>().GetEyesTransform().position - eyes.position;}
+        else{directionToTarget = currentTarget.GetComponent<EnemyAI3>().GetEyesTransform().position - eyes.position;}
+
+        if (!Physics.Raycast(eyes.position, directionToTarget.normalized, out RaycastHit hit, directionToTarget.magnitude, obstacleL))
+        {
+            Debug.DrawRay(eyes.position, directionToTarget, Color.red, 10f);
+            return true;
+        }
+        return false;
     }
-    private void AnimationEvent3(){
-        Attack3Event?.Invoke(this, new AttackEvent{PlayerTransform=currentPlayerTarget, InstantiateTransform=_rightHand, LastSeenTargetPos=lastSeenTargetPosition, AttackCenterForward=attackCenter, PlayerL=playerL});
+    private void AnimationEventNextStep(){
+        AnimationAttackEvent?.Invoke(this, new AttackEvent{TargetTransform=currentTarget, AttackCenterForward=attackCenter, TargetL=targetL});
+    }
+    public Transform GetEyesTransform(){
+        return eyes;
     }
 }
