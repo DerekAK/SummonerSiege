@@ -211,26 +211,16 @@ public class EnemyAI3 : MonoBehaviour
                 transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
                 //we have rotated towards the current target after a time, and the current target exists, so we are safe to decide an attack
                 
-                BaseAttackScript attackChosen;
-                if(decidedAttack){attackChosen = decidedAttack;}
-                else{attackChosen = DecideAttack();}
-                
-                Debug.Log("FUCKING SHIT");
-                Debug.Log(attackChosen);
-                Debug.Log(enemyInfo.GetChainProbability());
                 bool isChainAttack = UnityEngine.Random.value < enemyInfo.GetChainProbability();
-                attackChosen.HandleAnimation();
-                float waitTime = 0f;
-                float chaseGiveUpTime = 3f;
+                float waitTime = enemyInfo.GetWaitTimeAfterAttack();
+                float chaseGiveUpTime = enemyInfo.GetChaseGiveUpTime();
                 if(!isChainAttack){
-                    Debug.Log("NOT CHAIN ATTACK");
-                    waitTime = enemyInfo.GetWaitTimeAfterAttack();
-                    chaseGiveUpTime = enemyInfo.GetChaseGiveUpTime();
+                    waitTime = 0f;
+                    chaseGiveUpTime = 2f;
                 }
-                else{Debug.Log("YES CHAIN ATTACK");}
                 float elapsedTime = 0f;
                 while(elapsedTime < waitTime){
-                    if(currentTarget){transform.LookAt(currentTarget.position);}
+                    if(currentTarget){transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));}
                     else{
                         BecomeAlert();
                         yield break;
@@ -238,6 +228,12 @@ public class EnemyAI3 : MonoBehaviour
                     elapsedTime += Time.deltaTime;
                     yield return null;
                 }
+                transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
+                
+                BaseAttackScript attackChosen;
+                if(decidedAttack){attackChosen = decidedAttack;}
+                else{attackChosen = DecideAttack();}
+                attackChosen.HandleAnimation();
                 AnimationAttackEvent += attackChosen.ExecuteAttack;
                 switch(attackChosen.GetAttackType()){
                     case 1: //for melee
