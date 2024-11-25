@@ -214,7 +214,7 @@ public class EnemyAI3 : MonoBehaviour
                 bool isChainAttack = UnityEngine.Random.value < enemyInfo.GetChainProbability();
                 float waitTime = enemyInfo.GetWaitTimeAfterAttack();
                 float chaseGiveUpTime = enemyInfo.GetChaseGiveUpTime();
-                if(!isChainAttack){
+                if(isChainAttack){
                     waitTime = 0f;
                     chaseGiveUpTime = 2f;
                 }

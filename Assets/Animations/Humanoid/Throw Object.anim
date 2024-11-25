@@ -131404,21 +131404,21 @@ AnimationClip:
   m_HasMotionFloatCurves: 0
   m_Events:
   - time: 0
-    functionName: AnimationEventLongRange
+    functionName: AnimationEventNextStep
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0
     intParameter: 0
     messageOptions: 0
   - time: 1.7333333
-    functionName: AnimationEventLongRange
+    functionName: AnimationEventNextStep
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0
     intParameter: 0
     messageOptions: 0
   - time: 4.0666666
-    functionName: AnimationEventLongRange
+    functionName: AnimationEventNextStep
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0
