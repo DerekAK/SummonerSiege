@@ -3,53 +3,42 @@ using UnityEngine;
 using UnityEngine.AI;
 public class MutantJump : BaseAttackScript
 {
-    private EnemyAI3 _enemyScript;
     private NavMeshAgent _agent;
     private Rigidbody _rb;
-    private Coroutine jumpCoroutine;
     private float jumpUpDuration = 1f;
     private float jumpDownDuration = 0.2f;
     private float attackRadius = 10f;
     private float forceMultiplier = 50f;
     private Transform attackCenter;
-    private bool endRotate;
     
     private void Awake(){
         _enemyScript = GetComponent<EnemyAI3>();
         _agent = GetComponent<NavMeshAgent>();
         _rb = GetComponent<Rigidbody>();
         attackCenter = transform;
-        clipToOverride = "Attack" +  attackType.ToString() + " Placeholder";
+        OverrideClip();
     }
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ //in this case, its the start of the jump
         Debug.Log("EXECUTE ATTACK FOR MUTANT JUMP!");
-        endRotate = false;
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
         _enemyScript.AnimationAttackEvent += CrashDown;
         _rb.useGravity = false;
-        jumpCoroutine = StartCoroutine(JumpUp(e.TargetTransform));
-        StartCoroutine(RotateTowardsPlayer(e.TargetTransform));
-    }
-    private IEnumerator RotateTowardsPlayer(Transform playerTransform){
-        while(!endRotate){
-            Debug.Log("ROTATE COROUTINE IS HAOOENING IN MUTANT JUMP!");
-            transform.LookAt(new Vector3(playerTransform.position.x, transform.position.y, playerTransform.position.z));
-            yield return null;
-        }
-        yield break;
+        StartCoroutine(JumpUp(e.TargetTransform));
     }
     private IEnumerator JumpUp(Transform playerTransform) //this should run for the amount of time between the two attackanimations (in jumpduration)
     {
+        Debug.Log("JUMP UP!");
         _agent.enabled = false;
         Vector3 endDestination = playerTransform.position + Vector3.up * 30f;
         Vector3 origin = transform.position;
-        Vector3 destination = origin + (endDestination - origin)* 0.8f;
+        Vector3 destination = origin + (endDestination - origin) * 0.7f;
 
         float elapsedTime = 0f;
 
         while (elapsedTime < jumpUpDuration)
         {
             // Interpolate horizontal position only
+            transform.LookAt(new Vector3(playerTransform.position.x, transform.position.y, playerTransform.position.z));
             float t = elapsedTime / jumpUpDuration;
             Vector3 newPosition = Vector3.Lerp(origin, destination, t);
             transform.position = newPosition;
@@ -60,10 +49,8 @@ public class MutantJump : BaseAttackScript
     }
 
     private void CrashDown(object sender, EnemyAI3.AttackEvent e){ //in this case, its the end of the jump
-        endRotate = true;
         _enemyScript.AnimationAttackEvent -= CrashDown;
         _enemyScript.AnimationAttackEvent += TrackHits;
-        StopCoroutine(jumpCoroutine);
         StartCoroutine(JumpDown(transform, e.TargetTransform));
     }
 

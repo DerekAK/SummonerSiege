@@ -2,8 +2,10 @@ using UnityEngine;
 
 public class EnemySpecificInfo : MonoBehaviour
 {
-   protected Transform _rightHandTransform;
+   [SerializeField] protected Transform _rightHandTransform;
    public Transform GetRightHandTransform(){return _rightHandTransform;}
+   [SerializeField] protected Transform _swordAttachPointTransform;
+   public Transform GetSwordAttachPointTransform(){return _swordAttachPointTransform;}
 
    [SerializeField] protected float chainProbability;
    public float GetChainProbability(){
@@ -16,5 +18,9 @@ public class EnemySpecificInfo : MonoBehaviour
    [SerializeField] protected float chaseGiveUpTime;
    public float GetChaseGiveUpTime(){
       return chaseGiveUpTime;
+   }
+   [SerializeField] protected float animChangeProbability;
+   public float GetAnimChangeProbability(){
+      return animChangeProbability;
    }
 }

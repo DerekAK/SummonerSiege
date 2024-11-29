@@ -1,12 +1,9 @@
-using System;
 using System.Collections;
 using UnityEngine;
 
 public class StoneBoulder : BaseAttackScript
 {
     [SerializeField] private Transform pfStoneBoulder;
-    //[SerializeField] private AnimationClip clip;
-    private EnemyAI3 _enemyScript; //all should have, because these are events 
     private Rigidbody rbStone;
     private float rbStoneMass;
     private float rbThrowForceMultiplier;
@@ -15,15 +12,15 @@ public class StoneBoulder : BaseAttackScript
     //first attacks are only called with current player target, but for one attack that triggers multiple animation events that depend on current player target like this one, need this 
     private Coroutine rotateCoroutine;
     private Transform _rightHand;
-    private EnemySpecificInfo enemyInfo;
+    private EnemySpecificInfo _enemyInfo;
 
     private void Awake(){
         _enemyScript = GetComponent<EnemyAI3>();
-        clipToOverride = "Attack" +  attackType.ToString() + " Placeholder";
-        enemyInfo = GetComponent<EnemySpecificInfo>();
+        OverrideClip();
+        _enemyInfo = GetComponent<EnemySpecificInfo>();
     }
     private void Start(){
-        _rightHand = enemyInfo.GetRightHandTransform();
+        _rightHand = _enemyInfo.GetRightHandTransform();
     }
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ //can be null here 
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
@@ -31,11 +28,9 @@ public class StoneBoulder : BaseAttackScript
         hasThrownBoulder = false;
         rotateCoroutine = StartCoroutine(RotateTowardsPlayerUntilThrown(e.TargetTransform));
     }
-    private IEnumerator RotateTowardsPlayerUntilThrown(Transform targetTransform)
-    {
+    private IEnumerator RotateTowardsPlayerUntilThrown(Transform targetTransform){
         // Keep rotating towards the player until hasThrownBoulder is true
-        while (!hasThrownBoulder)
-        {
+        while (!hasThrownBoulder){
             transform.LookAt(new Vector3(targetTransform.position.x, transform.position.y, targetTransform.position.z));
             yield return null;
         }

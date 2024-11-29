@@ -3,8 +3,8 @@ using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
 using System;
-public class EnemyAI3 : MonoBehaviour
-{
+
+public class EnemyAI3 : MonoBehaviour{
     private bool isAttacking;
     private bool hasMelee, hasMedium, hasLong;
     private int countMeleeInRow, countMediumInRow, countLongInRow = 0;
@@ -19,12 +19,12 @@ public class EnemyAI3 : MonoBehaviour
     private List<Transform> targetsInRangeOfEnemy = new List<Transform>();
     private List<BaseAttackScript> attackScripts;
     private Transform currentTarget;
-    private EnemyState currentEnemyState;
     private Vector3 startPosition;
     private Vector3 roamPosition;
     private Coroutine idleCoroutine;
     private Coroutine alertCoroutine;
     private Coroutine chaseCoroutine;
+    private Coroutine speedCoroutine;
     private float attackCenterBoxRadius;
     private float enemyHeight;
     [SerializeField] private LayerMask obstacleL;
@@ -32,6 +32,7 @@ public class EnemyAI3 : MonoBehaviour
     [SerializeField] private LayerMask enemyL;
     private LayerMask targetL;
     [SerializeField] private string playerTag = "Player";
+    [SerializeField] private string weaponTag = "Weapon";
     [SerializeField] private string enemyTag = "Enemy";
     private string targetTag;
     [SerializeField] private Transform attackCenter;
@@ -45,8 +46,11 @@ public class EnemyAI3 : MonoBehaviour
     [SerializeField] private int roamingSpeed = 10;
     [SerializeField] private int chasingSpeed = 15;
     private EnemySpecificInfo enemyInfo;
-    private enum EnemyState{Idle = 0, Roaming = 1, Alert = 2, Chasing = 3, DecideAttack = 4, MeleeAttack = 5, MediumAttack = 6, LongRangeAttack = 7}
-
+    private EnemyAttackManager enemyAttackInfo;
+    private bool isWeaponOut;
+    private enum EnemyState{Idle = 0, Roaming = 1, Alert = 2, Chasing = 3, DecideAttack = 4, MeleeAttack = 5, MediumAttack = 6, 
+    LongRangeAttack = 7, UnsheathWeapon = 8, SheathWeapon = 9, ReceiveWeapon = 10}
+    private EnemyState currentEnemyState;
     public class AttackEvent : EventArgs{
         public Transform TargetTransform{ get;set;}
         public Transform AttackCenterForward{ get;set;}
@@ -56,6 +60,9 @@ public class EnemyAI3 : MonoBehaviour
     public event EventHandler<AttackEvent> AnimationAttackEvent;
 
     private void Awake(){
+        enemyAttackInfo = GetComponent<EnemyAttackManager>();
+        isWeaponOut = false;
+
         HandleAnimation(); //sets up a unique copy of the animatorOverrider for each enemy instance
         _rb = GetComponent<Rigidbody>();
         _anim = GetComponent<Animator>();
@@ -73,7 +80,6 @@ public class EnemyAI3 : MonoBehaviour
         enemyInfo = GetComponent<EnemySpecificInfo>();
         attackScripts = new List<BaseAttackScript>(GetComponents<BaseAttackScript>());
     }
-
     //every enemy instance will get it's own overrider copy
     private void HandleAnimation(){
         _anim = GetComponent<Animator>();
@@ -104,25 +110,25 @@ public class EnemyAI3 : MonoBehaviour
         idleCoroutine = null;
         Roam();
     }
-
     private void Roam(){
         currentEnemyState = EnemyState.Roaming;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
         _agent.speed = roamingSpeed;
         roamPosition = GetNewRoamingPosition();
         _agent.SetDestination(roamPosition);
-        InvokeRepeating(nameof(checkArrivalRoamingPosition), 0.5f, 0.5f); //this is to prevent doing it in update
+        StartCoroutine(RoamingCoroutine());
     }
-    private void checkArrivalRoamingPosition(){
-        if (_agent.remainingDistance <= _agent.stoppingDistance){
-            CancelInvoke(nameof(checkArrivalRoamingPosition));
-            Idle();
+    private IEnumerator RoamingCoroutine(){
+        yield return new WaitForSeconds(0.1f);
+        while(_agent.remainingDistance <= _agent.stoppingDistance){
+            yield return null;
         }
+        Idle();
     }
     private void OnTriggerEnter(Collider other){ //using triggers for player detection for computation optimization, need to set sphere collider to a trigger
         if(other.CompareTag(targetTag)){
             targetsInRangeOfEnemy.Add(other.transform);
-            if(currentEnemyState == EnemyState.Idle || currentEnemyState == EnemyState.Roaming){ //only want to become alert if previously idle or roaming, because could be chasing, attacking etc.
+            if(currentEnemyState == EnemyState.Idle || currentEnemyState == EnemyState.Roaming || currentEnemyState == EnemyState.ReceiveWeapon){ //only want to become alert if previously idle or roaming, because could be chasing, attacking etc.
                 BecomeAlert();
             }
         }
@@ -131,18 +137,18 @@ public class EnemyAI3 : MonoBehaviour
         if(other.CompareTag(targetTag)){
             targetsInRangeOfEnemy.Remove(other.transform); //will remove from list regardless, that way can check later on in waitstopattacking
             if(other.transform == currentTarget){
-                if(!isAttacking){ //safe to remove current target
+                if(currentEnemyState == EnemyState.DecideAttack || currentEnemyState == EnemyState.Chasing){ //safe to remove current target
                     currentTarget = null;
                 }
                 else{ //not safe to remove current target since most attacks depend on currTarget transform, so need to wait until not attacking
                     StartCoroutine(WaitStopAttacking());
                 }
             }
-            //could just be a target that is not currently being aggroed
         }  
     }
     private IEnumerator WaitStopAttacking(){
-        while(isAttacking){
+        Debug.Log("GOT HEREasdgasnidgjkansdiglu");
+        while(currentEnemyState != EnemyState.DecideAttack){
             yield return null;
         }
         //in decide attack at this point, so need to have a conditional in decide attack if currenttarget exists or not, but that should be the only place possible for it to become null
@@ -152,16 +158,11 @@ public class EnemyAI3 : MonoBehaviour
         //else, keep current target, because this means that current target went out of aggrosphere when enemy was attacking and came back in during same time, so still in aggro sphere
         yield break;
     }
-
     private void BecomeAlert(){
         _agent.ResetPath(); 
         currentEnemyState = EnemyState.Alert;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
-    
-        CancelIdle(); //this is if the enemy went from idle to alert, need to do this so doesn't go back to roaming
-        CancelInvoke(nameof(checkArrivalRoamingPosition)); //fully transition from roaming to alert
-        CancelAlert();
-
+        StopAllCoroutines();
         alertCoroutine = StartCoroutine(AlertCoroutine());
     }
 
@@ -173,7 +174,7 @@ public class EnemyAI3 : MonoBehaviour
                 TryDetectPlayer(); //this will cancel alertocourotine if finds a player, so will not go back to being idle
                 yield return null;
             }
-            yield return new WaitForSeconds(0.5f);
+            yield return new WaitForSeconds(0.1f);
             Idle();
         }
         else{ //no one in range
@@ -193,22 +194,21 @@ public class EnemyAI3 : MonoBehaviour
                 currentTarget = target; 
 
                 CancelAlert(); //this is to fully transition from alert to attacking
-                StartCoroutine(StareDownRival(null));
+                StartCoroutine(StareDownRival());
                 break;
             }
         }
     }
-    IEnumerator StareDownRival(BaseAttackScript decidedAttack){ //this is to look at the player before you attack them, and pause for a bit
-        Debug.Log("CountMeleeInRow: " + countMeleeInRow + "     CountMediumInRow: " + countMediumInRow + "       CountLongInRow: " + countLongInRow);
-        _agent.ResetPath();
+    IEnumerator StareDownRival(){ //this is to look at the player before you attack them, and pause for a bit
+        // job of this function is to turn towards the player, decide if doing a chained attack, 
+        // decide the attack, set animation of the attack, perform the attack and the attack animation will then call this function again
         currentEnemyState = EnemyState.DecideAttack;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
         yield return new WaitForSeconds(0.1f);
-
         if(currentTarget){
-            bool isChainAttack;
-            if(decidedAttack){isChainAttack = true;}
-            else{isChainAttack = UnityEngine.Random.value < enemyInfo.GetChainProbability();}
+            //Debug.Log("CountMeleeInRow: " + countMeleeInRow + "     CountMediumInRow: " + countMediumInRow + "       CountLongInRow: " + countLongInRow);
+            _agent.ResetPath();
+            bool isChainAttack = UnityEngine.Random.value < enemyInfo.GetChainProbability();
             float waitTime = enemyInfo.GetWaitTimeAfterAttack();
             float chaseGiveUpTime = enemyInfo.GetChaseGiveUpTime();
             if(isChainAttack){
@@ -217,13 +217,15 @@ public class EnemyAI3 : MonoBehaviour
             }
             float elapsedTime = 0f;
             while(elapsedTime < waitTime){
-                if(currentTarget){transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));}
+                if(currentTarget){
+                    transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
+                    elapsedTime += Time.deltaTime;
+                    yield return null;
+                }
                 else{
                     BecomeAlert();
                     yield break;
                 }
-                elapsedTime += Time.deltaTime;
-                yield return null;
             }
             transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
             bool isCurrentPlayerVisible = IsVisible();
@@ -231,35 +233,32 @@ public class EnemyAI3 : MonoBehaviour
                 transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
                 //we have rotated towards the current target after a time, and the current target exists, so we are safe to decide an attack
                 
-                BaseAttackScript attackChosen;
-                if(decidedAttack){attackChosen = decidedAttack;}
-                else{attackChosen = DecideAttack();}
-                Debug.Log("ASGDHNOUAJWGDNAOWJDGNSAS:   " + attackChosen);
-                attackChosen.HandleAnimation();
-                AnimationAttackEvent += attackChosen.ExecuteAttack;
-
-                switch(attackChosen.GetAttackType()){
-                    case 1: //for melee
-                        Chase(chaseGiveUpTime);
-                        break;
-                    case 2: //for medium
-                        currentEnemyState = EnemyState.MediumAttack;
-                        _anim.SetInteger("EnemyState", (int)currentEnemyState);
-                        countMediumInRow ++;
-                        countLongInRow =0;
-                        countMeleeInRow =0;
-                        break;
-                    case 3: // for long range
-                        currentEnemyState = EnemyState.LongRangeAttack;
-                        _anim.SetInteger("EnemyState", (int)currentEnemyState);
-                        countLongInRow ++;
-                        countMediumInRow =0;
-                        countMeleeInRow =0;
-                        break;
+                BaseAttackScript attackChosen = DecideAttack();
+                int weaponType;
+                if(attackChosen.GetWeaponType() != 0 && !isWeaponOut){
+                    Debug.Log("UNSHEATHE WEAPON!");
+                    weaponType = attackChosen.GetWeaponType();
+                    float unsheathClipLength = enemyAttackInfo.HandleUnsheathAnimation(weaponType);
+                    currentEnemyState = EnemyState.UnsheathWeapon;
+                    _anim.SetInteger("EnemyState", (int)currentEnemyState);
+                    isWeaponOut = true;
+                    StartCoroutine(waitSheathUnsheathe(unsheathClipLength, attackChosen, chaseGiveUpTime));
+                }
+                else if(attackChosen.GetWeaponType() == 0 && isWeaponOut){
+                    Debug.Log("SHEATHE WEAPON!");
+                    weaponType = enemyAttackInfo.GetWeaponEquipped().GetComponent<BaseWeaponScript>().GetWeaponType();
+                    float sheathClipLength = enemyAttackInfo.HandleSheathAnimation(weaponType);
+                    currentEnemyState = EnemyState.SheathWeapon;
+                    _anim.SetInteger("EnemyState", (int)currentEnemyState);
+                    isWeaponOut = false;
+                    StartCoroutine(waitSheathUnsheathe(sheathClipLength, attackChosen, chaseGiveUpTime));
+                }
+                else{
+                    Debug.Log("NEITHER SHEATHE NOR UNSHEATHE!");
+                    PerformAttack(attackChosen, chaseGiveUpTime);
                 }
             }
             else{
-                Debug.Log("CHASE UNTIL VISIBLE!");
                 StartCoroutine(ChaseUntilVisible());
                 yield break;
             }
@@ -267,6 +266,53 @@ public class EnemyAI3 : MonoBehaviour
         else{
             BecomeAlert();  //goes from staredown to alert if there is no current player targeted. This is because there still might be people in range of him
             yield break;
+        }
+    }
+    private IEnumerator waitSheathUnsheathe(float clipLength, BaseAttackScript attackChosen, float chaseGiveUpTime){
+        float elapsedTime = 0f;
+        Debug.Log("REACHED HERE!");
+        Debug.Log("CLIP LENGTH: " + clipLength);
+        while(elapsedTime < clipLength){
+            if(currentTarget){
+                elapsedTime += Time.deltaTime;
+                transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
+                yield return null;
+            }
+            else{
+                BecomeAlert();
+                yield break;
+            }
+        }
+        //got here means that sheathe/unsheathe clip finished
+        PerformAttack(attackChosen, chaseGiveUpTime);
+    }
+    private void OnDisable(){AnimationAttackEvent = null;}
+    private void PerformAttack(BaseAttackScript attackChosen, float chaseGiveUpTime){
+        currentEnemyState = EnemyState.DecideAttack;
+        _anim.SetInteger("EnemyState", (int)currentEnemyState);
+        AnimationAttackEvent = null; //unsubscribe all subscribers from animationattackevent before each new attack
+        attackChosen.HandleAnimation();
+        AnimationAttackEvent += attackChosen.ExecuteAttack;
+
+        switch(attackChosen.GetAttackType()){
+            case 1: //for melee
+                Chase(chaseGiveUpTime);
+                break;
+            case 2: //for medium
+                Debug.Log("REACHED HERE4");
+                currentEnemyState = EnemyState.MediumAttack;
+                _anim.SetInteger("EnemyState", (int)currentEnemyState);
+                countMediumInRow ++;
+                countLongInRow =0;
+                countMeleeInRow =0;
+                break;
+            case 3: // for long range
+                currentEnemyState = EnemyState.LongRangeAttack;
+                _anim.SetInteger("EnemyState", (int)currentEnemyState);
+                countLongInRow ++;
+                countMediumInRow =0;
+                countMeleeInRow =0;
+                break;
         }
     }
     private BaseAttackScript DecideAttack(){
@@ -279,52 +325,30 @@ public class EnemyAI3 : MonoBehaviour
         hasMelee = meleeAttacks.Count > 0;
         hasMedium = mediumAttacks.Count > 0;
         hasLong = longAttacks.Count > 0;
-        Debug.Log("hasMelee"+ hasMelee);
-        Debug.Log("hasMedium"+ hasMedium);
-        Debug.Log("hasLong"+ hasLong);
 
         if(playerProximityRatio < 0.33f){
-            if(hasMelee){
-                return GetAttack(meleeAttacks);
-            }
-            else if(hasMedium){
-                return GetAttack(mediumAttacks);
-            }
-            else{
-                return GetAttack(longAttacks);
-            }
+            if(hasMelee){return GetAttack(meleeAttacks);}
+            else if(hasMedium){return GetAttack(mediumAttacks);}
+            else{return GetAttack(longAttacks);}
         }
         else if(playerProximityRatio < 0.66){
-            if(hasMedium){
-                return GetAttack(mediumAttacks);
-            }   
-            else if(hasLong){ //second priority is long range
-                return GetAttack(longAttacks);
-            }
-            else{
-                return GetAttack(meleeAttacks);
-            }
+            if(hasMedium){return GetAttack(mediumAttacks);}   
+            else if(hasLong){return GetAttack(longAttacks);}
+            else{return GetAttack(meleeAttacks);}
         }
         else{
-            if(hasLong){
-                return GetAttack(longAttacks);
-            }
-            else if(hasMedium){
-                return GetAttack(mediumAttacks);
-            }
-            else{
-                return GetAttack(meleeAttacks);
-            } 
+            if(hasLong){return GetAttack(longAttacks);}
+            else if(hasMedium){return GetAttack(mediumAttacks);}
+            else{return GetAttack(meleeAttacks);} 
         }
     }
     private BaseAttackScript GetAttack(List<BaseAttackScript> filteredAttacks){
         float randomValue = UnityEngine.Random.value;
         float cumulativeWeight = 0f;
         foreach (var attack in filteredAttacks){
-            Debug.Log(attack);
             cumulativeWeight += attack.GetAttackWeight();
             if (randomValue <= cumulativeWeight){
-                Debug.Log("Chosen Attack:", attack);
+                Debug.Log("Chosen Attack:" + attack);
                 return attack; // Selected attack
             }
         }
@@ -337,8 +361,8 @@ public class EnemyAI3 : MonoBehaviour
     private IEnumerator ChaseCoroutine(float chaseTime){
         //need to give a few frames for thenavmesh to calculate the path to the player, otherwise remaining distance will be zero
         _agent.SetDestination(currentTarget.position);
-        yield return new WaitForSeconds(0.3f);
-        if(_agent.remainingDistance < _agent.stoppingDistance){
+        yield return new WaitForSeconds(0.1f);
+        if(_agent.remainingDistance < _agent.stoppingDistance){ //can immediately attack, doesn't need to go to chase animation
             currentEnemyState = EnemyState.MeleeAttack;
             _anim.SetInteger("EnemyState", (int)currentEnemyState); 
         }
@@ -370,15 +394,13 @@ public class EnemyAI3 : MonoBehaviour
                     countMediumInRow =0;        
                 }
                 else{
+                    Debug.Log("REACHED HERE2!");
                     if(hasMedium){
-                        StartCoroutine(StareDownRival(GetAttack(mediumAttacks)));
+                        Debug.Log("READHED HERE3!");
+                        PerformAttack(GetAttack(mediumAttacks), 0); //int value you provide doesn't matter
                     }
-                    else if(hasLong){
-                        StartCoroutine(StareDownRival(GetAttack(longAttacks)));
-                    }
-                    else{
-                        StartCoroutine(StareDownRival(null));
-                    }
+                    else if(hasLong){PerformAttack(GetAttack(longAttacks), 0);}
+                    else{StartCoroutine(StareDownRival());}
                 }
             }
             else{BecomeAlert();}
@@ -395,31 +417,23 @@ public class EnemyAI3 : MonoBehaviour
         {   
             Debug.DrawRay(new Vector3(newPos.x, 100f, newPos.z), Vector3.down * 200f, Color.red, 3f);
             NavMeshHit navHit;
-            if (NavMesh.SamplePosition(hit.point, out navHit, 100f, NavMesh.AllAreas))
-            {
-                // Successfully found a valid NavMesh position
-                //Debug.Log("Sampled NavMesh position at: " + navHit.position);
-                return navHit.position; // Return the valid NavMesh position
-            }
+            if (NavMesh.SamplePosition(hit.point, out navHit, 100f, NavMesh.AllAreas)){return navHit.position;} // Return the valid NavMesh position
         }
         return startPosition;
     }
     private void CancelIdle(){
-        //fully transition from idle
         if (idleCoroutine != null){ //this is if the enemy went from idle to alert, need to do this so doesn't go back to roaming
             StopCoroutine(idleCoroutine);
             idleCoroutine = null;
         }
     }
     private void CancelAlert(){
-        //fully transition from alert
         if (alertCoroutine != null){ //this is if the enemy went from idle to alert, need to do this so doesn't go back to roaming
             StopCoroutine(alertCoroutine);
             alertCoroutine = null;
         }
     }
     private void CancelChase(){
-        //fully transition from alert
         if (chaseCoroutine != null){ //this is if the enemy went from idle to alert, need to do this so doesn't go back to roaming
             StopCoroutine(chaseCoroutine);
             chaseCoroutine = null;
@@ -438,16 +452,14 @@ public class EnemyAI3 : MonoBehaviour
             yield break;
         }
         //reached here means currtarget still exists and we have made eye contact with him
-        else{StartCoroutine(StareDownRival(null));}
+        else{StartCoroutine(StareDownRival());}
     }
     private bool IsVisible(){
-
         Vector3 directionToTarget;
         if(currentTarget.CompareTag(playerTag)){directionToTarget = currentTarget.GetComponent<ThirdPersonMovementScript>().GetEyesTransform().position - eyes.position;}
         else{directionToTarget = currentTarget.GetComponent<EnemyAI3>().GetEyesTransform().position - eyes.position;}
 
-        if (!Physics.Raycast(eyes.position, directionToTarget.normalized, out RaycastHit hit, directionToTarget.magnitude, obstacleL))
-        {
+        if (!Physics.Raycast(eyes.position, directionToTarget.normalized, out RaycastHit hit, directionToTarget.magnitude, obstacleL)){
             Debug.DrawRay(eyes.position, directionToTarget, Color.red, 10f);
             return true;
         }
@@ -455,6 +467,40 @@ public class EnemyAI3 : MonoBehaviour
     }
     private void AnimationEventNextStep(){
         AnimationAttackEvent?.Invoke(this, new AttackEvent{TargetTransform=currentTarget, AttackCenterForward=attackCenter, TargetL=targetL});
+    }
+    private void SlowAnim(){SetAnimationSpeed(0);} // Slow mode
+    private void SpeedAnim(){SetAnimationSpeed(1);} // Fast mode
+    private void VarySpeedAnim(){
+        int mode = UnityEngine.Random.value < 0.5f ? 0 : 1; // Randomly pick slow (0) or fast (1)
+        SetAnimationSpeed(mode);
+    }
+    private void SetAnimationSpeed(int mode){
+        if (speedCoroutine != null){StopCoroutine(speedCoroutine);}
+        float pauseTime = UnityEngine.Random.value;
+        speedCoroutine = StartCoroutine(ChangeSpeedAnimator(pauseTime, mode));
+    }
+    private IEnumerator ChangeSpeedAnimator(float pauseTime, int mode){
+        float newSpeed;
+        float newPauseTime = pauseTime;
+        if (mode == 0){ // slow mode
+            newSpeed = UnityEngine.Random.Range(0.2f, 0.8f);
+        }
+        else if (mode == 1){ // fast mode
+            newSpeed = UnityEngine.Random.Range(1.2f, 2.5f);
+        }
+        else{ // normal mode
+            newSpeed = 1f; // Default speed
+        }
+        bool animChange = UnityEngine.Random.value < enemyInfo.GetAnimChangeProbability();
+        if(!animChange){
+            newSpeed = 1f;
+            newPauseTime = 0f;
+        }
+        Debug.Log($"Setting animation speed to {newSpeed} for {newPauseTime} seconds.");
+        _anim.speed = newSpeed;
+        yield return new WaitForSeconds(newPauseTime);
+        _anim.speed = 1f; 
+        speedCoroutine = null;
     }
     public Transform GetEyesTransform(){
         return eyes;

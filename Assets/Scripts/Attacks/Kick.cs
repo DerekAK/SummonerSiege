@@ -4,14 +4,13 @@ using UnityEngine.AI;
 
 public class Kick : BaseAttackScript
 {
-    private EnemyAI3 _enemyScript;
     private float attackRadius = 10f;
     private float forceMultiplier = 50000f;
     private Transform _attackCenter;
 
     private void Awake(){
         _enemyScript = GetComponent<EnemyAI3>();
-        clipToOverride = "Attack" +  attackType.ToString() + " Placeholder";
+        OverrideClip();
     }
     
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ 
