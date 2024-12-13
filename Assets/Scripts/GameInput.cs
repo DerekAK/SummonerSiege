@@ -19,7 +19,7 @@ public class GameInput : MonoBehaviour
         gameInputScript.Disable();
     }
     public Vector2 GetPlayerMovementVectorNormalized(){
-        Debug.Log(gameInputScript.Player.Move.ReadValue<Vector2>().normalized);
+        //Debug.Log(gameInputScript.Player.Move.ReadValue<Vector2>().normalized);
         return gameInputScript.Player.Move.ReadValue<Vector2>().normalized;
     }
 

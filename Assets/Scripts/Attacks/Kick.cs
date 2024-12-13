@@ -14,7 +14,6 @@ public class Kick : BaseAttackScript
     }
     
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ 
-        Debug.Log("Entered Kick Execute Attack!");
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
         _attackCenter = e.AttackCenterForward; //for gizmos purpose
         Vector3 attackCenter = e.AttackCenterForward.position;

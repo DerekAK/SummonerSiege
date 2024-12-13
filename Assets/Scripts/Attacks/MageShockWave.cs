@@ -16,7 +16,6 @@ public class MageShockWave : BaseAttackScript
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
         _enemyScript.AnimationAttackEvent += EndRotation;
-        Debug.Log("Do Something!");
 
         EnemySpecificInfo enemyInfo = GetComponent<EnemySpecificInfo>();
         hasStartCrashedDown = false;

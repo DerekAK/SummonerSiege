@@ -5,11 +5,11 @@ using System.Collections;
 using System;
 
 public class EnemyAI3 : MonoBehaviour{
-    private bool isAttacking;
+    private float chaseGiveUpTime;
+    private BaseAttackScript attackChosen;
     private bool hasMelee, hasMedium, hasLong;
     private int countMeleeInRow, countMediumInRow, countLongInRow = 0;
     private List<BaseAttackScript> meleeAttacks, mediumAttacks, longAttacks;
-    private Rigidbody _rb;
     private NavMeshAgent _agent;
     private Animator _anim;
     private AnimatorOverrideController _templateOverrider;
@@ -45,13 +45,15 @@ public class EnemyAI3 : MonoBehaviour{
     [SerializeField] private int maxIdleTime = 20;
     [SerializeField] private int roamingSpeed = 10;
     [SerializeField] private int chasingSpeed = 15;
-    private EnemySpecificInfo enemyInfo;
-    private EnemyAttackManager enemyAttackInfo;
+    private EnemySpecificInfo _enemyInfo;
+    private EnemyAttackManager _enemyAttackManager;
     private bool isWeaponOut;
     private enum EnemyState{Idle = 0, Roaming = 1, Alert = 2, Chasing = 3, DecideAttack = 4, MeleeAttack = 5, MediumAttack = 6, 
     LongRangeAttack = 7, UnsheathWeapon = 8, SheathWeapon = 9, ReceiveWeapon = 10}
     private EnemyState currentEnemyState;
     public class AttackEvent : EventArgs{
+        public BaseAttackScript AttackChosen{get;set;}
+        public float ChaseGiveUpTime{get;set;} 
         public Transform TargetTransform{ get;set;}
         public Transform AttackCenterForward{ get;set;}
         public LayerMask TargetL{get;set;}
@@ -60,11 +62,10 @@ public class EnemyAI3 : MonoBehaviour{
     public event EventHandler<AttackEvent> AnimationAttackEvent;
 
     private void Awake(){
-        enemyAttackInfo = GetComponent<EnemyAttackManager>();
+        _enemyAttackManager = GetComponent<EnemyAttackManager>();
         isWeaponOut = false;
 
-        HandleAnimation(); //sets up a unique copy of the animatorOverrider for each enemy instance
-        _rb = GetComponent<Rigidbody>();
+        SetUpAnimator(); //sets up a unique copy of the animatorOverrider for each enemy instance
         _anim = GetComponent<Animator>();
         _agent = GetComponent<NavMeshAgent>();
         _aggroCollider = GetComponent<SphereCollider>();
@@ -77,24 +78,27 @@ public class EnemyAI3 : MonoBehaviour{
         _agent.radius = 0.1f;
         targetTag = playerTag;
         targetL = playerL;
-        enemyInfo = GetComponent<EnemySpecificInfo>();
+        _enemyInfo = GetComponent<EnemySpecificInfo>();
         attackScripts = new List<BaseAttackScript>(GetComponents<BaseAttackScript>());
     }
     //every enemy instance will get it's own overrider copy
-    private void HandleAnimation(){
+    private void SetUpAnimator(){
         _anim = GetComponent<Animator>();
         _templateOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
         _copyOverrider = new AnimatorOverrideController(_templateOverrider);
         _anim.runtimeAnimatorController = _copyOverrider;
     }
     private void Start(){
+        _enemyAttackManager.HandleAnimations(isWeaponOut);
         playersInGame = GameManager.Instance.getPlayerTransforms();
         startPosition = feet.position;
         //can set to idle immediately because spawnscript will ensure no enemy is spawned in with a player in its aggrosphere
         Idle();
     }
     private void Update(){
-        Debug.Log("Count of inRange Targets: " + targetsInRangeOfEnemy.Count);
+        //Debug.Log("Count of inRange Targets: " + targetsInRangeOfEnemy.Count);
+        Debug.Log(currentTarget);
+        if(currentTarget){transform.LookAt(new Vector3(currentTarget.position.x, transform.position.y, currentTarget.position.z));}
     }
     private void Idle(){
         _agent.ResetPath();
@@ -120,7 +124,7 @@ public class EnemyAI3 : MonoBehaviour{
     }
     private IEnumerator RoamingCoroutine(){
         yield return new WaitForSeconds(0.1f);
-        while(_agent.remainingDistance <= _agent.stoppingDistance){
+        while(_agent.remainingDistance > _agent.stoppingDistance){
             yield return null;
         }
         Idle();
@@ -137,7 +141,9 @@ public class EnemyAI3 : MonoBehaviour{
         if(other.CompareTag(targetTag)){
             targetsInRangeOfEnemy.Remove(other.transform); //will remove from list regardless, that way can check later on in waitstopattacking
             if(other.transform == currentTarget){
+                Debug.Log("Registered currTarget leaving aggro sphere");
                 if(currentEnemyState == EnemyState.DecideAttack || currentEnemyState == EnemyState.Chasing){ //safe to remove current target
+                    Debug.Log("Safe to remove currentTarget");
                     currentTarget = null;
                 }
                 else{ //not safe to remove current target since most attacks depend on currTarget transform, so need to wait until not attacking
@@ -147,7 +153,7 @@ public class EnemyAI3 : MonoBehaviour{
         }  
     }
     private IEnumerator WaitStopAttacking(){
-        Debug.Log("GOT HEREasdgasnidgjkansdiglu");
+        Debug.Log("Not safe to remove currentTarget");
         while(currentEnemyState != EnemyState.DecideAttack){
             yield return null;
         }
@@ -202,15 +208,18 @@ public class EnemyAI3 : MonoBehaviour{
     IEnumerator StareDownRival(){ //this is to look at the player before you attack them, and pause for a bit
         // job of this function is to turn towards the player, decide if doing a chained attack, 
         // decide the attack, set animation of the attack, perform the attack and the attack animation will then call this function again
+        _enemyAttackManager.HandleAnimations(isWeaponOut);
+        
+        AnimationAttackEvent = null; //unsubscribe all subscribers from animationattackevent at this step too just in case
         currentEnemyState = EnemyState.DecideAttack;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
         yield return new WaitForSeconds(0.1f);
         if(currentTarget){
             //Debug.Log("CountMeleeInRow: " + countMeleeInRow + "     CountMediumInRow: " + countMediumInRow + "       CountLongInRow: " + countLongInRow);
             _agent.ResetPath();
-            bool isChainAttack = UnityEngine.Random.value < enemyInfo.GetChainProbability();
-            float waitTime = enemyInfo.GetWaitTimeAfterAttack();
-            float chaseGiveUpTime = enemyInfo.GetChaseGiveUpTime();
+            bool isChainAttack = UnityEngine.Random.value < _enemyInfo.GetChainProbability();
+            float waitTime = _enemyInfo.GetWaitTimeAfterAttack();
+            chaseGiveUpTime = _enemyInfo.GetChaseGiveUpTime();
             if(isChainAttack){
                 waitTime = 0f;
                 chaseGiveUpTime = 2f;
@@ -218,7 +227,6 @@ public class EnemyAI3 : MonoBehaviour{
             float elapsedTime = 0f;
             while(elapsedTime < waitTime){
                 if(currentTarget){
-                    transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
                     elapsedTime += Time.deltaTime;
                     yield return null;
                 }
@@ -227,34 +235,28 @@ public class EnemyAI3 : MonoBehaviour{
                     yield break;
                 }
             }
-            transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
             bool isCurrentPlayerVisible = IsVisible();
             if (isCurrentPlayerVisible){
-                transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
                 //we have rotated towards the current target after a time, and the current target exists, so we are safe to decide an attack
                 
-                BaseAttackScript attackChosen = DecideAttack();
-                int weaponType;
-                if(attackChosen.GetWeaponType() != 0 && !isWeaponOut){
-                    Debug.Log("UNSHEATHE WEAPON!");
-                    weaponType = attackChosen.GetWeaponType();
-                    float unsheathClipLength = enemyAttackInfo.HandleUnsheathAnimation(weaponType);
+                attackChosen = DecideAttack();
+                //Debug.Log("Chosen Attack: " + attackChosen);
+                if(attackChosen.DoesRequireWeapon() && !isWeaponOut){
+                    //Debug.Log("UNSHEATHE WEAPON!");
                     currentEnemyState = EnemyState.UnsheathWeapon;
                     _anim.SetInteger("EnemyState", (int)currentEnemyState);
                     isWeaponOut = true;
-                    StartCoroutine(waitSheathUnsheathe(unsheathClipLength, attackChosen, chaseGiveUpTime));
+                    AnimationAttackEvent += EndOfSheatheUnsheatheAnimation;
                 }
-                else if(attackChosen.GetWeaponType() == 0 && isWeaponOut){
-                    Debug.Log("SHEATHE WEAPON!");
-                    weaponType = enemyAttackInfo.GetWeaponEquipped().GetComponent<BaseWeaponScript>().GetWeaponType();
-                    float sheathClipLength = enemyAttackInfo.HandleSheathAnimation(weaponType);
+                else if(!attackChosen.DoesRequireWeapon() && isWeaponOut){
+                    //Debug.Log("SHEATHE WEAPON!");
                     currentEnemyState = EnemyState.SheathWeapon;
                     _anim.SetInteger("EnemyState", (int)currentEnemyState);
                     isWeaponOut = false;
-                    StartCoroutine(waitSheathUnsheathe(sheathClipLength, attackChosen, chaseGiveUpTime));
+                    AnimationAttackEvent += EndOfSheatheUnsheatheAnimation;
                 }
                 else{
-                    Debug.Log("NEITHER SHEATHE NOR UNSHEATHE!");
+                    //Debug.Log("NEITHER SHEATHE NOR UNSHEATHE!");
                     PerformAttack(attackChosen, chaseGiveUpTime);
                 }
             }
@@ -268,23 +270,9 @@ public class EnemyAI3 : MonoBehaviour{
             yield break;
         }
     }
-    private IEnumerator waitSheathUnsheathe(float clipLength, BaseAttackScript attackChosen, float chaseGiveUpTime){
-        float elapsedTime = 0f;
-        Debug.Log("REACHED HERE!");
-        Debug.Log("CLIP LENGTH: " + clipLength);
-        while(elapsedTime < clipLength){
-            if(currentTarget){
-                elapsedTime += Time.deltaTime;
-                transform.LookAt(new Vector3(currentTarget.position.x, feet.position.y, currentTarget.position.z));
-                yield return null;
-            }
-            else{
-                BecomeAlert();
-                yield break;
-            }
-        }
-        //got here means that sheathe/unsheathe clip finished
-        PerformAttack(attackChosen, chaseGiveUpTime);
+    private void EndOfSheatheUnsheatheAnimation(object sender, AttackEvent e){ //this will be invoked from animationattackevent in unsheathe and sheathe animations
+        AnimationAttackEvent -= EndOfSheatheUnsheatheAnimation;
+        PerformAttack(e.AttackChosen, e.ChaseGiveUpTime);
     }
     private void OnDisable(){AnimationAttackEvent = null;}
     private void PerformAttack(BaseAttackScript attackChosen, float chaseGiveUpTime){
@@ -292,27 +280,52 @@ public class EnemyAI3 : MonoBehaviour{
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
         AnimationAttackEvent = null; //unsubscribe all subscribers from animationattackevent before each new attack
         attackChosen.HandleAnimation();
-        AnimationAttackEvent += attackChosen.ExecuteAttack;
-
+        
+        if(attackChosen.DoesRequireWeapon()){
+            List<Transform> currWeapons = _enemyAttackManager.GetWeaponsEquipped();
+            if(currWeapons.Count == 1){ //single handed weapon
+                _enemyAttackManager.SetParentOfTransform(currWeapons[0], _enemyInfo.GetRightHandTransform(), 
+                attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset());
+            }
+            else{ //double handed weapon
+                _enemyAttackManager.SetParentOfTransform(currWeapons[0], _enemyInfo.GetRightHandTransform(), 
+                attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset());
+                _enemyAttackManager.SetParentOfTransform(currWeapons[1], _enemyInfo.GetLeftHandTransform(), 
+                attackChosen.GetSecondWeaponPositionOffset(), attackChosen.GetSecondWeaponRotationOffset());
+            }
+        }
         switch(attackChosen.GetAttackType()){
             case 1: //for melee
                 Chase(chaseGiveUpTime);
                 break;
             case 2: //for medium
-                Debug.Log("REACHED HERE4");
+                StartCoroutine(TransitionToAttack(2));
+                break;
+            case 3: //for long
+                StartCoroutine(TransitionToAttack(3));
+                break;
+        }
+    }
+    private IEnumerator TransitionToAttack(int mode){
+        yield return new WaitForSeconds(0.1f);
+        if(currentTarget){
+            if(mode == 2){
                 currentEnemyState = EnemyState.MediumAttack;
                 _anim.SetInteger("EnemyState", (int)currentEnemyState);
                 countMediumInRow ++;
                 countLongInRow =0;
                 countMeleeInRow =0;
-                break;
-            case 3: // for long range
+            }
+            else if(mode == 3){
                 currentEnemyState = EnemyState.LongRangeAttack;
                 _anim.SetInteger("EnemyState", (int)currentEnemyState);
                 countLongInRow ++;
                 countMediumInRow =0;
                 countMeleeInRow =0;
-                break;
+            }
+        }
+        else{
+            BecomeAlert();
         }
     }
     private BaseAttackScript DecideAttack(){
@@ -348,7 +361,6 @@ public class EnemyAI3 : MonoBehaviour{
         foreach (var attack in filteredAttacks){
             cumulativeWeight += attack.GetAttackWeight();
             if (randomValue <= cumulativeWeight){
-                Debug.Log("Chosen Attack:" + attack);
                 return attack; // Selected attack
             }
         }
@@ -384,7 +396,6 @@ public class EnemyAI3 : MonoBehaviour{
                 }
             }
             // either in range of target or have to give up chasing after specified time
-            Debug.Log("REACHED HERE");
             if(currentTarget){
                 if(elapsedTime < chaseTime){
                     currentEnemyState = EnemyState.MeleeAttack;
@@ -394,13 +405,26 @@ public class EnemyAI3 : MonoBehaviour{
                     countMediumInRow =0;        
                 }
                 else{
-                    Debug.Log("REACHED HERE2!");
-                    if(hasMedium){
-                        Debug.Log("READHED HERE3!");
-                        PerformAttack(GetAttack(mediumAttacks), 0); //int value you provide doesn't matter
+                    List<BaseAttackScript> filteredMediumAttacks;
+                    List<BaseAttackScript> filteredLongAttacks;
+                    if(isWeaponOut){
+                        filteredMediumAttacks = mediumAttacks.FindAll(attack => attack.DoesRequireWeapon());
+                        filteredLongAttacks = longAttacks.FindAll(attack => attack.DoesRequireWeapon());
+                        if(filteredMediumAttacks.Count > 0){
+                            PerformAttack(GetAttack(filteredMediumAttacks), 0); //number doesn't matter because only used for melee attacks
+                        }
+                        else if(filteredLongAttacks.Count > 0){PerformAttack(GetAttack(filteredLongAttacks), 0);}
+                        else{StartCoroutine(StareDownRival());}
                     }
-                    else if(hasLong){PerformAttack(GetAttack(longAttacks), 0);}
-                    else{StartCoroutine(StareDownRival());}
+                    else{ //weapon is not out
+                        filteredMediumAttacks = mediumAttacks.FindAll(attack => !attack.DoesRequireWeapon());
+                        filteredLongAttacks = longAttacks.FindAll(attack => !attack.DoesRequireWeapon());
+                        if(filteredMediumAttacks.Count > 0){
+                            PerformAttack(GetAttack(filteredMediumAttacks), 0); //number doesn't matter because only used for melee attacks
+                        }
+                        else if(filteredLongAttacks.Count > 0){PerformAttack(GetAttack(filteredLongAttacks), 0);}
+                        else{StartCoroutine(StareDownRival());}
+                    }
                 }
             }
             else{BecomeAlert();}
@@ -413,19 +437,12 @@ public class EnemyAI3 : MonoBehaviour{
         Vector3 newPos = startPosition + (randDir * roamingRange);
         
         RaycastHit hit; //this is to determine the exact y coordinate of the xz coordinate determined by newpos
-        if (Physics.Raycast(new Vector3(newPos.x, 100f, newPos.z), Vector3.down, out hit, Mathf.Infinity))
-        {   
+        if (Physics.Raycast(new Vector3(newPos.x, 100f, newPos.z), Vector3.down, out hit, Mathf.Infinity)){   
             Debug.DrawRay(new Vector3(newPos.x, 100f, newPos.z), Vector3.down * 200f, Color.red, 3f);
             NavMeshHit navHit;
             if (NavMesh.SamplePosition(hit.point, out navHit, 100f, NavMesh.AllAreas)){return navHit.position;} // Return the valid NavMesh position
         }
         return startPosition;
-    }
-    private void CancelIdle(){
-        if (idleCoroutine != null){ //this is if the enemy went from idle to alert, need to do this so doesn't go back to roaming
-            StopCoroutine(idleCoroutine);
-            idleCoroutine = null;
-        }
     }
     private void CancelAlert(){
         if (alertCoroutine != null){ //this is if the enemy went from idle to alert, need to do this so doesn't go back to roaming
@@ -466,7 +483,7 @@ public class EnemyAI3 : MonoBehaviour{
         return false;
     }
     private void AnimationEventNextStep(){
-        AnimationAttackEvent?.Invoke(this, new AttackEvent{TargetTransform=currentTarget, AttackCenterForward=attackCenter, TargetL=targetL});
+        AnimationAttackEvent?.Invoke(this, new AttackEvent{AttackChosen = attackChosen, ChaseGiveUpTime = chaseGiveUpTime, TargetTransform=currentTarget, AttackCenterForward=attackCenter, TargetL=targetL});
     }
     private void SlowAnim(){SetAnimationSpeed(0);} // Slow mode
     private void SpeedAnim(){SetAnimationSpeed(1);} // Fast mode
@@ -486,23 +503,26 @@ public class EnemyAI3 : MonoBehaviour{
             newSpeed = UnityEngine.Random.Range(0.2f, 0.8f);
         }
         else if (mode == 1){ // fast mode
-            newSpeed = UnityEngine.Random.Range(1.2f, 2.5f);
+            newSpeed = UnityEngine.Random.Range(1.2f, 1.8f);
         }
         else{ // normal mode
             newSpeed = 1f; // Default speed
         }
-        bool animChange = UnityEngine.Random.value < enemyInfo.GetAnimChangeProbability();
+        bool animChange = UnityEngine.Random.value < _enemyInfo.GetAnimChangeProbability();
         if(!animChange){
             newSpeed = 1f;
             newPauseTime = 0f;
         }
-        Debug.Log($"Setting animation speed to {newSpeed} for {newPauseTime} seconds.");
+        //Debug.Log($"Setting animation speed to {newSpeed} for {newPauseTime} seconds.");
         _anim.speed = newSpeed;
         yield return new WaitForSeconds(newPauseTime);
         _anim.speed = 1f; 
         speedCoroutine = null;
     }
-    public Transform GetEyesTransform(){
+    private Transform GetEyesTransform(){
         return eyes;
+    }
+    public Transform GetFeetTransform(){
+        return feet;
     }
 }

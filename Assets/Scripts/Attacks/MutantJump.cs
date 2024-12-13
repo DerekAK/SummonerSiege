@@ -19,15 +19,17 @@ public class MutantJump : BaseAttackScript
         OverrideClip();
     }
     public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ //in this case, its the start of the jump
-        Debug.Log("EXECUTE ATTACK FOR MUTANT JUMP!");
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
+        _enemyScript.AnimationAttackEvent += JumpUp;
+    }
+    private void JumpUp(object sender, EnemyAI3.AttackEvent e){
+        _enemyScript.AnimationAttackEvent -= JumpUp;
         _enemyScript.AnimationAttackEvent += CrashDown;
         _rb.useGravity = false;
         StartCoroutine(JumpUp(e.TargetTransform));
     }
     private IEnumerator JumpUp(Transform playerTransform) //this should run for the amount of time between the two attackanimations (in jumpduration)
     {
-        Debug.Log("JUMP UP!");
         _agent.enabled = false;
         Vector3 endDestination = playerTransform.position + Vector3.up * 30f;
         Vector3 origin = transform.position;
@@ -35,10 +37,8 @@ public class MutantJump : BaseAttackScript
 
         float elapsedTime = 0f;
 
-        while (elapsedTime < jumpUpDuration)
-        {
+        while (elapsedTime < jumpUpDuration){
             // Interpolate horizontal position only
-            transform.LookAt(new Vector3(playerTransform.position.x, transform.position.y, playerTransform.position.z));
             float t = elapsedTime / jumpUpDuration;
             Vector3 newPosition = Vector3.Lerp(origin, destination, t);
             transform.position = newPosition;
@@ -57,16 +57,25 @@ public class MutantJump : BaseAttackScript
     private IEnumerator JumpDown(Transform enemyTransform, Transform playerTransform){
         float elapsedTime = 0f;
         Vector3 start= enemyTransform.position;
-        Vector3 end = playerTransform.position;
-        while (elapsedTime < jumpDownDuration)
-        {
+        Vector3 newPos = playerTransform.position;
+        Vector3 end = new Vector3();
+        RaycastHit hit; //this is to determine the exact y coordinate of the xz coordinate determined by newpos
+        if (Physics.Raycast(new Vector3(newPos.x, 100f, newPos.z), Vector3.down, out hit, Mathf.Infinity)){   
+            Debug.DrawRay(new Vector3(newPos.x, 100f, newPos.z), Vector3.down * 200f, Color.red, 3f);
+            NavMeshHit navHit;
+            if (NavMesh.SamplePosition(hit.point, out navHit, 100f, NavMesh.AllAreas)){end = navHit.position;} // Return the valid NavMesh position
+        }
+        else{
+            end = playerTransform.position;
+        }
+        _rb.useGravity = true;
+        while (elapsedTime < jumpDownDuration){
             float t = elapsedTime / jumpDownDuration;
             Vector3 newPosition = Vector3.Lerp(start, end, t);
             enemyTransform.position = newPosition;
             elapsedTime += Time.deltaTime;
             yield return null;
         }
-        _rb.useGravity = true;
         _agent.enabled = true;
     }
 
