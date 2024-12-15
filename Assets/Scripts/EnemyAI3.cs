@@ -101,6 +101,7 @@ public class EnemyAI3 : MonoBehaviour{
         if(currentTarget){transform.LookAt(new Vector3(currentTarget.position.x, transform.position.y, currentTarget.position.z));}
     }
     private void Idle(){
+        if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(0);} //0 for idle
         _agent.ResetPath();
         currentEnemyState = EnemyState.Idle;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
@@ -115,6 +116,7 @@ public class EnemyAI3 : MonoBehaviour{
         Roam();
     }
     private void Roam(){
+        if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(1);} //1 for roaming
         currentEnemyState = EnemyState.Roaming;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
         _agent.speed = roamingSpeed;
@@ -165,6 +167,7 @@ public class EnemyAI3 : MonoBehaviour{
         yield break;
     }
     private void BecomeAlert(){
+        if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(2);} //2 for alert
         _agent.ResetPath(); 
         currentEnemyState = EnemyState.Alert;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
@@ -367,6 +370,7 @@ public class EnemyAI3 : MonoBehaviour{
         return null;
     }
     private void Chase(float chaseTime){
+        if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(3);} //3 for chasing
         _agent.speed = chasingSpeed;
         chaseCoroutine = StartCoroutine(ChaseCoroutine(chaseTime));
     }

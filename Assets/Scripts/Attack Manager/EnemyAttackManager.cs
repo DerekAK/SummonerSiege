@@ -58,6 +58,66 @@ public class EnemyAttackManager : MonoBehaviour
         childTransform.localPosition = positionOffset;
         childTransform.localEulerAngles = rotationOffset;
     }
+    
+    public void HandleWeaponPosition(int animationType){ //0 is idle, 1 is roaming, 2 is alert, 3 is chasing
+        if(currentWeaponsEquipped.Count > 0){    
+            Vector3 positionOffset, rotationOffset;
+            Transform weapon = currentWeaponsEquipped[0];
+            switch(animationType){
+                case 0:
+                    positionOffset = weapon.GetComponent<BaseWeaponScript>().GetPositionOffsetFirstWeaponIdle();
+                    rotationOffset = weapon.GetComponent<BaseWeaponScript>().GetRotationOffsetFirstWeaponIdle();
+                    break;
+                case 1: 
+                    positionOffset = weapon.GetComponent<BaseWeaponScript>().GetPositionOffsetFirstWeaponRoaming();
+                    rotationOffset = weapon.GetComponent<BaseWeaponScript>().GetRotationOffsetFirstWeaponRoaming();
+                    break;
+                case 2: 
+                    positionOffset = weapon.GetComponent<BaseWeaponScript>().GetPositionOffsetFirstWeaponAlert();
+                    rotationOffset = weapon.GetComponent<BaseWeaponScript>().GetRotationOffsetFirstWeaponAlert();
+                    break;
+                case 3: 
+                    positionOffset = weapon.GetComponent<BaseWeaponScript>().GetPositionOffsetFirstWeaponChasing();
+                    rotationOffset = weapon.GetComponent<BaseWeaponScript>().GetRotationOffsetFirstWeaponChasing();
+                    break;
+                default:
+                    positionOffset = Vector3.zero;
+                    rotationOffset = Vector3.zero;
+                    break;
+            }
+            weapon.localPosition = positionOffset;
+            weapon.localEulerAngles = rotationOffset;
+            if(currentWeaponsEquipped.Count == 2){
+                Vector3 positionOffset2, rotationOffset2;
+                Transform weapon2 = currentWeaponsEquipped[1];
+                switch(animationType){
+                    case 0:
+                        positionOffset2 = weapon2.GetComponent<BaseWeaponScript>().GetPositionOffsetSecondWeaponIdle();
+                        rotationOffset2 = weapon2.GetComponent<BaseWeaponScript>().GetRotationOffsetSecondWeaponIdle();
+                        break;
+                    case 1: 
+                        positionOffset2 = weapon2.GetComponent<BaseWeaponScript>().GetPositionOffsetSecondWeaponRoaming();
+                        rotationOffset2 = weapon2.GetComponent<BaseWeaponScript>().GetRotationOffsetSecondWeaponRoaming();
+                        break;
+                    case 2:
+                        positionOffset2 = weapon2.GetComponent<BaseWeaponScript>().GetPositionOffsetSecondWeaponAlert();
+                        rotationOffset2 = weapon2.GetComponent<BaseWeaponScript>().GetRotationOffsetSecondWeaponAlert();
+                        break;
+                    case 3: 
+                        positionOffset2 = weapon2.GetComponent<BaseWeaponScript>().GetPositionOffsetSecondWeaponChasing();
+                        rotationOffset2 = weapon2.GetComponent<BaseWeaponScript>().GetRotationOffsetSecondWeaponChasing();
+                        break;
+                    default:
+                        positionOffset2 = Vector3.zero;
+                        rotationOffset2 = Vector3.zero;
+                        break;
+                }
+                weapon2.localPosition = positionOffset2;
+                weapon2.localEulerAngles = rotationOffset2;
+            }
+
+        } 
+    }
 
     //next several functions are all called by the Sheathe/Unsheathe AnimationClips
     private void MoveSingleWeaponToRightHandForUnsheath(){ //function called by unsheathe animations 
@@ -111,7 +171,6 @@ public class EnemyAttackManager : MonoBehaviour
             _animOverrider["Roaming Placeholder"] = currentWeaponsEquipped[0].GetComponent<BaseWeaponScript>().GetRoamingWeaponClip();
             _animOverrider["Chasing Placeholder"] = currentWeaponsEquipped[0].GetComponent<BaseWeaponScript>().GetChasingWeaponClip();
             _animOverrider["Alert Placeholder"] = currentWeaponsEquipped[0].GetComponent<BaseWeaponScript>().GetAlertWeaponClip();
-            
         }
         else{
             _animOverrider["Idle Placeholder"] = unarmedIdleClip;
