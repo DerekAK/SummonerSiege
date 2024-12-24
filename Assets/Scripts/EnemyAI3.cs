@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
 using System;
+using TMPro;
 
 public class EnemyAI3 : MonoBehaviour{
     private float chaseGiveUpTime;
@@ -79,7 +80,6 @@ public class EnemyAI3 : MonoBehaviour{
         targetTag = playerTag;
         targetL = playerL;
         _enemyInfo = GetComponent<EnemySpecificInfo>();
-        attackScripts = new List<BaseAttackScript>(GetComponents<BaseAttackScript>());
     }
     //every enemy instance will get it's own overrider copy
     private void SetUpAnimator(){
@@ -89,7 +89,7 @@ public class EnemyAI3 : MonoBehaviour{
         _anim.runtimeAnimatorController = _copyOverrider;
     }
     private void Start(){
-        _enemyAttackManager.HandleAnimations(isWeaponOut);
+        attackScripts = _enemyAttackManager.GetCurrentAvailableAttacks();
         playersInGame = GameManager.Instance.getPlayerTransforms();
         startPosition = feet.position;
         //can set to idle immediately because spawnscript will ensure no enemy is spawned in with a player in its aggrosphere
@@ -98,7 +98,7 @@ public class EnemyAI3 : MonoBehaviour{
     private void Update(){
         //Debug.Log("Count of inRange Targets: " + targetsInRangeOfEnemy.Count);
         Debug.Log(currentTarget);
-        if(currentTarget){transform.LookAt(new Vector3(currentTarget.position.x, transform.position.y, currentTarget.position.z));}
+        if(currentTarget != null){transform.LookAt(new Vector3(currentTarget.position.x, transform.position.y, currentTarget.position.z));}
     }
     private void Idle(){
         if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(0);} //0 for idle

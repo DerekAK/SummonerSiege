@@ -1,5 +1,3 @@
-using System.Collections;
-using Unity.VisualScripting;
 using UnityEngine;
 public abstract class BaseAttackScript : MonoBehaviour
 {
@@ -27,8 +25,10 @@ public abstract class BaseAttackScript : MonoBehaviour
 
     [SerializeField] protected float attackWeight;
     public float GetAttackWeight(){return attackWeight;}
+    public void SetAttackWeight(float newWeight){attackWeight = newWeight;}
 
     [SerializeField] protected AnimationClip clip;
+    public AnimationClip getAnimationClip(){return clip;}
     protected void OverrideClip(){clipToOverride = "Attack" +  attackType.ToString() + " Placeholder";}
     protected string clipToOverride;
     public abstract void ExecuteAttack(object sender, EnemyAI3.AttackEvent e);
@@ -36,7 +36,9 @@ public abstract class BaseAttackScript : MonoBehaviour
     protected AnimatorOverrideController _animOverrider;
     
     public void HandleAnimation(){
-        _anim = GetComponent<Animator>();
+        Debug.Log(transform.root.gameObject.name);
+        _anim = transform.root.gameObject.GetComponent<Animator>();
+        Debug.Log("ANIMATOR:", _anim);
         _animOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
         _animOverrider[clipToOverride] = clip;
         _enemyScript.AnimationAttackEvent += ExecuteAttack;

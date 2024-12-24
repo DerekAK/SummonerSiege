@@ -23,4 +23,8 @@ public class EnemySpecificInfo : MonoBehaviour
    public float GetAnimChangeProbability(){return animChangeProbability;}
    [SerializeField] private float weaponSpawnProbability;
    public float GetWeaponSpawnProbability(){return weaponSpawnProbability;}
+   [SerializeField] private float detectionTime;
+   public float GetDetectionTime(){
+      return detectionTime;
+   }
 }
