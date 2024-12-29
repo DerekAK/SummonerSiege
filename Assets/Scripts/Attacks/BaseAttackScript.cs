@@ -1,10 +1,10 @@
 using UnityEngine;
 public abstract class BaseAttackScript : MonoBehaviour
 {
-    protected EnemyAI3 _enemyScript;
+    protected EnemyAI4 _enemyScript;
+    protected GameObject _enemyGameObject;
     
     //attack specific information
-
     [Tooltip("Can be empty for non-weapon attacks! Also only fill up the field that is necessary for that attack. To figure out offset, attach the weapon(s) to the respective hand transform and rotate/position weapon until works with animation, and record offset and position here")]
     [SerializeField] private Vector3 weaponPositionOffsetFirstWeapon;
     public Vector3 GetFirstWeaponPositionOffset(){return weaponPositionOffsetFirstWeapon;}
@@ -21,26 +21,31 @@ public abstract class BaseAttackScript : MonoBehaviour
     
     [Tooltip("1-melee, 2-medium-range, 3-long-range")]
     [SerializeField] protected int attackType;
-    public int GetAttackType(){return attackType;}
+    public int GetAttackType(){
+        return attackType;
+    }
 
     [SerializeField] protected float attackWeight;
-    public float GetAttackWeight(){return attackWeight;}
-    public void SetAttackWeight(float newWeight){attackWeight = newWeight;}
-
-    [SerializeField] protected AnimationClip clip;
-    public AnimationClip getAnimationClip(){return clip;}
-    protected void OverrideClip(){clipToOverride = "Attack" +  attackType.ToString() + " Placeholder";}
-    protected string clipToOverride;
-    public abstract void ExecuteAttack(object sender, EnemyAI3.AttackEvent e);
-    protected Animator _anim;
-    protected AnimatorOverrideController _animOverrider;
+    public float GetAttackWeight(){
+        return attackWeight;
+    }
+    public void SetAttackWeight(float newWeight){
+        attackWeight = newWeight;
+    }
     
-    public void HandleAnimation(){
-        Debug.Log(transform.root.gameObject.name);
-        _anim = transform.root.gameObject.GetComponent<Animator>();
-        Debug.Log("ANIMATOR:", _anim);
-        _animOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
-        _animOverrider[clipToOverride] = clip;
+    [SerializeField] protected AnimationClip clip;
+    public AnimationClip getAnimationClip(){
+        return clip;
+    }
+    
+    public abstract void ExecuteAttack(object sender, EnemyAI4.AttackEvent e);
+    
+    public void SetGameObjectReference(GameObject gameObject){
+        _enemyScript = gameObject.GetComponent<EnemyAI4>();
+        _enemyGameObject = gameObject;
+    }
+    
+    public void SubscribeAttackToEvent(){
         _enemyScript.AnimationAttackEvent += ExecuteAttack;
-    }    
+    }
 }

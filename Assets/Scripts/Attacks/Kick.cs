@@ -7,13 +7,8 @@ public class Kick : BaseAttackScript
     private float attackRadius = 10f;
     private float forceMultiplier = 50000f;
     private Transform _attackCenter;
-
-    private void Awake(){
-        _enemyScript = GetComponent<EnemyAI3>();
-        OverrideClip();
-    }
     
-    public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ 
+    public override void ExecuteAttack(object sender, EnemyAI4.AttackEvent e){ 
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
         _attackCenter = e.AttackCenterForward; //for gizmos purpose
         Vector3 attackCenter = e.AttackCenterForward.position;

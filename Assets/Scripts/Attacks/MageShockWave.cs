@@ -4,35 +4,27 @@ using UnityEngine.AI;
 
 public class MageShockWave : BaseAttackScript
 {
+    [SerializeField] private float hoverSpeed = 20f;
     private bool hasStartCrashedDown;
     private Transform _rightHand;
     private NavMeshAgent _agent;
-
-    private void Awake(){
-        _enemyScript = GetComponent<EnemyAI3>();
-        _agent = GetComponent<NavMeshAgent>();
-        OverrideClip();
-    }
-    public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){
+    public override void ExecuteAttack(object sender, EnemyAI4.AttackEvent e){
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
         _enemyScript.AnimationAttackEvent += EndRotation;
 
-        EnemySpecificInfo enemyInfo = GetComponent<EnemySpecificInfo>();
+        _agent = _enemyGameObject.GetComponent<NavMeshAgent>();
         hasStartCrashedDown = false;
-        StartCoroutine(RotateTowardsPlayerUntilCrash(e.TargetTransform));
+        StartCoroutine(RotateTowardsPlayerUntilCrash(_enemyScript.GetCurrentTarget()));
     }
-
-    private IEnumerator RotateTowardsPlayerUntilCrash(Transform targetTransform)
-    {
-        while (!hasStartCrashedDown)
-        {
+    private IEnumerator RotateTowardsPlayerUntilCrash(Transform targetTransform){
+        _agent.speed = hoverSpeed;
+        while (!hasStartCrashedDown){
             _agent.SetDestination(targetTransform.position);
-            transform.LookAt(new Vector3(targetTransform.position.x, transform.position.y, targetTransform.position.z));
+            _enemyGameObject.transform.LookAt(new Vector3(targetTransform.position.x, _enemyGameObject.transform.position.y, targetTransform.position.z));
             yield return null;
         }
     }
-
-    private void EndRotation(object sender, EnemyAI3.AttackEvent e){ 
+    private void EndRotation(object sender, EnemyAI4.AttackEvent e){ 
         _agent.ResetPath();
         _enemyScript.AnimationAttackEvent -= EndRotation;
         hasStartCrashedDown = true;

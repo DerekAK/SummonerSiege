@@ -89,7 +89,7 @@ public class EnemyAI3 : MonoBehaviour{
         _anim.runtimeAnimatorController = _copyOverrider;
     }
     private void Start(){
-        attackScripts = _enemyAttackManager.GetCurrentAvailableAttacks();
+        //attackScripts = _enemyAttackManager.GetCurrentAvailableAttacks();
         playersInGame = GameManager.Instance.getPlayerTransforms();
         startPosition = feet.position;
         //can set to idle immediately because spawnscript will ensure no enemy is spawned in with a player in its aggrosphere
@@ -101,7 +101,7 @@ public class EnemyAI3 : MonoBehaviour{
         if(currentTarget != null){transform.LookAt(new Vector3(currentTarget.position.x, transform.position.y, currentTarget.position.z));}
     }
     private void Idle(){
-        if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(0);} //0 for idle
+        //if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(0);} //0 for idle
         _agent.ResetPath();
         currentEnemyState = EnemyState.Idle;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
@@ -116,7 +116,7 @@ public class EnemyAI3 : MonoBehaviour{
         Roam();
     }
     private void Roam(){
-        if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(1);} //1 for roaming
+        //if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(1);} //1 for roaming
         currentEnemyState = EnemyState.Roaming;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
         _agent.speed = roamingSpeed;
@@ -167,7 +167,7 @@ public class EnemyAI3 : MonoBehaviour{
         yield break;
     }
     private void BecomeAlert(){
-        if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(2);} //2 for alert
+        //if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(2);} //2 for alert
         _agent.ResetPath(); 
         currentEnemyState = EnemyState.Alert;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
@@ -211,7 +211,7 @@ public class EnemyAI3 : MonoBehaviour{
     IEnumerator StareDownRival(){ //this is to look at the player before you attack them, and pause for a bit
         // job of this function is to turn towards the player, decide if doing a chained attack, 
         // decide the attack, set animation of the attack, perform the attack and the attack animation will then call this function again
-        _enemyAttackManager.HandleAnimations(isWeaponOut);
+        //_enemyAttackManager.HandleAnimations(isWeaponOut);
         
         AnimationAttackEvent = null; //unsubscribe all subscribers from animationattackevent at this step too just in case
         currentEnemyState = EnemyState.DecideAttack;
@@ -282,21 +282,21 @@ public class EnemyAI3 : MonoBehaviour{
         currentEnemyState = EnemyState.DecideAttack;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
         AnimationAttackEvent = null; //unsubscribe all subscribers from animationattackevent before each new attack
-        attackChosen.HandleAnimation();
+        //attackChosen.HandleAnimation();
         
-        if(attackChosen.DoesRequireWeapon()){
-            List<Transform> currWeapons = _enemyAttackManager.GetWeaponsEquipped();
-            if(currWeapons.Count == 1){ //single handed weapon
-                _enemyAttackManager.SetParentOfTransform(currWeapons[0], _enemyInfo.GetRightHandTransform(), 
-                attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset());
-            }
-            else{ //double handed weapon
-                _enemyAttackManager.SetParentOfTransform(currWeapons[0], _enemyInfo.GetRightHandTransform(), 
-                attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset());
-                _enemyAttackManager.SetParentOfTransform(currWeapons[1], _enemyInfo.GetLeftHandTransform(), 
-                attackChosen.GetSecondWeaponPositionOffset(), attackChosen.GetSecondWeaponRotationOffset());
-            }
-        }
+        // if(attackChosen.DoesRequireWeapon()){
+        //     List<Transform> currWeapons = _enemyAttackManager.GetWeaponsEquipped();
+        //     if(currWeapons.Count == 1){ //single handed weapon
+        //         _enemyAttackManager.SetParentOfTransform(currWeapons[0], _enemyInfo.GetRightHandTransform(), 
+        //         attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset());
+        //     }
+        //     else{ //double handed weapon
+        //         _enemyAttackManager.SetParentOfTransform(currWeapons[0], _enemyInfo.GetRightHandTransform(), 
+        //         attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset());
+        //         _enemyAttackManager.SetParentOfTransform(currWeapons[1], _enemyInfo.GetLeftHandTransform(), 
+        //         attackChosen.GetSecondWeaponPositionOffset(), attackChosen.GetSecondWeaponRotationOffset());
+        //     }
+        // }
         switch(attackChosen.GetAttackType()){
             case 1: //for melee
                 Chase(chaseGiveUpTime);
@@ -370,7 +370,7 @@ public class EnemyAI3 : MonoBehaviour{
         return null;
     }
     private void Chase(float chaseTime){
-        if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(3);} //3 for chasing
+        //if(isWeaponOut){_enemyAttackManager.HandleWeaponPosition(3);} //3 for chasing
         _agent.speed = chasingSpeed;
         chaseCoroutine = StartCoroutine(ChaseCoroutine(chaseTime));
     }

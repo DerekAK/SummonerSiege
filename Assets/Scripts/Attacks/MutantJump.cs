@@ -1,57 +1,57 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
-public class MutantJump : BaseAttackScript
-{
+public class MutantJump : BaseAttackScript{
+
+    //enemy ai script will call the animation to play
+    // the animation requires attributes from the enemy ai script including the transform of the player 
+    // question: The animation events will call functions that are on the specific attack script, this makes sense. However, how 
+    // will those functions access the attributes from the enemy ai script? I don't think that the attack script can access the enemy ai script.
+    // this is because the attack script is located on a prefab and that prefab is a serializefield reference in 
     private NavMeshAgent _agent;
     private Rigidbody _rb;
-    private float jumpUpDuration = 1f;
-    private float jumpDownDuration = 0.2f;
+    private float jumpUpDuration = 0.4f;
+    private float jumpDownDuration = 0.3f;
     private float attackRadius = 10f;
     private float forceMultiplier = 50f;
     private Transform attackCenter;
     
-    private void Awake(){
-        _enemyScript = GetComponent<EnemyAI3>();
-        _agent = GetComponent<NavMeshAgent>();
-        _rb = GetComponent<Rigidbody>();
-        attackCenter = transform;
-        OverrideClip();
-    }
-    public override void ExecuteAttack(object sender, EnemyAI3.AttackEvent e){ //in this case, its the start of the jump
+    public override void ExecuteAttack(object sender, EnemyAI4.AttackEvent e){ //in this case, its the start of the jump
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
         _enemyScript.AnimationAttackEvent += JumpUp;
+        _agent = _enemyGameObject.GetComponent<NavMeshAgent>();
+        _rb = _enemyGameObject.GetComponent<Rigidbody>();
+        attackCenter = transform;
     }
-    private void JumpUp(object sender, EnemyAI3.AttackEvent e){
+    private void JumpUp(object sender, EnemyAI4.AttackEvent e){
         _enemyScript.AnimationAttackEvent -= JumpUp;
         _enemyScript.AnimationAttackEvent += CrashDown;
-        _rb.useGravity = false;
-        StartCoroutine(JumpUp(e.TargetTransform));
+        StartCoroutine(JumpUp(_enemyScript.GetCurrentTarget()));
     }
     private IEnumerator JumpUp(Transform playerTransform) //this should run for the amount of time between the two attackanimations (in jumpduration)
     {
         _agent.enabled = false;
+        _rb.useGravity = false;
         Vector3 endDestination = playerTransform.position + Vector3.up * 30f;
-        Vector3 origin = transform.position;
+        Vector3 origin = _enemyGameObject.transform.position;
         Vector3 destination = origin + (endDestination - origin) * 0.7f;
-
         float elapsedTime = 0f;
-
         while (elapsedTime < jumpUpDuration){
             // Interpolate horizontal position only
+            _enemyGameObject.transform.LookAt(new Vector3(playerTransform.position.x, _enemyGameObject.transform.position.y, playerTransform.position.z));
             float t = elapsedTime / jumpUpDuration;
             Vector3 newPosition = Vector3.Lerp(origin, destination, t);
-            transform.position = newPosition;
+            _enemyGameObject.transform.position = newPosition;
             elapsedTime += Time.deltaTime;
             yield return null;
         }
         yield break;
     }
 
-    private void CrashDown(object sender, EnemyAI3.AttackEvent e){ //in this case, its the end of the jump
+    private void CrashDown(object sender, EnemyAI4.AttackEvent e){ //in this case, its the end of the jump
         _enemyScript.AnimationAttackEvent -= CrashDown;
         _enemyScript.AnimationAttackEvent += TrackHits;
-        StartCoroutine(JumpDown(transform, e.TargetTransform));
+        StartCoroutine(JumpDown(_enemyGameObject.transform, _enemyScript.GetCurrentTarget()));
     }
 
     private IEnumerator JumpDown(Transform enemyTransform, Transform playerTransform){
@@ -74,12 +74,13 @@ public class MutantJump : BaseAttackScript
             Vector3 newPosition = Vector3.Lerp(start, end, t);
             enemyTransform.position = newPosition;
             elapsedTime += Time.deltaTime;
+            _enemyGameObject.transform.LookAt(new Vector3(playerTransform.position.x, _enemyGameObject.transform.position.y, playerTransform.position.z));
             yield return null;
         }
         _agent.enabled = true;
     }
 
-    private void TrackHits(object sender, EnemyAI3.AttackEvent e){ 
+    private void TrackHits(object sender, EnemyAI4.AttackEvent e){ 
         _enemyScript.AnimationAttackEvent -= TrackHits;
         Collider[] hitColliders = Physics.OverlapBox(attackCenter.position, Vector3.one * attackRadius, attackCenter.rotation, e.TargetL);
         foreach (Collider hitCollider in hitColliders){

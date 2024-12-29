@@ -1,7 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
-using NUnit.Framework;
 using System.Linq;
+using System.Collections;
+using UnityEngine.AI;
 public class EnemyAttackManager : MonoBehaviour
 {
 
@@ -24,6 +25,9 @@ public class EnemyAttackManager : MonoBehaviour
     [SerializeField] private List<BaseAttackScript> swordShieldAttacks = new List<BaseAttackScript>();
     [SerializeField] private List<BaseAttackScript> doubleWieldingAttacks = new List<BaseAttackScript>();
 
+    private EnemyAI4 _enemyScript;
+    private Rigidbody _rb;
+    private NavMeshAgent _agent;
     public List<BaseAttackScript> GetCurrentAvailableAttacks(){
         if(currentWeaponsEquipped.Count > 0){
             if(currentWeaponsEquipped.Count == 2){return defaultAttacks.Concat(doubleWieldingAttacks).ToList();}
@@ -32,76 +36,90 @@ public class EnemyAttackManager : MonoBehaviour
         }
         else{return defaultAttacks;}
     }
+    public List<BaseAttackScript> GetAllAttacks(){
+        return defaultAttacks.Concat(singleWeaponAttacks).Concat(doubleWieldingAttacks).Concat(swordShieldAttacks).ToList();
+    }
+
     //unarmed clips
     [SerializeField] private AnimationClip unarmedIdleClip;
     [SerializeField] private AnimationClip unarmedRoamingClip;
-    [SerializeField] private AnimationClip unarmedChasingClip;
     [SerializeField] private AnimationClip unarmedAlertClip;
     [SerializeField] private AnimationClip unarmedStareDownClip;
     [SerializeField] private AnimationClip unarmedDodgeClip;
-    [SerializeField] private AnimationClip unarmedRetreatClip;
+    [SerializeField] private AnimationClip unarmedJumpClip;
     [SerializeField] private AnimationClip unarmedRepositionClip;
+    [SerializeField] private AnimationClip unarmedRetreatClip;
     [SerializeField] private AnimationClip unarmedReceiveBuffClip;
     [SerializeField] private AnimationClip unarmedTakeHitClip;
     [SerializeField] private AnimationClip unarmedDieClip;
-    [SerializeField] private AnimationClip unarmedTurnClip;
+    [SerializeField] private AnimationClip unarmedRightTurnClip;
+    [SerializeField] private AnimationClip unarmedLeftTurnClip;
     [SerializeField] private AnimationClip unarmedApproachClip;
 
     //SINGLE WEAPON CLIPS (This assumes same non-attack animations for single and double handed weapons, which makes it simpler)
     [SerializeField] private ArmedAnimationScript singleWeaponIdleClip;
     [SerializeField] private ArmedAnimationScript singleWeaponRoamingClip;
-    [SerializeField] private ArmedAnimationScript singleWeaponChasingClip;
     [SerializeField] private ArmedAnimationScript singleWeaponAlertClip;
     [SerializeField] private ArmedAnimationScript singleWeaponEquipClip;
     [SerializeField] private ArmedAnimationScript singleWeaponUnequipClip;
     [SerializeField] private ArmedAnimationScript singleWeaponStareDownClip;
     [SerializeField] private ArmedAnimationScript singleWeaponDodgeClip;
-    [SerializeField] private ArmedAnimationScript singleWeaponRetreatClip;
+    [SerializeField] private ArmedAnimationScript singleWeaponJumpClip;
     [SerializeField] private ArmedAnimationScript singleWeaponRepositionClip;
+    [SerializeField] private ArmedAnimationScript singleWeaponRetreatClip;
     [SerializeField] private ArmedAnimationScript singleWeaponReceiveBuffClip;
     [SerializeField] private ArmedAnimationScript singleWeaponTakeHitClip;
     [SerializeField] private ArmedAnimationScript singleWeaponDieClip;
-    [SerializeField] private ArmedAnimationScript singleWeaponTurnClip;
+    [SerializeField] private ArmedAnimationScript singleWeaponRightTurnClip;
+    [SerializeField] private ArmedAnimationScript singleWeaponLeftTurnClip;
     [SerializeField] private ArmedAnimationScript singleWeaponApproachClip;
     
     //DOUBLE WIELDING WEAPON CLIPS
     [SerializeField] private ArmedAnimationScript doubleWieldingIdleClip;
     [SerializeField] private ArmedAnimationScript doubleWieldingRoamingClip;
-    [SerializeField] private ArmedAnimationScript doubleWieldingChasingClip;
     [SerializeField] private ArmedAnimationScript doubleWieldingAlertClip;
     [SerializeField] private ArmedAnimationScript doubleWieldingEquipClip;
     [SerializeField] private ArmedAnimationScript doubleWieldingUnequipClip;
     [SerializeField] private ArmedAnimationScript doubleWieldingStareDownClip;
     [SerializeField] private ArmedAnimationScript doubleWieldingDodgeClip;
-    [SerializeField] private ArmedAnimationScript doubleWieldingRetreatClip;
+    [SerializeField] private ArmedAnimationScript doubleWieldingJumpClip;
     [SerializeField] private ArmedAnimationScript doubleWieldingRepositionClip;
+    [SerializeField] private ArmedAnimationScript doubleWieldingRetreatClip;
     [SerializeField] private ArmedAnimationScript doubleWieldingReceiveBuffClip;
     [SerializeField] private ArmedAnimationScript doubleWieldingTakeHitClip;
     [SerializeField] private ArmedAnimationScript doubleWieldingDieClip;
-    [SerializeField] private ArmedAnimationScript doubleWieldingTurnClip;
+    [SerializeField] private ArmedAnimationScript doubleWieldingRightTurnClip;
+    [SerializeField] private ArmedAnimationScript doubleWieldingLeftTurnClip;
     [SerializeField] private ArmedAnimationScript doubleWieldingApproachClip;
 
     //SHIELD SWORD CLIPS
     [SerializeField] private ArmedAnimationScript shieldSwordIdleClip;
     [SerializeField] private ArmedAnimationScript shieldSwordRoamingClip;
-    [SerializeField] private ArmedAnimationScript shieldSwordChasingClip;
     [SerializeField] private ArmedAnimationScript shieldSwordAlertClip;
+    [SerializeField] private ArmedAnimationScript shieldSwordStareDownClip;
+    [SerializeField] private ArmedAnimationScript shieldSwordApproachClip;
     [SerializeField] private ArmedAnimationScript shieldSwordEquipClip;
     [SerializeField] private ArmedAnimationScript shieldSwordUnequipClip;
-    [SerializeField] private ArmedAnimationScript shieldSwordStareDownClip;
     [SerializeField] private ArmedAnimationScript shieldSwordDodgeClip;
-    [SerializeField] private ArmedAnimationScript shieldSwordRetreatClip;
+    [SerializeField] private ArmedAnimationScript shieldSwordBlockClip;
+    [SerializeField] private ArmedAnimationScript shieldSwordJumpClip;
     [SerializeField] private ArmedAnimationScript shieldSwordRepositionClip;
     [SerializeField] private ArmedAnimationScript shieldSwordReceiveBuffClip;
     [SerializeField] private ArmedAnimationScript shieldSwordTakeHitClip;
     [SerializeField] private ArmedAnimationScript shieldSwordDieClip;
-    [SerializeField] private ArmedAnimationScript shieldSwordTurnClip;
-    [SerializeField] private ArmedAnimationScript shieldSwordApproachClip;
-    [SerializeField] private ArmedAnimationScript shieldSwordBlockClip;
+    [SerializeField] private ArmedAnimationScript shieldSwordRightTurnClip;
+    [SerializeField] private ArmedAnimationScript shieldSwordLeftTurnClip;
+    [SerializeField] private ArmedAnimationScript shieldSwordRetreatClip;
 
+    private bool hasJump;
+    public bool HasJump(){return hasJump;}
     private void Awake(){
         _enemyInfo = GetComponent<EnemySpecificInfo>();
         _anim = GetComponent<Animator>();
+        _rb = GetComponent<Rigidbody>();
+        _agent = GetComponent<NavMeshAgent>();
+        _enemyScript = GetComponent<EnemyAI4>();
+        hasJump = unarmedJumpClip && singleWeaponJumpClip && shieldSwordJumpClip && doubleWieldingJumpClip; 
     }
     private void Start(){ //just in case the copy overrider hasn't been assigned yet in EnemyAI3.Awake()
         _animOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
@@ -149,6 +167,30 @@ public class EnemyAttackManager : MonoBehaviour
         childTransform.localEulerAngles = rotationOffset;
     }
     
+    public void HandleWeaponShieldPositionForAttack(BaseAttackScript attackChosen){
+        
+        if(currentWeaponsEquipped.Count == 1 && !currentShieldEquipped){
+            Transform weapon = currentWeaponsEquipped[0];
+            weapon.localPosition = attackChosen.GetFirstWeaponPositionOffset();
+            weapon.localEulerAngles = attackChosen.GetFirstWeaponRotationOffset();
+        }
+        else if(currentShieldEquipped){
+            Transform weapon = currentWeaponsEquipped[0];
+            Transform shield = currentShieldEquipped;
+            weapon.localPosition = attackChosen.GetFirstWeaponPositionOffset();
+            weapon.localEulerAngles = attackChosen.GetFirstWeaponRotationOffset();
+            shield.localPosition = attackChosen.GetSecondWeaponPositionOffset();
+            shield.localEulerAngles = attackChosen.GetSecondWeaponRotationOffset();
+        }
+        else if(currentWeaponsEquipped.Count == 2){
+            Transform weapon1 = currentWeaponsEquipped[0];
+            Transform weapon2 = currentWeaponsEquipped[1];
+            weapon1.localPosition = attackChosen.GetFirstWeaponPositionOffset();
+            weapon1.localEulerAngles = attackChosen.GetFirstWeaponRotationOffset();
+            weapon2.localPosition = attackChosen.GetSecondWeaponPositionOffset();
+            weapon2.localEulerAngles = attackChosen.GetSecondWeaponRotationOffset();
+        }
+    }
     public void HandleWeaponShieldPosition(EnemyAI4.EnemyState animationType){
         if(currentWeaponsEquipped.Count == 1 && !currentShieldEquipped){    
             Vector3 positionOffset, rotationOffset;
@@ -166,9 +208,9 @@ public class EnemyAttackManager : MonoBehaviour
                     positionOffset = singleWeaponAlertClip.GetPositionOffset1();
                     rotationOffset = singleWeaponAlertClip.GetRotationOffset1();
                     break;
-                case EnemyAI4.EnemyState.Chasing: 
-                    positionOffset = singleWeaponChasingClip.GetPositionOffset1();
-                    rotationOffset = singleWeaponChasingClip.GetRotationOffset1();
+                case EnemyAI4.EnemyState.Approach: 
+                    positionOffset = singleWeaponApproachClip.GetPositionOffset1();
+                    rotationOffset = singleWeaponApproachClip.GetRotationOffset1();
                     break;
                 case EnemyAI4.EnemyState.StareDown: 
                     positionOffset = singleWeaponStareDownClip.GetPositionOffset1();
@@ -178,13 +220,17 @@ public class EnemyAttackManager : MonoBehaviour
                     positionOffset = singleWeaponDodgeClip.GetPositionOffset1();
                     rotationOffset = singleWeaponDodgeClip.GetRotationOffset1();
                     break;
-                case EnemyAI4.EnemyState.Retreat: 
-                    positionOffset = singleWeaponRetreatClip.GetPositionOffset1();
-                    rotationOffset = singleWeaponRetreatClip.GetRotationOffset1();
+                case EnemyAI4.EnemyState.Jump: 
+                    positionOffset = singleWeaponJumpClip.GetPositionOffset1();
+                    rotationOffset = singleWeaponJumpClip.GetRotationOffset1();
                     break;
                 case EnemyAI4.EnemyState.Reposition: 
                     positionOffset = singleWeaponRepositionClip.GetPositionOffset1();
                     rotationOffset = singleWeaponRepositionClip.GetRotationOffset1();
+                    break;
+                case EnemyAI4.EnemyState.Retreat: 
+                    positionOffset = singleWeaponRetreatClip.GetPositionOffset1();
+                    rotationOffset = singleWeaponRetreatClip.GetRotationOffset1();
                     break;
                 case EnemyAI4.EnemyState.ReceiveBuff: 
                     positionOffset = singleWeaponReceiveBuffClip.GetPositionOffset1();
@@ -198,13 +244,13 @@ public class EnemyAttackManager : MonoBehaviour
                     positionOffset = singleWeaponDieClip.GetPositionOffset1();
                     rotationOffset = singleWeaponDieClip.GetRotationOffset1();
                     break;
-                case EnemyAI4.EnemyState.Turn: 
-                    positionOffset = singleWeaponTurnClip.GetPositionOffset1();
-                    rotationOffset = singleWeaponTurnClip.GetRotationOffset1();
+                case EnemyAI4.EnemyState.RightTurn: 
+                    positionOffset = singleWeaponRightTurnClip.GetPositionOffset1();
+                    rotationOffset = singleWeaponRightTurnClip.GetRotationOffset1();
                     break;
-                case EnemyAI4.EnemyState.Approach: 
-                    positionOffset = singleWeaponApproachClip.GetPositionOffset1();
-                    rotationOffset = singleWeaponApproachClip.GetRotationOffset1();
+                case EnemyAI4.EnemyState.LeftTurn: 
+                    positionOffset = singleWeaponLeftTurnClip.GetPositionOffset1();
+                    rotationOffset = singleWeaponLeftTurnClip.GetRotationOffset1();
                     break;
                 default:
                     positionOffset = Vector3.zero;
@@ -237,11 +283,11 @@ public class EnemyAttackManager : MonoBehaviour
                     positionOffset2 = shieldSwordAlertClip.GetPositionOffset2();
                     rotationOffset2 = shieldSwordAlertClip.GetRotationOffset2();
                     break;
-                case EnemyAI4.EnemyState.Chasing: 
-                    positionOffset1 = shieldSwordChasingClip.GetPositionOffset1();
-                    rotationOffset1 = shieldSwordChasingClip.GetRotationOffset1();
-                    positionOffset2 = shieldSwordChasingClip.GetPositionOffset2();
-                    rotationOffset2 = shieldSwordChasingClip.GetRotationOffset2();
+                case EnemyAI4.EnemyState.Approach: 
+                    positionOffset1 = shieldSwordApproachClip.GetPositionOffset1();
+                    rotationOffset1 = shieldSwordApproachClip.GetRotationOffset1();
+                    positionOffset2 = shieldSwordApproachClip.GetPositionOffset2();
+                    rotationOffset2 = shieldSwordApproachClip.GetRotationOffset2();
                     break;
                 case EnemyAI4.EnemyState.StareDown: 
                     positionOffset1 = shieldSwordStareDownClip.GetPositionOffset1();
@@ -255,17 +301,23 @@ public class EnemyAttackManager : MonoBehaviour
                     positionOffset2 = shieldSwordDodgeClip.GetPositionOffset2();
                     rotationOffset2 = shieldSwordDodgeClip.GetRotationOffset2();
                     break;
-                case EnemyAI4.EnemyState.Retreat: 
-                    positionOffset1 = shieldSwordRetreatClip.GetPositionOffset1();
-                    rotationOffset1 = shieldSwordRetreatClip.GetRotationOffset1();
-                    positionOffset2 = shieldSwordRetreatClip.GetPositionOffset2();
-                    rotationOffset2 = shieldSwordRetreatClip.GetRotationOffset2();
+                case EnemyAI4.EnemyState.Jump: 
+                    positionOffset1 = shieldSwordJumpClip.GetPositionOffset1();
+                    rotationOffset1 = shieldSwordJumpClip.GetRotationOffset1();
+                    positionOffset2 = shieldSwordJumpClip.GetPositionOffset2();
+                    rotationOffset2 = shieldSwordJumpClip.GetRotationOffset2();
                     break;
                 case EnemyAI4.EnemyState.Reposition: 
                     positionOffset1 = shieldSwordRepositionClip.GetPositionOffset1();
                     rotationOffset1 = shieldSwordRepositionClip.GetRotationOffset1();
                     positionOffset2 = shieldSwordRepositionClip.GetPositionOffset2();
                     rotationOffset2 = shieldSwordRepositionClip.GetRotationOffset2();
+                    break;
+                case EnemyAI4.EnemyState.Retreat: 
+                    positionOffset1 = shieldSwordRetreatClip.GetPositionOffset1();
+                    rotationOffset1 = shieldSwordRetreatClip.GetRotationOffset1();
+                    positionOffset2 = shieldSwordRetreatClip.GetPositionOffset2();
+                    rotationOffset2 = shieldSwordRetreatClip.GetRotationOffset2();
                     break;
                 case EnemyAI4.EnemyState.ReceiveBuff: 
                     positionOffset1 = shieldSwordReceiveBuffClip.GetPositionOffset1();
@@ -285,17 +337,17 @@ public class EnemyAttackManager : MonoBehaviour
                     positionOffset2 = shieldSwordDieClip.GetPositionOffset2();
                     rotationOffset2 = shieldSwordDieClip.GetRotationOffset2();
                     break;
-                case EnemyAI4.EnemyState.Turn: 
-                    positionOffset1 = shieldSwordTurnClip.GetPositionOffset1();
-                    rotationOffset1 = shieldSwordTurnClip.GetRotationOffset1();
-                    positionOffset2 = shieldSwordTurnClip.GetPositionOffset2();
-                    rotationOffset2 = shieldSwordTurnClip.GetRotationOffset2();
+                case EnemyAI4.EnemyState.LeftTurn: 
+                    positionOffset1 = shieldSwordLeftTurnClip.GetPositionOffset1();
+                    rotationOffset1 = shieldSwordLeftTurnClip.GetRotationOffset1();
+                    positionOffset2 = shieldSwordLeftTurnClip.GetPositionOffset2();
+                    rotationOffset2 = shieldSwordLeftTurnClip.GetRotationOffset2();
                     break;
-                case EnemyAI4.EnemyState.Approach: 
-                    positionOffset1 = shieldSwordApproachClip.GetPositionOffset1();
-                    rotationOffset1 = shieldSwordApproachClip.GetRotationOffset1();
-                    positionOffset2 = shieldSwordApproachClip.GetPositionOffset2();
-                    rotationOffset2 = shieldSwordApproachClip.GetRotationOffset2();
+                case EnemyAI4.EnemyState.RightTurn: 
+                    positionOffset1 = shieldSwordRightTurnClip.GetPositionOffset1();
+                    rotationOffset1 = shieldSwordRightTurnClip.GetRotationOffset1();
+                    positionOffset2 = shieldSwordRightTurnClip.GetPositionOffset2();
+                    rotationOffset2 = shieldSwordRightTurnClip.GetRotationOffset2();
                     break;
                 case EnemyAI4.EnemyState.Block: 
                     positionOffset1 = shieldSwordBlockClip.GetPositionOffset1();
@@ -338,11 +390,11 @@ public class EnemyAttackManager : MonoBehaviour
                     positionOffset2 = doubleWieldingAlertClip.GetPositionOffset2();
                     rotationOffset2 = doubleWieldingAlertClip.GetRotationOffset2();
                     break;
-                case EnemyAI4.EnemyState.Chasing: 
-                    positionOffset1 = doubleWieldingChasingClip.GetPositionOffset1();
-                    rotationOffset1 = doubleWieldingChasingClip.GetRotationOffset1();
-                    positionOffset2 = doubleWieldingChasingClip.GetPositionOffset2();
-                    rotationOffset2 = doubleWieldingChasingClip.GetRotationOffset2();
+                case EnemyAI4.EnemyState.Approach: 
+                    positionOffset1 = doubleWieldingApproachClip.GetPositionOffset1();
+                    rotationOffset1 = doubleWieldingApproachClip.GetRotationOffset1();
+                    positionOffset2 = doubleWieldingApproachClip.GetPositionOffset2();
+                    rotationOffset2 = doubleWieldingApproachClip.GetRotationOffset2();
                     break;
                 case EnemyAI4.EnemyState.StareDown: 
                     positionOffset1 = doubleWieldingStareDownClip.GetPositionOffset1();
@@ -356,17 +408,23 @@ public class EnemyAttackManager : MonoBehaviour
                     positionOffset2 = doubleWieldingDodgeClip.GetPositionOffset2();
                     rotationOffset2 = doubleWieldingDodgeClip.GetRotationOffset2();
                     break;
-                case EnemyAI4.EnemyState.Retreat: 
-                    positionOffset1 = doubleWieldingRetreatClip.GetPositionOffset1();
-                    rotationOffset1 = doubleWieldingRetreatClip.GetRotationOffset1();
-                    positionOffset2 = doubleWieldingRetreatClip.GetPositionOffset2();
-                    rotationOffset2 = doubleWieldingRetreatClip.GetRotationOffset2();
+                case EnemyAI4.EnemyState.Jump: 
+                    positionOffset1 = doubleWieldingJumpClip.GetPositionOffset1();
+                    rotationOffset1 = doubleWieldingJumpClip.GetRotationOffset1();
+                    positionOffset2 = doubleWieldingJumpClip.GetPositionOffset2();
+                    rotationOffset2 = doubleWieldingJumpClip.GetRotationOffset2();
                     break;
                 case EnemyAI4.EnemyState.Reposition: 
                     positionOffset1 = doubleWieldingRepositionClip.GetPositionOffset1();
                     rotationOffset1 = doubleWieldingRepositionClip.GetRotationOffset1();
                     positionOffset2 = doubleWieldingRepositionClip.GetPositionOffset2();
                     rotationOffset2 = doubleWieldingRepositionClip.GetRotationOffset2();
+                    break;
+                case EnemyAI4.EnemyState.Retreat: 
+                    positionOffset1 = doubleWieldingRetreatClip.GetPositionOffset1();
+                    rotationOffset1 = doubleWieldingRetreatClip.GetRotationOffset1();
+                    positionOffset2 = doubleWieldingRetreatClip.GetPositionOffset2();
+                    rotationOffset2 = doubleWieldingRetreatClip.GetRotationOffset2();
                     break;
                 case EnemyAI4.EnemyState.ReceiveBuff: 
                     positionOffset1 = doubleWieldingReceiveBuffClip.GetPositionOffset1();
@@ -386,17 +444,17 @@ public class EnemyAttackManager : MonoBehaviour
                     positionOffset2 = doubleWieldingDieClip.GetPositionOffset2();
                     rotationOffset2 = doubleWieldingDieClip.GetRotationOffset2();
                     break;
-                case EnemyAI4.EnemyState.Turn: 
-                    positionOffset1 = doubleWieldingTurnClip.GetPositionOffset1();
-                    rotationOffset1 = doubleWieldingTurnClip.GetRotationOffset1();
-                    positionOffset2 = doubleWieldingTurnClip.GetPositionOffset2();
-                    rotationOffset2 = doubleWieldingTurnClip.GetRotationOffset2();
+                case EnemyAI4.EnemyState.LeftTurn: 
+                    positionOffset1 = doubleWieldingLeftTurnClip.GetPositionOffset1();
+                    rotationOffset1 = doubleWieldingLeftTurnClip.GetRotationOffset1();
+                    positionOffset2 = doubleWieldingLeftTurnClip.GetPositionOffset2();
+                    rotationOffset2 = doubleWieldingLeftTurnClip.GetRotationOffset2();
                     break;
-                case EnemyAI4.EnemyState.Approach: 
-                    positionOffset1 = doubleWieldingApproachClip.GetPositionOffset1();
-                    rotationOffset1 = doubleWieldingApproachClip.GetRotationOffset1();
-                    positionOffset2 = doubleWieldingApproachClip.GetPositionOffset2();
-                    rotationOffset2 = doubleWieldingApproachClip.GetRotationOffset2();
+                case EnemyAI4.EnemyState.RightTurn: 
+                    positionOffset1 = doubleWieldingRightTurnClip.GetPositionOffset1();
+                    rotationOffset1 = doubleWieldingRightTurnClip.GetRotationOffset1();
+                    positionOffset2 = doubleWieldingRightTurnClip.GetPositionOffset2();
+                    rotationOffset2 = doubleWieldingRightTurnClip.GetRotationOffset2();
                     break;
                 default:
                     positionOffset1 = Vector3.zero;
@@ -430,63 +488,67 @@ public class EnemyAttackManager : MonoBehaviour
             if(currentWeaponsEquipped.Count == 1 && !currentShieldEquipped){
                 _animOverrider["Idle Placeholder"] = singleWeaponIdleClip.GetAnimationClip();
                 _animOverrider["Roaming Placeholder"] = singleWeaponRoamingClip.GetAnimationClip();
-                _animOverrider["Chasing Placeholder"] = singleWeaponChasingClip.GetAnimationClip();
                 _animOverrider["Alert Placeholder"] = singleWeaponAlertClip.GetAnimationClip();
                 _animOverrider["StareDown Placeholder"] = singleWeaponStareDownClip.GetAnimationClip();
                 _animOverrider["Dodge Placeholder"] = singleWeaponDodgeClip.GetAnimationClip();
-                _animOverrider["Retreat Placeholder"] = singleWeaponRetreatClip.GetAnimationClip();
+                _animOverrider["Jump Placeholder"] = singleWeaponJumpClip.GetAnimationClip();
                 _animOverrider["Reposition Placeholder"] = singleWeaponRepositionClip.GetAnimationClip();
+                _animOverrider["Retreat Placeholder"] = singleWeaponRetreatClip.GetAnimationClip();
                 _animOverrider["ReceiveBuff Placeholder"] = singleWeaponReceiveBuffClip.GetAnimationClip();
                 _animOverrider["TakeHit Placeholder"] = singleWeaponTakeHitClip.GetAnimationClip();
                 _animOverrider["Die Placeholder"] = singleWeaponDieClip.GetAnimationClip();
-                _animOverrider["Turn Placeholder"] = singleWeaponTurnClip.GetAnimationClip();
+                _animOverrider["RightTurn Placeholder"] = singleWeaponRightTurnClip.GetAnimationClip();
+                _animOverrider["LeftTurn Placeholder"] = singleWeaponLeftTurnClip.GetAnimationClip();
                 _animOverrider["Approach Placeholder"] = singleWeaponApproachClip.GetAnimationClip();
             }
             else if(currentShieldEquipped){
                 _animOverrider["Idle Placeholder"] = shieldSwordIdleClip.GetAnimationClip();
                 _animOverrider["Roaming Placeholder"] = shieldSwordRoamingClip.GetAnimationClip();
-                _animOverrider["Chasing Placeholder"] = shieldSwordChasingClip.GetAnimationClip();
                 _animOverrider["Alert Placeholder"] = shieldSwordAlertClip.GetAnimationClip();
                 _animOverrider["StareDown Placeholder"] = shieldSwordStareDownClip.GetAnimationClip();
                 _animOverrider["Dodge Placeholder"] = shieldSwordDodgeClip.GetAnimationClip();
                 _animOverrider["Block Placeholder"] = shieldSwordBlockClip.GetAnimationClip();
-                _animOverrider["Retreat Placeholder"] = shieldSwordRetreatClip.GetAnimationClip();
+                _animOverrider["Jump Placeholder"] = shieldSwordJumpClip.GetAnimationClip();
                 _animOverrider["Reposition Placeholder"] = shieldSwordRepositionClip.GetAnimationClip();
+                _animOverrider["Retreat Placeholder"] = shieldSwordRetreatClip.GetAnimationClip();
                 _animOverrider["ReceiveBuff Placeholder"] = shieldSwordReceiveBuffClip.GetAnimationClip();
                 _animOverrider["TakeHit Placeholder"] = shieldSwordTakeHitClip.GetAnimationClip();
                 _animOverrider["Die Placeholder"] = shieldSwordDieClip.GetAnimationClip();
-                _animOverrider["Turn Placeholder"] = shieldSwordTurnClip.GetAnimationClip();
+                _animOverrider["RightTurn Placeholder"] = shieldSwordRightTurnClip.GetAnimationClip();
+                _animOverrider["LeftTurn Placeholder"] = shieldSwordLeftTurnClip.GetAnimationClip();
                 _animOverrider["Approach Placeholder"] = shieldSwordApproachClip.GetAnimationClip();
             }
             else{ //2 weapons
                 _animOverrider["Idle Placeholder"] = doubleWieldingIdleClip.GetAnimationClip();
                 _animOverrider["Roaming Placeholder"] = doubleWieldingRoamingClip.GetAnimationClip();
-                _animOverrider["Chasing Placeholder"] = doubleWieldingChasingClip.GetAnimationClip();
                 _animOverrider["Alert Placeholder"] = doubleWieldingAlertClip.GetAnimationClip();
                 _animOverrider["StareDown Placeholder"] = doubleWieldingStareDownClip.GetAnimationClip();
                 _animOverrider["Dodge Placeholder"] = doubleWieldingDodgeClip.GetAnimationClip();
-                _animOverrider["Retreat Placeholder"] = doubleWieldingRetreatClip.GetAnimationClip();
+                _animOverrider["Jump Placeholder"] = doubleWieldingJumpClip.GetAnimationClip();
                 _animOverrider["Reposition Placeholder"] = doubleWieldingRepositionClip.GetAnimationClip();
+                _animOverrider["Retreat Placeholder"] = doubleWieldingRetreatClip.GetAnimationClip();
                 _animOverrider["ReceiveBuff Placeholder"] = doubleWieldingReceiveBuffClip.GetAnimationClip();
                 _animOverrider["TakeHit Placeholder"] = doubleWieldingTakeHitClip.GetAnimationClip();
                 _animOverrider["Die Placeholder"] = doubleWieldingDieClip.GetAnimationClip();
-                _animOverrider["Turn Placeholder"] = doubleWieldingTurnClip.GetAnimationClip();
+                _animOverrider["RightTurn Placeholder"] = doubleWieldingRightTurnClip.GetAnimationClip();
+                _animOverrider["LeftTurn Placeholder"] = doubleWieldingLeftTurnClip.GetAnimationClip();
                 _animOverrider["Approach Placeholder"] = doubleWieldingApproachClip.GetAnimationClip();
             }
         }
         else{
             _animOverrider["Idle Placeholder"] = unarmedIdleClip;
             _animOverrider["Roaming Placeholder"] = unarmedRoamingClip;
-            _animOverrider["Chasing Placeholder"] = unarmedChasingClip;
             _animOverrider["Alert Placeholder"] = unarmedAlertClip;
             _animOverrider["StareDown Placeholder"] = unarmedStareDownClip;
             _animOverrider["Dodge Placeholder"] = unarmedDodgeClip;
-            _animOverrider["Retreat Placeholder"] = unarmedRetreatClip;
+            _animOverrider["Jump Placeholder"] = unarmedJumpClip;
             _animOverrider["Reposition Placeholder"] = unarmedRepositionClip;
+            _animOverrider["Retreat Placeholder"] = unarmedRetreatClip;
             _animOverrider["ReceiveBuff Placeholder"] = unarmedReceiveBuffClip;
             _animOverrider["TakeHit Placeholder"] = unarmedTakeHitClip;
             _animOverrider["Die Placeholder"] = unarmedDieClip;
-            _animOverrider["Turn Placeholder"] = unarmedTurnClip;
+            _animOverrider["RightTurn Placeholder"] = unarmedRightTurnClip;
+            _animOverrider["LeftTurn Placeholder"] = unarmedLeftTurnClip;
             _animOverrider["Approach Placeholder"] = unarmedApproachClip;
         }
     }
@@ -549,63 +611,104 @@ public class EnemyAttackManager : MonoBehaviour
         SetParentOfTransform(currentWeaponsEquipped[0], _enemyInfo.GetDoubleWeaponAttachPointTransform1(), Vector3.zero, Vector3.zero);
         SetParentOfTransform(currentWeaponsEquipped[1], _enemyInfo.GetDoubleWeaponAttachPointTransform2(), Vector3.zero, Vector3.zero);
     }
+
+    private void StartJump(float timeToJumpUp){
+        Debug.Log("Start JUMP!");
+        StartCoroutine(JumpUpPhase(timeToJumpUp));
+    }
+    private IEnumerator JumpUpPhase(float jumpUpDuration){
+        _agent.enabled = false;
+        _rb.useGravity = false;
+        Vector3 endDestination = _enemyScript.GetJumpPosition() + Vector3.up * 30f;
+        Vector3 origin = transform.position;
+        Vector3 destination = origin + (endDestination - origin) * 0.5f;
+        float elapsedTime = 0f;
+        while (elapsedTime < jumpUpDuration){
+            transform.LookAt(new Vector3 (_enemyScript.GetCurrentTarget().position.x, transform.position.y, _enemyScript.GetCurrentTarget().position.z));
+            float t = elapsedTime / jumpUpDuration;
+            Vector3 newPosition = Vector3.Lerp(origin, destination, t);
+            transform.position = newPosition;
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+        yield break;
+    }
+    private void PeakJump(float timeToJumpDown){
+        StartCoroutine(JumpDownPhase(timeToJumpDown));
+    }
+    private IEnumerator JumpDownPhase(float timeToJumpDown){
+        Vector3 end = _enemyScript.GetJumpPosition(); //this is guaranteed to be valid navmesh position
+        float elapsedTime = 0f;
+        Vector3 start= transform.position;
+        while (elapsedTime < timeToJumpDown){
+            transform.LookAt(new Vector3 (_enemyScript.GetCurrentTarget().position.x, transform.position.y, _enemyScript.GetCurrentTarget().position.z));
+            float t = elapsedTime / timeToJumpDown;
+            Vector3 newPosition = Vector3.Lerp(start, end, t);
+            transform.position = newPosition;
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+        _agent.enabled = true;
+        _rb.useGravity = true;
+    }
 }
-    
 
-//     [SerializeField] private AnimationClip unsheathAnimation
+ 
 
-//     private List<BaseAttackScript> activeAttacks = new List<BaseAttackScript>();
-//     private Dictionary<string, List<BaseAttackScript>> weaponDefaultAttacksDict = new Dictionary<string, List<BaseAttackScript>>();
-//     private List<BaseAttackScript> learnedAttacks = new List<BaseAttackScript>();
+// //     [SerializeField] private AnimationClip unsheathAnimation
 
-//     public void AddAttack(Attack newAttack)
-//     {
-//         activeAttacks.Add(newAttack);
-//         RecalculateWeights();
-//     }
+// //     private List<BaseAttackScript> activeAttacks = new List<BaseAttackScript>();
+// //     private Dictionary<string, List<BaseAttackScript>> weaponDefaultAttacksDict = new Dictionary<string, List<BaseAttackScript>>();
+// //     private List<BaseAttackScript> learnedAttacks = new List<BaseAttackScript>();
 
-//     public void RemoveAttack(Attack attackToRemove)
-//     {
-//         activeAttacks.Remove(attackToRemove);
-//         RecalculateWeights();
-//     }
+// //     public void AddAttack(Attack newAttack)
+// //     {
+// //         activeAttacks.Add(newAttack);
+// //         RecalculateWeights();
+// //     }
 
-//     public void EquipWeapon(string weaponType)
-//     {
-//         // Remove existing weapon-based attacks
-//         RemoveWeaponBasedAttacks();
+// //     public void RemoveAttack(Attack attackToRemove)
+// //     {
+// //         activeAttacks.Remove(attackToRemove);
+// //         RecalculateWeights();
+// //     }
 
-//         // Add default attacks for the new weapon
-//         if (weaponDefaultAttacks.TryGetValue(weaponType, out var defaultAttacks))
-//         {
-//             activeAttacks.AddRange(defaultAttacks);
-//         }
+// //     public void EquipWeapon(string weaponType)
+// //     {
+// //         // Remove existing weapon-based attacks
+// //         RemoveWeaponBasedAttacks();
 
-//         // Retain learned attacks
-//         activeAttacks.AddRange(learnedAttacks);
-//         RecalculateWeights();
-//     }
+// //         // Add default attacks for the new weapon
+// //         if (weaponDefaultAttacks.TryGetValue(weaponType, out var defaultAttacks))
+// //         {
+// //             activeAttacks.AddRange(defaultAttacks);
+// //         }
 
-//     public void LearnAttack(Attack newLearnedAttack)
-//     {
-//         learnedAttacks.Add(newLearnedAttack);
-//         activeAttacks.Add(newLearnedAttack);
-//         RecalculateWeights();
-//     }
+// //         // Retain learned attacks
+// //         activeAttacks.AddRange(learnedAttacks);
+// //         RecalculateWeights();
+// //     }
 
-//     private void RemoveWeaponBasedAttacks()
-//     {
-//         activeAttacks.RemoveAll(attack => !learnedAttacks.Contains(attack));
-//     }
+// //     public void LearnAttack(Attack newLearnedAttack)
+// //     {
+// //         learnedAttacks.Add(newLearnedAttack);
+// //         activeAttacks.Add(newLearnedAttack);
+// //         RecalculateWeights();
+// //     }
 
-//     private void RecalculateWeights()
-//     {
-//         // Reassign weights to all attacks proportionally
-//         float totalWeight = activeAttacks.Sum(a => a.weight);
-//         foreach (var attack in activeAttacks)
-//         {
-//             attack.adjustedWeight = attack.weight / totalWeight;
-//         }
-//     }
-// }
+// //     private void RemoveWeaponBasedAttacks()
+// //     {
+// //         activeAttacks.RemoveAll(attack => !learnedAttacks.Contains(attack));
+// //     }
+
+// //     private void RecalculateWeights()
+// //     {
+// //         // Reassign weights to all attacks proportionally
+// //         float totalWeight = activeAttacks.Sum(a => a.weight);
+// //         foreach (var attack in activeAttacks)
+// //         {
+// //             attack.adjustedWeight = attack.weight / totalWeight;
+// //         }
+// //     }
+
 

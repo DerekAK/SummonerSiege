@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 2cc7c5d5a1c3d4a5bbc4ed8606ac3b4e
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 65284
+  packageName: RPG Character Mecanim Animation Pack FREE
+  packageVersion: 2.5.2
+  assetPath: Assets/ExplosiveLLC/RPG Character Mecanim Animation Pack FREE/Code/Actions/ActionHandler.cs
+  uploadId: 586175
