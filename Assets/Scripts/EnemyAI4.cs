@@ -54,6 +54,7 @@ public class EnemyAI4 : MonoBehaviour{
     }
     //events to subscribe to
     public event EventHandler<AttackEvent> AnimationAttackEvent;
+    private EnemyState nextAttackState;
 
     private void Awake(){
     
@@ -76,6 +77,7 @@ public class EnemyAI4 : MonoBehaviour{
         _anim.runtimeAnimatorController = _copyOverrider;
     }
     private void Start(){
+        nextAttackState = EnemyState.AttackA;
         _aggroCollider.radius = (_enemyInfo.GetAggroDistance()-1)/transform.localScale.y;
         _agent.stoppingDistance = 10f; //THIS IS REALLY IMPORTANT TO GET RIGHT
         _agent.angularSpeed = 1000f;
@@ -193,12 +195,14 @@ public class EnemyAI4 : MonoBehaviour{
     private IEnumerator TurnTowardsTarget(Vector3 targetPosition){
         Debug.Log("TurningTowardsTarget Coroutine!");
         _anim.applyRootMotion = true;
+        _anim.speed = 3f;
         while (true){
             targetPosition = new Vector3(currentTarget.position.x, transform.position.y, currentTarget.position.z);
             Vector3 directionToTarget = (targetPosition - transform.position).normalized;
             float angle = Vector3.Angle(transform.forward, directionToTarget);
             if (math.abs(angle) < 3f){ //because angle changes by a bit each frame, could potentially be up to 3, maybe even more so this might not always work
                 _anim.applyRootMotion = false;
+                _anim.speed = 1f;
                 yield break;
             }
             yield return null;
@@ -207,6 +211,9 @@ public class EnemyAI4 : MonoBehaviour{
     private IEnumerator StareDownCoroutine(){
         float stareDownTime = UnityEngine.Random.Range(_enemyInfo.GetStareDownTime()-2f, _enemyInfo.GetStareDownTime()+2f);
         float elapsedTime = 0f;
+        _agent.SetDestination(new Vector3(currentTarget.position.x, transform.position.y, currentTarget.position.z));
+        yield return new WaitForSeconds(0.2f);
+        _agent.ResetPath();
         while (elapsedTime < stareDownTime){
             elapsedTime += Time.deltaTime;
             transform.LookAt(new Vector3(currentTarget.position.x, transform.position.y, currentTarget.position.z));
@@ -256,6 +263,7 @@ public class EnemyAI4 : MonoBehaviour{
                     yield break;
                 }
             }
+            HandleAttackTransition();
             PerformAttack();
         }
         else{
@@ -272,7 +280,10 @@ public class EnemyAI4 : MonoBehaviour{
             _anim.SetInteger("EnemyState", (int)currentEnemyState);
             StartCoroutine(ApproachCoroutine());
         }
-        else{PerformAttack();}
+        else{
+            HandleAttackTransition();
+            PerformAttack();
+        }
     }
     private float DetermineTurnDirection(){
         Vector3 directionToTarget = (currentTarget.position - transform.position).normalized;
@@ -299,16 +310,20 @@ public class EnemyAI4 : MonoBehaviour{
             _anim.SetInteger("EnemyState", (int)currentEnemyState);
             StartCoroutine(ApproachCoroutine());
         }
-        else{PerformAttack();}
+        else{
+            HandleAttackTransition();
+            PerformAttack();
+        }
     }
-
+    private void HandleAttackTransition(){
+        currentEnemyState = nextAttackState;
+        _anim.SetInteger("EnemyState", (int)currentEnemyState);
+        if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPositionForAttack(attackChosen);}
+    }
     private void PerformAttack(){
+        AnimationAttackEvent = null;
         if(IsVisible()){
-            AnimationAttackEvent = null;
             if(attackChosenInstance){Destroy(attackChosenInstance.gameObject);}
-            currentEnemyState = EnemyState.AttackA;
-            _anim.SetInteger("EnemyState", (int)currentEnemyState);
-            if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPositionForAttack(attackChosen);}
             attackChosenInstance = Instantiate(attackChosen);
             attackChosenInstance.SetGameObjectReference(this.gameObject);
             AnimationAttackEvent += attackChosenInstance.ExecuteAttack;
@@ -326,36 +341,45 @@ public class EnemyAI4 : MonoBehaviour{
         Dictionary<EnemyState, float> possibleTransitions;
         Debug.Log("Coming from: " + currentEnemyState);
         
-        //IMPORTANT! ALL TRANSITIONS HERE WIL BE TREATED AS RIGHT TURN, BUT HANDLED AS BEING RIGHT OR LEFT TURN
+        // IMPORTANT! ALL TRANSITIONS HERE WIL BE TREATED AS RIGHT TURN, BUT HANDLED AS BEING RIGHT OR LEFT TURN
+        // Having a possible attack a transition means possible equip, unequip, reposition, jump, approach
         switch (currentEnemyState){
             case EnemyState.Alert:
-                possibleTransitions = new Dictionary<EnemyState, float>{{EnemyState.RightTurn, 100}, {EnemyState.Retreat, 20}};
+                possibleTransitions = new Dictionary<EnemyState, float>{{EnemyState.RightTurn, 2}, {EnemyState.Retreat, 1}};
                 break;
             case EnemyState.RightTurn:
                 possibleTransitions = new Dictionary<EnemyState, float>
-                    {{EnemyState.StareDown, 100}, {EnemyState.AttackA, 50}, {EnemyState.Retreat, 20}};
+                    {{EnemyState.StareDown, 2}, {EnemyState.AttackA, 1}, {EnemyState.Retreat, 1}};
                 break;
             case EnemyState.LeftTurn:
                 possibleTransitions = new Dictionary<EnemyState, float>
-                    {{EnemyState.StareDown, 100}, {EnemyState.AttackA, 50}, {EnemyState.Retreat, 20}};
+                    {{EnemyState.StareDown, 2}, {EnemyState.AttackA, 1}, {EnemyState.Retreat, 1}};
                 break;
             case EnemyState.StareDown:
                 possibleTransitions = new Dictionary<EnemyState, float>
-                    {{EnemyState.AttackA, 50}, {EnemyState.Retreat, 50}};
+                    {{EnemyState.AttackA, 1}, {EnemyState.Retreat, 1}};
                 break;
             case EnemyState.Retreat:
                 possibleTransitions = new Dictionary<EnemyState, float>
-                    {{EnemyState.RightTurn, 1}};
+                    {{EnemyState.StareDown, 1}, {EnemyState.AttackA, 2}, {EnemyState.Retreat, 1}};
                 break;
             case EnemyState.AttackA:
-                possibleTransitions = new Dictionary<EnemyState, float>{{EnemyState.RightTurn, 100}, {EnemyState.Retreat, 50}};
+                nextAttackState = EnemyState.AttackB;
+                possibleTransitions = new Dictionary<EnemyState, float>
+                {{EnemyState.StareDown, 1}, {EnemyState.AttackA, 1}, {EnemyState.Retreat, 1}};
                 break;
             case EnemyState.AttackB:
+                nextAttackState = EnemyState.AttackA;
                 //same next possible transitions as from attacka
-                possibleTransitions = new Dictionary<EnemyState, float>{{EnemyState.RightTurn, 100}, {EnemyState.Retreat, 50}};
+                possibleTransitions = new Dictionary<EnemyState, float>
+                {{EnemyState.StareDown, 1}, {EnemyState.AttackA, 1}, {EnemyState.Retreat, 1}};
+                break;
+            case EnemyState.Approach: //this will only be called from approachUntilVisible()
+                //still need this because want to reconsider what attack to do after approaching from approachuntilvisible()
+                possibleTransitions = new Dictionary<EnemyState, float>{{EnemyState.AttackA, 1}};
                 break;
 
-            // will never arrive from approach, jump, reposition, equip, unequip because always attack afterwards
+            // will never arrive from jump, reposition, equip, unequip because always attack afterwards
             
             // IMPLEMENT LATER
             // case EnemyState.Dodge:
@@ -377,6 +401,10 @@ public class EnemyAI4 : MonoBehaviour{
         }
         (EnemyState decision, Vector3? repositionLocation) = DecidedWeightedCombatDecision(possibleTransitions);
         Debug.Log("From: " + currentEnemyState + ", Decided on: " + decision);
+        HandleNextCombatDecision(decision, repositionLocation);
+    }
+
+    private void HandleNextCombatDecision(EnemyState decision, Vector3? repositionLocation){
         currentEnemyState = decision;
         if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPosition(currentEnemyState);}
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
@@ -397,12 +425,15 @@ public class EnemyAI4 : MonoBehaviour{
                 PerformAttack();
                 break;
             case EnemyState.AttackB:
+                PerformAttack();
                 break;
             case EnemyState.Equip:
+                StartCoroutine(WaitEndEquipAnimation());
                 //animation will call the attackChosen, don't need to do anything
                 break;
             case EnemyState.Unequip:
                 //animation will call the attackChosen, don't need to do anything
+                StartCoroutine(WaitEndUnequipAnimation());
                 break;
             case EnemyState.Dodge:
                 break;
@@ -428,34 +459,19 @@ public class EnemyAI4 : MonoBehaviour{
                 break;
         }
     }
-    private (EnemyState, Vector3?) DecidedWeightedCombatDecision(Dictionary<EnemyState, float> possibleTransitions){
-        // at very minimum, need long range vs melee range, aggressive vs patient, smart vs dumb, combo tendency vs not, 
-        // e.g. 
-        // MODIFIERS:
-        // aggression (-1 to 1):
-            // weight probability of doing an attack (intuition: vs. jumping back or staring down)
-            // 
-        
-        //
-        // chaining probability (0 to 1). probability of starting a chained attack
-        // chaining length (0 to 1). need to yield 0 to 6 possible chains?
-        // attack intelligence: factors that influence what attack it will pick
-            // distance to target (factored in regardless of intelligence), will weight that type of attack (1, 2, 3 (melee, short, long))
-            // if weapon is equipped by enemy, will weight armed attacks (attack requires weapon boolean)
-            // DON'T want to take into account the type of weapon the enemy has equipped, because that could make them choose a melee attack for a
-            // melee player if the melee player has a bow equipped temporarily
-            // depending on player type (e.g. berserker, weight long range), (e.g. mage, weight melee)
-            // depending on elemental weakness of target, if have an attack that is strong against that element
-            // depending on status of player (e.g. stunned, low health), might choose to be more or less aggressive
-        //(-1 to 1) attack picking smartness. When deciding an attack, will take into account the class of the player
-        //player 
-        //defensiveness (-1 to 1)
-        //
-
-        //approach is for melee fights
-        //don't want to approach into every type of attack though. 
-
-        
+    private IEnumerator WaitEndEquipAnimation(){
+        yield return new WaitForSeconds(_copyOverrider["Equip Placeholder"].length);
+        isWeaponOut = true;
+        (EnemyState transition, Vector3? newPos) = DecideNextTransitionForAttack();
+        HandleNextCombatDecision(transition, newPos);
+    }
+    private IEnumerator WaitEndUnequipAnimation(){
+        yield return new WaitForSeconds(_copyOverrider["Unequip Placeholder"].length);
+        isWeaponOut = false;
+        (EnemyState transition, Vector3? newPos) = DecideNextTransitionForAttack();
+        HandleNextCombatDecision(transition, newPos);
+    }
+    private (EnemyState, Vector3?) DecidedWeightedCombatDecision(Dictionary<EnemyState, float> possibleTransitions){        
         //initial application of weights
         float totalWeight = 0f;
         foreach(var key in possibleTransitions.Keys.ToList()){
@@ -468,6 +484,8 @@ public class EnemyAI4 : MonoBehaviour{
                     break;
                 case EnemyState.AttackA:
                     possibleTransitions[key] += possibleTransitions[key] * _enemyInfo.GetAggression();
+                    break;
+                case EnemyState.AttackB:
                     break;
                 case EnemyState.Equip:
                     break;
@@ -509,28 +527,13 @@ public class EnemyAI4 : MonoBehaviour{
                     attackChosen = DecideAttack();
 
                     //from here, might not attack directly, but can still set the attack to this because know that this is necessarily next attack
-                    _copyOverrider["AttackA Placeholder"] = attackChosen.getAnimationClip();
+                    if(nextAttackState == EnemyState.AttackA){_copyOverrider["AttackA Placeholder"] = attackChosen.getAnimationClip();}
+                    else{_copyOverrider["AttackB Placeholder"] = attackChosen.getAnimationClip();}
 
                     if(attackChosen.DoesRequireWeapon() && !isWeaponOut){return (EnemyState.Equip, null);}
                     if(!attackChosen.DoesRequireWeapon() && isWeaponOut){return (EnemyState.Unequip, null);}
                     
-                    float distanceToPlayer = Vector3.Distance(feet.position, currentTarget.position);
-                    float playerProximityRatio = Mathf.Clamp(distanceToPlayer/_enemyInfo.GetAggroDistance(), 0f, 1f);
-                    int attackType = attackChosen.GetAttackType();
-                    if(attackType == 1 && playerProximityRatio > 0.33f ||
-                        attackType == 2 && playerProximityRatio < 0.33f && playerProximityRatio > 0.66f ||
-                        attackType == 3 && playerProximityRatio < 0.33f){
-                        Vector3 newPos;
-                        if(attackType == 1){newPos = GetRandomPositionInRange(1);}
-                        else if(attackType == 2){newPos = GetRandomPositionInRange(2);}
-                        else{newPos = GetRandomPositionInRange(3);}
-                        newPos = FindNavMeshPosition(newPos);
-                        return _enemyAttackManager.HasJump() ? (EnemyState.Jump, newPos) : (EnemyState.Reposition, newPos);
-                    }
-                    if(attackType == 1){return (EnemyState.Approach, null);}
-                    return (EnemyState.AttackA, null);
-                    //reposition, approach, jump
-                    
+                    return DecideNextTransitionForAttack();                    
 
                     //based on attack, needs to either equip, unequip, approach (if in melee range), jump (get further away or closer to do attack),
                     // or approach fast(seconds before a melee attack) 
@@ -539,6 +542,25 @@ public class EnemyAI4 : MonoBehaviour{
         }
         Debug.Log("SHOULD NEVER GET HERE! Could not decide a combat transition");
         return (EnemyState.Alert, null);
+    }
+
+    private (EnemyState, Vector3?) DecideNextTransitionForAttack(){
+        float distanceToPlayer = Vector3.Distance(feet.position, currentTarget.position);
+        float playerProximityRatio = Mathf.Clamp(distanceToPlayer/_enemyInfo.GetAggroDistance(), 0f, 1f);
+        int attackType = attackChosen.GetAttackType();
+        if(attackType == 1 && playerProximityRatio > 0.33f ||
+            attackType == 2 && playerProximityRatio < 0.33f && playerProximityRatio > 0.66f ||
+            attackType == 3 && playerProximityRatio < 0.33f){
+            Vector3 newPos;
+            int mode;
+            if(attackType == 1){mode = 1;}
+            else if(attackType == 2){mode = 2;}
+            else{mode = 3;}
+            newPos = FindNavMeshPosition(GetRandomPositionInRange(mode));
+            return _enemyAttackManager.HasJump() ? (EnemyState.Jump, newPos) : (EnemyState.Reposition, newPos);
+        }
+        if(attackType == 1){return (EnemyState.Approach, null);}
+        return (nextAttackState, null);
     }
     private BaseAttackScript DecideAttack(){
         
@@ -614,11 +636,6 @@ public class EnemyAI4 : MonoBehaviour{
         }
         return null;
     }
-    // private void EndOfSheatheUnsheatheAnimation(object sender, AttackEvent e){ //this will be invoked from animationattackevent in unsheathe and sheathe animations
-    //     AnimationAttackEvent -= EndOfSheatheUnsheatheAnimation;
-    //     PerformAttack(e.AttackChosen, e.ChaseGiveUpTime);
-    // }
-    private void OnDisable(){AnimationAttackEvent = null;}
           
     private Vector3 GetRandomPositionInRange(int mode){
         float minRatio = 0f;
@@ -652,9 +669,9 @@ public class EnemyAI4 : MonoBehaviour{
         if (Physics.Raycast(new Vector3(position.x, 500f, position.z), Vector3.down, out hit, Mathf.Infinity)){   
             Debug.DrawRay(new Vector3(position.x, 500f, position.z), Vector3.down * 500f, Color.red, 3f);
             NavMeshHit navHit;
-            if (NavMesh.SamplePosition(hit.point, out navHit, 100f, NavMesh.AllAreas)){return navHit.position;} // Return the valid NavMesh position
+            if (NavMesh.SamplePosition(hit.point, out navHit, 1000f, NavMesh.AllAreas)){return navHit.position;} // Return the valid NavMesh position
         }
-        return position;
+        return transform.position;
     }
     private Vector3 GetNewRoamingPosition(){
         Vector3 randDir = new Vector3(UnityEngine.Random.Range(-1f, 1f), 0, UnityEngine.Random.Range(-1f, 1f)).normalized;
@@ -675,9 +692,13 @@ public class EnemyAI4 : MonoBehaviour{
             BecomeAlert();
             yield break;
         }
-        else{PerformAttack();}
+        else{
+            _agent.ResetPath();
+            DecideNextCombatStep();
+        }
     }
     private bool IsVisible(){
+        Debug.Log("Checking if is Visible!");
         Vector3 directionToTarget;
         if(currentTarget.CompareTag(playerTag)){directionToTarget = currentTarget.GetComponent<ThirdPersonMovementScript>().GetEyesTransform().position - eyes.position;}
         else{directionToTarget = currentTarget.GetComponent<EnemyAI4>().GetEyesTransform().position - eyes.position;}
@@ -691,21 +712,20 @@ public class EnemyAI4 : MonoBehaviour{
     private void AnimationEventNextStep(){
         AnimationAttackEvent?.Invoke(this, new AttackEvent{AttackChosen = attackChosen, TargetTransform=currentTarget, AttackCenterForward=attackCenter, TargetL=targetL});
     }
-    private void SlowAnim(){SetAnimationSpeed(0);} // Slow mode
-    private void SpeedAnim(){SetAnimationSpeed(1);} // Fast mode
-    private void VarySpeedAnim(){
+    private void SlowAnim(float time){SetAnimationSpeed(0, time);} // Slow mode
+    private void SpeedAnim(float time){SetAnimationSpeed(1, time);} // Fast mode
+    private void VarySpeedAnim(float time){
         int mode = UnityEngine.Random.value < 0.5f ? 0 : 1; // Randomly pick slow (0) or fast (1)
-        SetAnimationSpeed(mode);
+        SetAnimationSpeed(mode, time);
     }
-    private void SetAnimationSpeed(int mode){
+    private void SetAnimationSpeed(int mode, float time){
         Debug.Log("SettingAnimationSpeed!");
         if (speedCoroutine != null){StopCoroutine(speedCoroutine);}
-        float pauseTime = UnityEngine.Random.value;
-        speedCoroutine = StartCoroutine(ChangeSpeedAnimator(pauseTime, mode));
+        speedCoroutine = StartCoroutine(ChangeSpeedAnimator(time, mode));
     }
     private IEnumerator ChangeSpeedAnimator(float pauseTime, int mode){
         float newSpeed;
-        float newPauseTime = pauseTime;
+        float newPauseTime;
         if (mode == 0){newSpeed = UnityEngine.Random.Range(0.2f, 0.8f);}
         else if (mode == 1){newSpeed = UnityEngine.Random.Range(1.2f, 1.8f);}
         else{ newSpeed = 1f;}
@@ -716,6 +736,7 @@ public class EnemyAI4 : MonoBehaviour{
         }
         //Debug.Log($"Setting animation speed to {newSpeed} for {newPauseTime} seconds.");
         _anim.speed = newSpeed;
+        newPauseTime = pauseTime/newSpeed; //e.g. if pauseTime was 2 seconds, and newSpeed = 0.5, then newPauseTime needs to be 2/0.5 = 4 seconds
         yield return new WaitForSeconds(newPauseTime);
         _anim.speed = 1f; 
         speedCoroutine = null;
@@ -724,5 +745,32 @@ public class EnemyAI4 : MonoBehaviour{
     public Transform GetFeetTransform(){return feet;}
     public Vector3 GetJumpPosition(){return currentJumpPosition;}
     public Transform GetCurrentTarget(){return currentTarget;}
+    private void OnDisable(){AnimationAttackEvent = null;}
+
+    // at very minimum, need long range vs melee range, aggressive vs patient, smart vs dumb, combo tendency vs not, 
+        // e.g. 
+        // MODIFIERS:
+        // aggression (-1 to 1):
+            // weight probability of doing an attack (intuition: vs. jumping back or staring down)
+            // 
+        
+        //
+        // chaining probability (0 to 1). probability of starting a chained attack
+        // chaining length (0 to 1). need to yield 0 to 6 possible chains?
+        // attack intelligence: factors that influence what attack it will pick
+            // distance to target (factored in regardless of intelligence), will weight that type of attack (1, 2, 3 (melee, short, long))
+            // if weapon is equipped by enemy, will weight armed attacks (attack requires weapon boolean)
+            // DON'T want to take into account the type of weapon the enemy has equipped, because that could make them choose a melee attack for a
+            // melee player if the melee player has a bow equipped temporarily
+            // depending on player type (e.g. berserker, weight long range), (e.g. mage, weight melee)
+            // depending on elemental weakness of target, if have an attack that is strong against that element
+            // depending on status of player (e.g. stunned, low health), might choose to be more or less aggressive
+        //(-1 to 1) attack picking smartness. When deciding an attack, will take into account the class of the player
+        //player 
+        //defensiveness (-1 to 1)
+        //
+
+        //approach is for melee fights
+        //don't want to approach into every type of attack though. 
 
 }

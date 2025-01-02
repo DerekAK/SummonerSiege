@@ -4,7 +4,7 @@ using UnityEngine.AI;
 
 public class MageShockWave : BaseAttackScript
 {
-    [SerializeField] private float hoverSpeed = 20f;
+    [SerializeField] private float hoverSpeed = 10000f;
     private bool hasStartCrashedDown;
     private Transform _rightHand;
     private NavMeshAgent _agent;
@@ -16,11 +16,11 @@ public class MageShockWave : BaseAttackScript
         hasStartCrashedDown = false;
         StartCoroutine(RotateTowardsPlayerUntilCrash(_enemyScript.GetCurrentTarget()));
     }
+
     private IEnumerator RotateTowardsPlayerUntilCrash(Transform targetTransform){
-        _agent.speed = hoverSpeed;
-        while (!hasStartCrashedDown){
-            _agent.SetDestination(targetTransform.position);
-            _enemyGameObject.transform.LookAt(new Vector3(targetTransform.position.x, _enemyGameObject.transform.position.y, targetTransform.position.z));
+        while (!hasStartCrashedDown) {
+            Vector3 targetPosition = new Vector3(targetTransform.position.x, _enemyGameObject.transform.position.y, targetTransform.position.z);
+            _enemyGameObject.transform.LookAt(targetPosition);
             yield return null;
         }
     }

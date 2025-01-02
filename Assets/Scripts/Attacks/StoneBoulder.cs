@@ -27,7 +27,7 @@ public class StoneBoulder : BaseAttackScript
         finishedRotate = false;
         while(!finishedRotate){
             Transform targetTransform = _enemyScript.GetCurrentTarget();
-            _enemyGameObject.transform.LookAt(new Vector3(targetTransform.position.x, transform.position.y, targetTransform.position.z));
+            _enemyGameObject.transform.LookAt(new Vector3(targetTransform.position.x, _enemyGameObject.transform.position.y, targetTransform.position.z));
             yield return null;
         }
     }

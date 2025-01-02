@@ -14,6 +14,8 @@ public class EnemySpecificInfo : MonoBehaviour
    public Transform GetDoubleWeaponAttachPointTransform2(){return _doubleWeaponAttachPointTransform2;}
    [SerializeField] private float weaponSpawnProbability;
    public float GetWeaponSpawnProbability(){return weaponSpawnProbability;}
+   [SerializeField] private float shieldSpawnProbability;
+   public float GetShieldSpawnProbability(){return shieldSpawnProbability;}
    [SerializeField] private float chainProbability;
    public float GetChainProbability(){return chainProbability;}
    [SerializeField] private float attackWaitTime;

@@ -7,11 +7,11 @@ public class Sword2HandedDefault : BaseAttackScript{
         endRotate = false;
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
         _enemyScript.AnimationAttackEvent += EndRotate;
-        StartCoroutine(RotateTowardsPlayer(e.TargetTransform));
+        StartCoroutine(RotateTowardsPlayer(_enemyScript.GetCurrentTarget()));
     }
     private IEnumerator RotateTowardsPlayer(Transform targetTransform){
         while (!endRotate){
-            _enemyGameObject.transform.LookAt(new Vector3(targetTransform.position.x, transform.position.y, targetTransform.position.z));
+            _enemyGameObject.transform.LookAt(new Vector3(targetTransform.position.x, _enemyGameObject.transform.position.y, targetTransform.position.z));
             yield return null;
         }
     }

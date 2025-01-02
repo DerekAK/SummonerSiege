@@ -124,9 +124,10 @@ public class EnemyAttackManager : MonoBehaviour
     private void Start(){ //just in case the copy overrider hasn't been assigned yet in EnemyAI3.Awake()
         _animOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
         if(defaultSpawnWeapon && Random.value < _enemyInfo.GetWeaponSpawnProbability()){
-            //enemy is spawned with weapon
             InstantiateWeapon(defaultSpawnWeapon);
-            if(defaultShield && defaultSpawnWeapon.GetComponent<BaseWeaponScript>().GetWeaponType() == 1){InstantiateShield(defaultShield);}
+        }
+        if(defaultShield && Random.value < _enemyInfo.GetShieldSpawnProbability() && defaultSpawnWeapon.GetComponent<BaseWeaponScript>().GetWeaponType() == 1){
+            InstantiateShield(defaultShield);
         } 
         HandleAnimations(false);
     }
@@ -638,6 +639,7 @@ public class EnemyAttackManager : MonoBehaviour
     }
     private IEnumerator JumpDownPhase(float timeToJumpDown){
         Vector3 end = _enemyScript.GetJumpPosition(); //this is guaranteed to be valid navmesh position
+        end = end + 2f * Vector3.up;
         float elapsedTime = 0f;
         Vector3 start= transform.position;
         while (elapsedTime < timeToJumpDown){
