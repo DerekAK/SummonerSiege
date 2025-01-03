@@ -15,6 +15,7 @@ public class MutantJump : BaseAttackScript{
     private float attackRadius = 10f;
     private float forceMultiplier = 50f;
     private Transform attackCenter;
+    private bool hasReachedPeakOfJump;
     
     public override void ExecuteAttack(object sender, EnemyAI4.AttackEvent e){ //in this case, its the start of the jump
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
@@ -22,6 +23,16 @@ public class MutantJump : BaseAttackScript{
         _agent = _enemyGameObject.GetComponent<NavMeshAgent>();
         _rb = _enemyGameObject.GetComponent<Rigidbody>();
         attackCenter = transform;
+        hasReachedPeakOfJump = false;
+        StartCoroutine(RotateTowardsPlayer());
+    }
+
+    private IEnumerator RotateTowardsPlayer(){
+        Transform playerTransform = _enemyScript.GetCurrentTarget();
+        while(!hasReachedPeakOfJump){
+            _enemyGameObject.transform.LookAt(new Vector3(playerTransform.position.x, _enemyGameObject.transform.position.y, playerTransform.position.z));
+            yield return null;
+        }
     }
     private void JumpUp(object sender, EnemyAI4.AttackEvent e){
         _enemyScript.AnimationAttackEvent -= JumpUp;
@@ -38,7 +49,6 @@ public class MutantJump : BaseAttackScript{
         float elapsedTime = 0f;
         while (elapsedTime < jumpUpDuration){
             // Interpolate horizontal position only
-            _enemyGameObject.transform.LookAt(new Vector3(playerTransform.position.x, _enemyGameObject.transform.position.y, playerTransform.position.z));
             float t = elapsedTime / jumpUpDuration;
             Vector3 newPosition = Vector3.Lerp(origin, destination, t);
             _enemyGameObject.transform.position = newPosition;
@@ -51,6 +61,7 @@ public class MutantJump : BaseAttackScript{
     private void CrashDown(object sender, EnemyAI4.AttackEvent e){ //in this case, its the end of the jump
         _enemyScript.AnimationAttackEvent -= CrashDown;
         _enemyScript.AnimationAttackEvent += TrackHits;
+        hasReachedPeakOfJump = true;
         StartCoroutine(JumpDown(_enemyGameObject.transform, _enemyScript.GetCurrentTarget()));
     }
 

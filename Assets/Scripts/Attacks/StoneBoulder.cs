@@ -43,8 +43,6 @@ public class StoneBoulder : BaseAttackScript
         rbStone = currBoulder.GetComponent<Rigidbody>();
         
         _enemyAttackManager.SetParentOfTransform(currBoulder, _rightHand, GetFirstWeaponPositionOffset(), GetFirstWeaponRotationOffset());
-        float enemyLocalScale = _enemyGameObject.transform.root.localScale.x;
-        currBoulder.localScale *= enemyLocalScale;
         rbStone.isKinematic = true;
     }
 
@@ -54,7 +52,7 @@ public class StoneBoulder : BaseAttackScript
         currBoulder.SetParent(null);
         Vector3 playerPosition = e.TargetTransform.position;
         finishedRotate = true;
-        ThrowWithRigidbody(currBoulder.gameObject, _rightHand.position, playerPosition, 200f, 2f);
+        ThrowWithRigidbody(currBoulder.gameObject, _rightHand.position, playerPosition, 200f, 10f);
     }
 
     public void ThrowWithRigidbody(GameObject obj, Vector3 start, Vector3 end, float speed, float arcHeight){

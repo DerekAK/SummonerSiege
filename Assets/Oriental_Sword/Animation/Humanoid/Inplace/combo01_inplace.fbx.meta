@@ -1,12 +1,5 @@
 fileFormatVersion: 2
 guid: 3494cec61702d934fb8c9532ae01016b
-AssetOrigin:
-  serializedVersion: 1
-  productId: 71318
-  packageName: Oriental Sword AnimSet
-  packageVersion: 1.61
-  assetPath: Assets/Oriental_Sword/Animation/Humanoid/Inplace/combo01_inplace.fbx
-  uploadId: 698663
 ModelImporter:
   serializedVersion: 22200
   internalIDToNameTable:
@@ -26,6 +19,8 @@ ModelImporter:
     optimizeGameObjects: 0
     removeConstantScaleCurves: 0
     motionNodeName: 
+    rigImportErrors: 
+    rigImportWarnings: 
     animationImportErrors: 
     animationImportWarnings: 
     animationRetargetingWarnings: 
@@ -883,3 +878,10 @@ ModelImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 71318
+  packageName: Oriental Sword AnimSet
+  packageVersion: 1.61
+  assetPath: Assets/Oriental_Sword/Animation/Humanoid/Inplace/combo01_inplace.fbx
+  uploadId: 698663
