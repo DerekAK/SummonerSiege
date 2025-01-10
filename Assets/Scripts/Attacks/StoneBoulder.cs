@@ -16,17 +16,17 @@ public class StoneBoulder : BaseAttackScript
     private bool finishedRotate;
 
     public override void ExecuteAttack(object sender, EnemyAI4.AttackEvent e){ 
+        base.ExecuteAttack(sender, e);
         _enemyScript.AnimationAttackEvent -= ExecuteAttack;
         _enemyScript.AnimationAttackEvent += PickUpBoulder;
         _enemyAttackManager = _enemyGameObject.GetComponent<EnemyAttackManager>();
         _enemyInfo = _enemyGameObject.GetComponent<EnemySpecificInfo>();
         _rightHand = _enemyInfo.GetRightHandTransform();
-        StartCoroutine(RotateTowardsPlayerUntilEnd());
+        StartCoroutine(RotateTowardsPlayerUntilEnd(e.TargetTransform));
     }
-    private IEnumerator RotateTowardsPlayerUntilEnd(){
+    private IEnumerator RotateTowardsPlayerUntilEnd(Transform targetTransform){
         finishedRotate = false;
         while(!finishedRotate){
-            Transform targetTransform = _enemyScript.GetCurrentTarget();
             _enemyGameObject.transform.LookAt(new Vector3(targetTransform.position.x, _enemyGameObject.transform.position.y, targetTransform.position.z));
             yield return null;
         }
@@ -42,7 +42,7 @@ public class StoneBoulder : BaseAttackScript
         currBoulder = Instantiate(pfStoneBoulder, _rightHand.position, Quaternion.identity);
         rbStone = currBoulder.GetComponent<Rigidbody>();
         
-        _enemyAttackManager.SetParentOfTransform(currBoulder, _rightHand, GetFirstWeaponPositionOffset(), GetFirstWeaponRotationOffset());
+        UtilityFunctions.SetParentOfTransform(currBoulder, _rightHand, GetFirstWeaponPositionOffset(), GetFirstWeaponRotationOffset());
         rbStone.isKinematic = true;
     }
 
@@ -52,21 +52,6 @@ public class StoneBoulder : BaseAttackScript
         currBoulder.SetParent(null);
         Vector3 playerPosition = e.TargetTransform.position;
         finishedRotate = true;
-        ThrowWithRigidbody(currBoulder.gameObject, _rightHand.position, playerPosition, 200f, 10f);
-    }
-
-    public void ThrowWithRigidbody(GameObject obj, Vector3 start, Vector3 end, float speed, float arcHeight){
-        Rigidbody rb = obj.GetComponent<Rigidbody>();
-        rb.useGravity = true;
-        Vector3 direction = end - start;
-        Vector3 horizontalDirection = new Vector3(direction.x, 0, direction.z);
-        float horizontalDistance = horizontalDirection.magnitude;
-        float verticalDistance = direction.y;
-        float timeToTarget = horizontalDistance / speed;
-        float horizontalSpeed = horizontalDistance / timeToTarget;
-        float verticalSpeed = (verticalDistance / timeToTarget) + (0.5f * Mathf.Abs(Physics.gravity.y) * timeToTarget);
-        Vector3 velocity = horizontalDirection.normalized * horizontalSpeed;
-        velocity.y = verticalSpeed;
-        rb.linearVelocity = velocity;
+        UtilityFunctions.ThrowWithRigidbody(currBoulder.gameObject, _rightHand.position, playerPosition, 200f, 10f);
     }
 }

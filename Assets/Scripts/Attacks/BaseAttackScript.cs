@@ -18,34 +18,20 @@ public abstract class BaseAttackScript : MonoBehaviour
     [SerializeField] private bool requiresWeapon; 
     public bool DoesRequireWeapon(){return requiresWeapon;}
 
-    
     [Tooltip("1-melee, 2-medium-range, 3-long-range")]
     [SerializeField] protected int attackType;
     public int GetAttackType(){
         return attackType;
     }
-
     [SerializeField] protected float attackWeight;
-    public float GetAttackWeight(){
-        return attackWeight;
-    }
-    public void SetAttackWeight(float newWeight){
-        attackWeight = newWeight;
-    }
-    
+    public float GetAttackWeight(){return attackWeight;}
+    public void SetAttackWeight(float newWeight){attackWeight = newWeight;}
     [SerializeField] protected AnimationClip clip;
-    public AnimationClip getAnimationClip(){
-        return clip;
+    public AnimationClip getAnimationClip(){return clip;}
+    
+    public virtual void ExecuteAttack(object sender, EnemyAI4.AttackEvent e){
+        _enemyScript = e.EnemyInstance.GetComponent<EnemyAI4>();
+        _enemyGameObject = e.EnemyInstance;
     }
     
-    public abstract void ExecuteAttack(object sender, EnemyAI4.AttackEvent e);
-    
-    public void SetGameObjectReference(GameObject gameObject){
-        _enemyScript = gameObject.GetComponent<EnemyAI4>();
-        _enemyGameObject = gameObject;
-    }
-    
-    public void SubscribeAttackToEvent(){
-        _enemyScript.AnimationAttackEvent += ExecuteAttack;
-    }
 }

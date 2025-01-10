@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Collections;
 using UnityEngine.AI;
+using Unity.VisualScripting.FullSerializer;
 public class EnemyAttackManager : MonoBehaviour
 {
 
     //IMPORTANT TO UNDERSTAND: the offsets for sheathe and unsheathe are called by the animation clips calling animation events, 
     //while the offsets for alert, roaming, chasing, idle, etc. are called by logic in enemyai3 script, since those will always be set 
     //at beginning of animation, so it's better to not have to deal with that for every single non-attack armed animation
-
-
+    [SerializeField] AnimationCurve jumpCurve;
     [Tooltip("Not every enemy needs a default weapon or default shield, but will never spawn a shield without a weapon")]
     [SerializeField] private Transform defaultSpawnWeapon; //Not every enemy needs this
     [SerializeField] private Transform defaultShield; //Not every enemy needs this
@@ -20,18 +20,22 @@ public class EnemyAttackManager : MonoBehaviour
     private Animator _anim;
     private AnimatorOverrideController _animOverrider;
     private EnemySpecificInfo _enemyInfo;
-    [SerializeField] private List<BaseAttackScript> defaultAttacks = new List<BaseAttackScript>();
-    [SerializeField] private List<BaseAttackScript> singleWeaponAttacks = new List<BaseAttackScript>();
-    [SerializeField] private List<BaseAttackScript> swordShieldAttacks = new List<BaseAttackScript>();
-    [SerializeField] private List<BaseAttackScript> doubleWieldingAttacks = new List<BaseAttackScript>();
+
+    [System.Serializable]
+    public class AttackData{
+        public BaseAttackScript attack;
+        public float weight;            
+    }
+    [SerializeField] private List<AttackData> defaultAttacks = new List<AttackData>();
+    [SerializeField] private List<AttackData> singleWeaponAttacks = new List<AttackData>();
+    [SerializeField] private List<AttackData> swordShieldAttacks = new List<AttackData>();
+    [SerializeField] private List<AttackData> doubleWieldingAttacks = new List<AttackData>();
 
     private Coroutine smoothMoveCoroutine1 = null;
     private Coroutine smoothMoveCoroutine2 = null;
 
     private EnemyAI4 _enemyScript;
-    private Rigidbody _rb;
-    private NavMeshAgent _agent;
-    public List<BaseAttackScript> GetCurrentAvailableAttacks(){
+    public List<AttackData> GetCurrentAvailableAttacks(){
         if(currentWeaponsEquipped.Count > 0){
             if(currentWeaponsEquipped.Count == 2){return defaultAttacks.Concat(doubleWieldingAttacks).ToList();}
             else if(currentShieldEquipped){return defaultAttacks.Concat(swordShieldAttacks).ToList();}
@@ -39,7 +43,7 @@ public class EnemyAttackManager : MonoBehaviour
         }
         else{return defaultAttacks;}
     }
-    public List<BaseAttackScript> GetAllAttacks(){
+    public List<AttackData> GetAllAttacks(){
         return defaultAttacks.Concat(singleWeaponAttacks).Concat(doubleWieldingAttacks).Concat(swordShieldAttacks).ToList();
     }
 
@@ -114,15 +118,18 @@ public class EnemyAttackManager : MonoBehaviour
     [SerializeField] private ArmedAnimationScript shieldSwordLeftTurnClip;
     [SerializeField] private ArmedAnimationScript shieldSwordRetreatClip;
 
-    private bool hasJump;
-    public bool HasJump(){return hasJump;}
+    public bool HasJump(bool isWeaponOut){
+        if(isWeaponOut){
+            if(currentWeaponsEquipped.Count == 1 && !currentShieldEquipped){return singleWeaponJumpClip != null;}
+            else if(currentWeaponsEquipped.Count == 1){return shieldSwordJumpClip != null;}
+            else{return doubleWieldingJumpClip;}
+        }
+        else{return unarmedJumpClip != null;}
+    }
     private void Awake(){
         _enemyInfo = GetComponent<EnemySpecificInfo>();
         _anim = GetComponent<Animator>();
-        _rb = GetComponent<Rigidbody>();
-        _agent = GetComponent<NavMeshAgent>();
         _enemyScript = GetComponent<EnemyAI4>();
-        hasJump = unarmedJumpClip && singleWeaponJumpClip && shieldSwordJumpClip && doubleWieldingJumpClip; 
     }
     private void Start(){ //just in case the copy overrider hasn't been assigned yet in EnemyAI3.Awake()
         _animOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
@@ -141,7 +148,7 @@ public class EnemyAttackManager : MonoBehaviour
             Transform attachPoint = _enemyInfo.GetSingleWeaponAttachPointTransform();
             currentWeaponsEquipped.Add(Instantiate(weaponPf, attachPoint.position, Quaternion.identity));
             Transform currWeapon = currentWeaponsEquipped[0];
-            SetParentOfTransform(currWeapon, attachPoint, Vector3.zero, Vector3.zero);
+            UtilityFunctions.SetParentOfTransform(currWeapon, attachPoint, Vector3.zero, Vector3.zero);
         }
         else{ //double-wielding weapon, spawn two of them at attachpoints
             Transform attachPoint1 = _enemyInfo.GetDoubleWeaponAttachPointTransform1();
@@ -150,43 +157,37 @@ public class EnemyAttackManager : MonoBehaviour
             currentWeaponsEquipped.Add(Instantiate(weaponPf, attachPoint2.position, Quaternion.identity));
             Transform currWeapon1 = currentWeaponsEquipped[0];
             Transform currWeapon2 = currentWeaponsEquipped[1];
-            SetParentOfTransform(currWeapon1, attachPoint1, Vector3.zero, Vector3.zero);
-            SetParentOfTransform(currWeapon2, attachPoint2, Vector3.zero, Vector3.zero);
+            UtilityFunctions.SetParentOfTransform(currWeapon1, attachPoint1, Vector3.zero, Vector3.zero);
+            UtilityFunctions.SetParentOfTransform(currWeapon2, attachPoint2, Vector3.zero, Vector3.zero);
         }
     }
     private void InstantiateShield(Transform shieldPf){
         Transform attachPoint = _enemyInfo.GetSingleWeaponAttachPointTransform();
         currentShieldEquipped = Instantiate(shieldPf, attachPoint.position, Quaternion.identity);
-        SetParentOfTransform(currentShieldEquipped, attachPoint, new Vector3(0f, 0.3f, -0.1f), new Vector3(0f, 0f, 180f));
-    }
-    public void SetParentOfTransform(Transform childTransform, Transform parentTransform, Vector3 positionOffset, Vector3 rotationOffset){
-        childTransform.SetParent(parentTransform, true);
-        childTransform.localPosition = positionOffset;
-        childTransform.localEulerAngles = rotationOffset;
-        childTransform.localScale *= parentTransform.root.localScale.x;
+        UtilityFunctions.SetParentOfTransform(currentShieldEquipped, attachPoint, new Vector3(0f, 0.3f, -0.1f), new Vector3(0f, 0f, 180f));
     }
     
     public void HandleWeaponShieldPositionForAttack(BaseAttackScript attackChosen){
         if(currentWeaponsEquipped.Count == 1 && !currentShieldEquipped){
             Transform weapon = currentWeaponsEquipped[0];
             if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
-            smoothMoveCoroutine1 = StartCoroutine(SmoothMove(weapon, attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset()));
+            smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(weapon, attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset(), 1));
         }
         else if(currentShieldEquipped){
             Transform weapon = currentWeaponsEquipped[0];
             Transform shield = currentShieldEquipped;
             if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
             if(smoothMoveCoroutine2 != null){StopCoroutine(smoothMoveCoroutine2);} 
-            smoothMoveCoroutine1 = StartCoroutine(SmoothMove(weapon, attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset()));
-            smoothMoveCoroutine2 = StartCoroutine(SmoothMove(shield, attackChosen.GetSecondWeaponPositionOffset(), attackChosen.GetSecondWeaponRotationOffset()));
+            smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(weapon, attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset(), 1));
+            smoothMoveCoroutine2 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(shield, attackChosen.GetSecondWeaponPositionOffset(), attackChosen.GetSecondWeaponRotationOffset(), 1));
         }
         else if(currentWeaponsEquipped.Count == 2){
             Transform weapon1 = currentWeaponsEquipped[0];
             Transform weapon2 = currentWeaponsEquipped[1];
             if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
             if(smoothMoveCoroutine2 != null){StopCoroutine(smoothMoveCoroutine2);} 
-            smoothMoveCoroutine1 = StartCoroutine(SmoothMove(weapon1, attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset()));
-            smoothMoveCoroutine2 = StartCoroutine(SmoothMove(weapon2, attackChosen.GetSecondWeaponPositionOffset(), attackChosen.GetSecondWeaponRotationOffset()));
+            smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(weapon1, attackChosen.GetFirstWeaponPositionOffset(), attackChosen.GetFirstWeaponRotationOffset(), 1));
+            smoothMoveCoroutine2 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(weapon2, attackChosen.GetSecondWeaponPositionOffset(), attackChosen.GetSecondWeaponRotationOffset(), 1));
         }
     }
     public void HandleWeaponShieldPosition(EnemyAI4.EnemyState animationType){
@@ -256,7 +257,7 @@ public class EnemyAttackManager : MonoBehaviour
                     break;
             }
             if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
-            smoothMoveCoroutine1 = StartCoroutine(SmoothMove(weapon, positionOffset, rotationOffset));
+            smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(weapon, positionOffset, rotationOffset, 1));
         }
         else if (currentShieldEquipped){
             Vector3 positionOffset1, positionOffset2, rotationOffset1, rotationOffset2;
@@ -360,6 +361,10 @@ public class EnemyAttackManager : MonoBehaviour
                     rotationOffset2 = Vector3.zero;
                     break;
             }
+            if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
+            if(smoothMoveCoroutine2 != null){StopCoroutine(smoothMoveCoroutine2);} 
+            smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(weapon, positionOffset1, rotationOffset1, 1));
+            smoothMoveCoroutine2 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(shield, positionOffset2, rotationOffset2, 1));
         }
         else if(currentWeaponsEquipped.Count == 2){
             Vector3 positionOffset1, positionOffset2, rotationOffset1, rotationOffset2;
@@ -459,50 +464,10 @@ public class EnemyAttackManager : MonoBehaviour
             }
             if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
             if(smoothMoveCoroutine2 != null){StopCoroutine(smoothMoveCoroutine2);} 
-            smoothMoveCoroutine1 = StartCoroutine(SmoothMove(weapon1, positionOffset1, rotationOffset1));
-            smoothMoveCoroutine2 = StartCoroutine(SmoothMove(weapon2, positionOffset2, rotationOffset2));
+            smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(weapon1, positionOffset1, rotationOffset1, 1));
+            smoothMoveCoroutine2 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(weapon2, positionOffset2, rotationOffset2, 1));
         }
     }
-
-    private IEnumerator SmoothMove(Transform item, Vector3 targetPosition, Vector3 targetRotation){
-        float transitionSpeed = 1f;
-        Vector3 initialPosition = item.localPosition;
-        Quaternion initialRotation = item.localRotation; // Use Quaternion
-        Quaternion targetQuaternion = Quaternion.Euler(targetRotation); // Convert targetRotation to Quaternion
-        float distance = Vector3.Distance(initialPosition, targetPosition); // Calculate distance to target
-        float duration = distance / transitionSpeed; // Adjust for smooth transition
-        float elapsedTime = 0f;
-        while (elapsedTime < duration){
-            elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
-            item.localPosition = Vector3.Lerp(initialPosition, targetPosition, t);
-            item.localRotation = Quaternion.Lerp(initialRotation, targetQuaternion, t); // Use Quaternion.Lerp
-            yield return null; // Wait until the next frame
-        }
-        item.localPosition = targetPosition;
-        item.localRotation = targetQuaternion;
-    }
-
-    private IEnumerator SmoothMoveChangeParent(Transform item, Transform newParent, Vector3 targetPosition, Vector3 targetRotation){
-        float transitionSpeed = 1f;
-        item.SetParent(newParent, worldPositionStays: true);
-        Vector3 initialPosition = item.localPosition;
-        Quaternion initialRotation = item.localRotation; // Use Quaternion
-        Quaternion targetQuaternion = Quaternion.Euler(targetRotation); // Convert targetRotation to Quaternion
-        float distance = Vector3.Distance(initialPosition, targetPosition); // Calculate distance to target
-        float duration = distance / transitionSpeed; // Adjust for smooth transition
-        float elapsedTime = 0f;
-        while (elapsedTime < duration){
-            elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
-            item.localPosition = Vector3.Lerp(initialPosition, targetPosition, t);
-            item.localRotation = Quaternion.Lerp(initialRotation, targetQuaternion, t); // Use Quaternion.Lerp
-            yield return null; // Wait until the next frame
-        }
-        item.localPosition = targetPosition;
-        item.localRotation = targetQuaternion;
-    }
-
     public void HandleAnimations(bool isWeaponOut){ //if weapon is out, that means that shield will also be out if the enemy has a shield
         if(currentWeaponsEquipped.Count == 1 && !currentShieldEquipped){
             _animOverrider["Unequip Placeholder"] = singleWeaponUnequipClip.GetAnimationClip();
@@ -591,21 +556,21 @@ public class EnemyAttackManager : MonoBehaviour
         Vector3 positionOffset = singleWeaponEquipClip.GetPositionOffset1();
         Vector3 rotationOffset = singleWeaponEquipClip.GetRotationOffset1();
         if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine1 = StartCoroutine(SmoothMoveChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetRightHandTransform(),
-            positionOffset, rotationOffset));
+        smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransformsChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetRightHandTransform(),
+            positionOffset, rotationOffset, 1));
     }
     private void MoveSingleWeaponToRightHandForUnequip(){ //function called by equip animations (this is required to change position of sword in hand when putting it back)
         Vector3 positionOffset = singleWeaponUnequipClip.GetPositionOffset1();
         Vector3 rotationOffset = singleWeaponUnequipClip.GetRotationOffset1();
         if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine1 = StartCoroutine(SmoothMove(currentWeaponsEquipped[0],
-            positionOffset, rotationOffset));
+        smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(currentWeaponsEquipped[0],
+            positionOffset, rotationOffset, 1));
     }
     private void MoveSingleWeaponToAttachPoint(){ //function called by unequip animations
         //can set to zero zero here because attach point is always correct orientation
         if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine1 = StartCoroutine(SmoothMoveChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetSingleWeaponAttachPointTransform(),
-            Vector3.zero, Vector3.zero));
+        smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransformsChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetSingleWeaponAttachPointTransform(),
+            Vector3.zero, Vector3.zero, 1));
         }
     private void MoveShieldSwordToHandsForEquip(){ //function called by unsheathe animations
         Vector3 positionOffset1 = shieldSwordEquipClip.GetPositionOffset1();
@@ -613,11 +578,11 @@ public class EnemyAttackManager : MonoBehaviour
         Vector3 positionOffset2 = shieldSwordEquipClip.GetPositionOffset2();
         Vector3 rotationOffset2 = shieldSwordEquipClip.GetRotationOffset2();
         if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine1 = StartCoroutine(SmoothMoveChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetRightHandTransform(),
-            positionOffset1, rotationOffset1));
+        smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransformsChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetRightHandTransform(),
+            positionOffset1, rotationOffset1, 1));
         if(smoothMoveCoroutine2 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine2 = StartCoroutine(SmoothMoveChangeParent(currentShieldEquipped, _enemyInfo.GetLeftHandTransform(),
-            positionOffset2, rotationOffset2));
+        smoothMoveCoroutine2 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransformsChangeParent(currentShieldEquipped, _enemyInfo.GetLeftHandTransform(),
+            positionOffset2, rotationOffset2, 1));
     }
     private void MoveShieldSwordToHandsForUnequip(){ //function called by sheathe animations
         Vector3 positionOffset1 = shieldSwordUnequipClip.GetPositionOffset1();
@@ -625,21 +590,21 @@ public class EnemyAttackManager : MonoBehaviour
         Vector3 positionOffset2 = shieldSwordUnequipClip.GetPositionOffset2();
         Vector3 rotationOffset2 = shieldSwordUnequipClip.GetRotationOffset2();
         if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine1 = StartCoroutine(SmoothMove(currentWeaponsEquipped[0],
-            positionOffset1, rotationOffset1));
+        smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(currentWeaponsEquipped[0],
+            positionOffset1, rotationOffset1, 1));
         if(smoothMoveCoroutine2 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine2 = StartCoroutine(SmoothMove(currentShieldEquipped,
-            positionOffset2, rotationOffset2));
+        smoothMoveCoroutine2 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(currentShieldEquipped,
+            positionOffset2, rotationOffset2, 1));
     }
     private void MoveShieldSwordToAttachPoint(){
         Vector3 positionOffset = new Vector3(0f, 0.3f, -0.1f);
         Vector3 rotationOffset = new Vector3(0f, 0f, 180f);
         if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine1 = StartCoroutine(SmoothMoveChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetSingleWeaponAttachPointTransform(),
-            Vector3.zero, Vector3.zero));
+        smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransformsChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetSingleWeaponAttachPointTransform(),
+            Vector3.zero, Vector3.zero, 1));
         if(smoothMoveCoroutine2 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine2 = StartCoroutine(SmoothMoveChangeParent(currentShieldEquipped, _enemyInfo.GetSingleWeaponAttachPointTransform(),
-            positionOffset, rotationOffset));
+        smoothMoveCoroutine2 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransformsChangeParent(currentShieldEquipped, _enemyInfo.GetSingleWeaponAttachPointTransform(),
+            positionOffset, rotationOffset, 1));
     }
     private void MoveDoubleWeaponsToHandsForEquip(){ //function called by unsheathe animations
         Vector3 positionOffset1 = doubleWieldingEquipClip.GetPositionOffset1();
@@ -648,11 +613,11 @@ public class EnemyAttackManager : MonoBehaviour
         Vector3 rotationOffset2 = doubleWieldingEquipClip.GetRotationOffset2();
 
         if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine1 = StartCoroutine(SmoothMoveChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetRightHandTransform(),
-            positionOffset1, rotationOffset1));
+        smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransformsChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetRightHandTransform(),
+            positionOffset1, rotationOffset1, 1));
         if(smoothMoveCoroutine2 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine2 = StartCoroutine(SmoothMoveChangeParent(currentWeaponsEquipped[1], _enemyInfo.GetLeftHandTransform(),
-            positionOffset2, rotationOffset2));
+        smoothMoveCoroutine2 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransformsChangeParent(currentWeaponsEquipped[1], _enemyInfo.GetLeftHandTransform(),
+            positionOffset2, rotationOffset2, 1));
     }
     private void MoveDoubleWeaponsToHandsForUnequip(){ //function called by sheathe animations
         Vector3 positionOffset1 = doubleWieldingUnequipClip.GetPositionOffset1();
@@ -660,120 +625,36 @@ public class EnemyAttackManager : MonoBehaviour
         Vector3 positionOffset2 = doubleWieldingUnequipClip.GetPositionOffset2();
         Vector3 rotationOffset2 = doubleWieldingUnequipClip.GetRotationOffset2();
         if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine1 = StartCoroutine(SmoothMove(currentWeaponsEquipped[0],
-            positionOffset1, rotationOffset1));
+        smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(currentWeaponsEquipped[0],
+            positionOffset1, rotationOffset1, 1));
         if(smoothMoveCoroutine2 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine2 = StartCoroutine(SmoothMove(currentWeaponsEquipped[1],
-            positionOffset2, rotationOffset2));
+        smoothMoveCoroutine2 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransforms(currentWeaponsEquipped[1],
+            positionOffset2, rotationOffset2, 1));
     }
     private void MoveDoubleWeaponsToAttachPoints(){
         //can set to zero zero here because attach points are always correct orientation
         if(smoothMoveCoroutine1 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine1 = StartCoroutine(SmoothMoveChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetDoubleWeaponAttachPointTransform1(),
-            Vector3.zero, Vector3.zero));
+        smoothMoveCoroutine1 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransformsChangeParent(currentWeaponsEquipped[0], _enemyInfo.GetDoubleWeaponAttachPointTransform1(),
+            Vector3.zero, Vector3.zero, 1));
         if(smoothMoveCoroutine2 != null){StopCoroutine(smoothMoveCoroutine1);} 
-        smoothMoveCoroutine2 = StartCoroutine(SmoothMoveChangeParent(currentWeaponsEquipped[1], _enemyInfo.GetDoubleWeaponAttachPointTransform2(),
-            Vector3.zero, Vector3.zero));
+        smoothMoveCoroutine2 = StartCoroutine(UtilityFunctions.SmoothMoveBetweenTransformsChangeParent(currentWeaponsEquipped[1], _enemyInfo.GetDoubleWeaponAttachPointTransform2(),
+            Vector3.zero, Vector3.zero, 1));
     }
-    private void StartJump(float timeToJumpUp){
-        Debug.Log("Start JUMP!");
-        StartCoroutine(JumpUpPhase(timeToJumpUp));
-    }
-    private IEnumerator JumpUpPhase(float jumpUpDuration){
-        _agent.SetDestination(_enemyScript.GetCurrentTarget().position);
-        yield return new WaitForSeconds(0.1f);
-        _agent.ResetPath();
-        _agent.enabled = false;
-        _rb.useGravity = false;
-        Vector3 endDestination = _enemyScript.GetJumpPosition() + Vector3.up * 30f;
+    private void StartJump(float timeToJump){  
+        Debug.Log("START JUMP!");
+        Vector3 landDestination = _enemyScript.GetJumpPosition();
+        Debug.Log("Jump Destination: " + landDestination);
         Vector3 origin = transform.position;
-        Vector3 destination = origin + (endDestination - origin) * 0.5f;
-        float elapsedTime = 0f;
-        while (elapsedTime < jumpUpDuration){
-            transform.LookAt(new Vector3 (_enemyScript.GetCurrentTarget().position.x, transform.position.y, _enemyScript.GetCurrentTarget().position.z));
-            float t = elapsedTime / jumpUpDuration;
-            Vector3 newPosition = Vector3.Lerp(origin, destination, t);
-            transform.position = newPosition;
-            elapsedTime += Time.deltaTime;
-            yield return null;
-        }
-        yield break;
+        float baseJumpDistance = 100f;
+        float jumpDistance = Vector3.Distance(origin, landDestination);
+        float speedChange = jumpDistance/baseJumpDistance;
+        _anim.speed = speedChange;
+        timeToJump *= speedChange;
+        StartCoroutine(UtilityFunctions.MoveRigidBodyWithAnimationCurve(gameObject.GetComponent<Rigidbody>(), landDestination, jumpCurve, timeToJump));
     }
-    private void PeakJump(float timeToJumpDown){StartCoroutine(JumpDownPhase(timeToJumpDown));}
-    private IEnumerator JumpDownPhase(float timeToJumpDown){
-        Vector3 end = _enemyScript.GetJumpPosition(); //this is guaranteed to be valid navmesh position
-        end = end + 2f * Vector3.up;
-        float elapsedTime = 0f;
-        Vector3 start= transform.position;
-        while (elapsedTime < timeToJumpDown){
-            transform.LookAt(new Vector3 (_enemyScript.GetCurrentTarget().position.x, transform.position.y, _enemyScript.GetCurrentTarget().position.z));
-            float t = elapsedTime / timeToJumpDown;
-            Vector3 newPosition = Vector3.Lerp(start, end, t);
-            transform.position = newPosition;
-            elapsedTime += Time.deltaTime;
-            yield return null;
-        }
-        _agent.enabled = true;
-        _rb.useGravity = true;
+    private void EndJumpAnimation(){
+        Debug.Log("END JUMP!");
+        _enemyScript.SetHasFinishedJump(true);
+        _anim.speed = 1;
     }
 }
-
- 
-
-// //     [SerializeField] private AnimationClip unsheathAnimation
-
-// //     private List<BaseAttackScript> activeAttacks = new List<BaseAttackScript>();
-// //     private Dictionary<string, List<BaseAttackScript>> weaponDefaultAttacksDict = new Dictionary<string, List<BaseAttackScript>>();
-// //     private List<BaseAttackScript> learnedAttacks = new List<BaseAttackScript>();
-
-// //     public void AddAttack(Attack newAttack)
-// //     {
-// //         activeAttacks.Add(newAttack);
-// //         RecalculateWeights();
-// //     }
-
-// //     public void RemoveAttack(Attack attackToRemove)
-// //     {
-// //         activeAttacks.Remove(attackToRemove);
-// //         RecalculateWeights();
-// //     }
-
-// //     public void EquipWeapon(string weaponType)
-// //     {
-// //         // Remove existing weapon-based attacks
-// //         RemoveWeaponBasedAttacks();
-
-// //         // Add default attacks for the new weapon
-// //         if (weaponDefaultAttacks.TryGetValue(weaponType, out var defaultAttacks))
-// //         {
-// //             activeAttacks.AddRange(defaultAttacks);
-// //         }
-
-// //         // Retain learned attacks
-// //         activeAttacks.AddRange(learnedAttacks);
-// //         RecalculateWeights();
-// //     }
-
-// //     public void LearnAttack(Attack newLearnedAttack)
-// //     {
-// //         learnedAttacks.Add(newLearnedAttack);
-// //         activeAttacks.Add(newLearnedAttack);
-// //         RecalculateWeights();
-// //     }
-
-// //     private void RemoveWeaponBasedAttacks()
-// //     {
-// //         activeAttacks.RemoveAll(attack => !learnedAttacks.Contains(attack));
-// //     }
-
-// //     private void RecalculateWeights()
-// //     {
-// //         // Reassign weights to all attacks proportionally
-// //         float totalWeight = activeAttacks.Sum(a => a.weight);
-// //         foreach (var attack in activeAttacks)
-// //         {
-// //             attack.adjustedWeight = attack.weight / totalWeight;
-// //         }
-// //     }
-
-

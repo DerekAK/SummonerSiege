@@ -5,36 +5,50 @@ using System.Collections;
 using System;
 using System.Linq;
 using Unity.Mathematics;
+using Unity.VisualScripting;
+using UnityEditor;
 
 public class EnemyAI4 : MonoBehaviour{
+
+    public class AttackEvent : EventArgs{
+        public GameObject EnemyInstance { get; }
+        public BaseAttackScript AttackChosen { get; }
+        public Transform TargetTransform { get; }
+        public Transform AttackCenterForward { get; }
+        public LayerMask TargetL { get; }
+        public AttackEvent(GameObject enemyInstance, BaseAttackScript attackChosen, Transform targetTransform, Transform attackCenterForward, LayerMask targetL){
+            EnemyInstance = enemyInstance;
+            AttackChosen = attackChosen;
+            TargetTransform = targetTransform;
+            AttackCenterForward = attackCenterForward;
+            TargetL = targetL;
+        }
+    }
+    public event EventHandler<AttackEvent> AnimationAttackEvent;
     private BaseAttackScript attackChosen;
     private bool hasMelee, hasMedium, hasLong;
     private int countMeleeInRow, countMediumInRow, countLongInRow = 0;
-    private List<BaseAttackScript> meleeAttacks, mediumAttacks, longAttacks;
+    private List<EnemyAttackManager.AttackData> meleeAttacks, mediumAttacks, longAttacks;
     private NavMeshAgent _agent;
     private Animator _anim;
     private Rigidbody _rb;
     private AnimatorOverrideController _templateOverrider;
     private AnimatorOverrideController _copyOverrider;
     private SphereCollider _aggroCollider;
+    private CapsuleCollider _capsuleCollider;
     private List<Transform> playersInGame;
     private List<Transform> targetsInRangeOfEnemy = new List<Transform>();
-    private List<BaseAttackScript> attackPool;
+    private List<EnemyAttackManager.AttackData> attackPool;
     private Transform currentTarget;
     private Vector3 startPosition;
     private Vector3 roamPosition;
     private Coroutine alertCoroutine;
     private Coroutine speedCoroutine;
-    private float attackCenterBoxRadius;
     private float enemyHeight;
     [SerializeField] private LayerMask obstacleL;
-    [SerializeField] private LayerMask playerL;
-    [SerializeField] private LayerMask enemyL;
-    private LayerMask targetL;
-    [SerializeField] private string playerTag = "Player";
-    [SerializeField] private string weaponTag = "Weapon";
-    [SerializeField] private string enemyTag = "Enemy";
-    private string targetTag;
+    [SerializeField] private LayerMask targetL;
+    private string playerTag = "Player";
+    [SerializeField] private string targetTag;
     [SerializeField] private Transform attackCenter;
     [SerializeField] private Transform eyes;
     [SerializeField] private Transform feet;
@@ -46,18 +60,11 @@ public class EnemyAI4 : MonoBehaviour{
     public enum EnemyState{Idle=0, Roaming=1, Alert=2, StareDown=3, Approach=4, AttackA=5, AttackB=6, 
     Equip=7, Unequip=8, Dodge=9, Block=10, Jump=11, Reposition=12, ReceiveBuff=13, TakeHit=14, Die=15, RightTurn=16, Retreat=17, LeftTurn=18}
     private EnemyState currentEnemyState;
-    public class AttackEvent : EventArgs{
-        public BaseAttackScript AttackChosen{get;set;}
-        public Transform TargetTransform{ get;set;}
-        public Transform AttackCenterForward{ get;set;}
-        public LayerMask TargetL{get;set;}
-    }
-    //events to subscribe to
-    public event EventHandler<AttackEvent> AnimationAttackEvent;
     private EnemyState nextAttackState;
+    private bool hasFinishedJump = false;
+    public void SetHasFinishedJump(bool finished){hasFinishedJump = finished;}
 
     private void Awake(){
-    
         SetUpAnimator(); //sets up a unique copy of the animatorOverrider for each enemy instance
         _enemyAttackManager = GetComponent<EnemyAttackManager>();
         _enemyInfo = GetComponent<EnemySpecificInfo>();
@@ -65,10 +72,8 @@ public class EnemyAI4 : MonoBehaviour{
         _rb = GetComponent<Rigidbody>();
         _aggroCollider = GetComponent<SphereCollider>();
         enemyHeight = GetComponent<CapsuleCollider>().height * transform.localScale.y;
-        attackCenterBoxRadius = enemyHeight/2; 
-        targetTag = playerTag;
-        targetL = playerL;
     }
+
     //every enemy instance will get it's own overrider copy
     private void SetUpAnimator(){
         _anim = GetComponent<Animator>();
@@ -76,10 +81,11 @@ public class EnemyAI4 : MonoBehaviour{
         _copyOverrider = new AnimatorOverrideController(_templateOverrider);
         _anim.runtimeAnimatorController = _copyOverrider;
     }
+
     private void Start(){
         nextAttackState = EnemyState.AttackA;
         _aggroCollider.radius = (_enemyInfo.GetAggroDistance()-1)/transform.localScale.y;
-        _agent.stoppingDistance = 10f; //THIS IS REALLY IMPORTANT TO GET RIGHT
+        _agent.stoppingDistance = 1.5f * transform.root.localScale.x; //THIS IS REALLY IMPORTANT TO GET RIGHT
         _agent.angularSpeed = 1000f;
         _agent.acceleration = 200f;
         _agent.radius = 0.1f;
@@ -90,6 +96,10 @@ public class EnemyAI4 : MonoBehaviour{
         //can set to idle immediately because spawnscript will ensure no enemy is spawned in with a player in its aggrosphere
         Idle();
     }
+
+    // private void FixedUpdate() {
+    //     _rb.MovePosition(transform.position);
+    // }
     private void Idle(){
         _agent.ResetPath();
         currentEnemyState = EnemyState.Idle;
@@ -175,7 +185,6 @@ public class EnemyAI4 : MonoBehaviour{
             if(target.CompareTag(playerTag)){directionToTarget = target.GetComponent<ThirdPersonMovementScript>().GetEyesTransform().position - eyes.position;}
             else{directionToTarget = target.GetComponent<EnemyAI4>().GetEyesTransform().position - eyes.position;}
             if (!Physics.Raycast(eyes.position, directionToTarget.normalized, out RaycastHit hit, directionToTarget.magnitude, obstacleL)){
-                Debug.DrawRay(eyes.position, directionToTarget, Color.red, 10f);
                 currentTarget = target; 
                 StopCoroutine(alertCoroutine);
                 alertCoroutine = null;
@@ -195,20 +204,22 @@ public class EnemyAI4 : MonoBehaviour{
     private IEnumerator TurnTowardsTarget(Vector3 targetPosition){
         Debug.Log("TurningTowardsTarget Coroutine!");
         _anim.applyRootMotion = true;
-        _anim.speed = 3f;
         while (true){
             targetPosition = new Vector3(currentTarget.position.x, transform.position.y, currentTarget.position.z);
             Vector3 directionToTarget = (targetPosition - transform.position).normalized;
             float angle = Vector3.Angle(transform.forward, directionToTarget);
             if (math.abs(angle) < 3f){ //because angle changes by a bit each frame, could potentially be up to 3, maybe even more so this might not always work
                 _anim.applyRootMotion = false;
-                _anim.speed = 1f;
                 yield break;
             }
             yield return null;
         }
     }
     private IEnumerator StareDownCoroutine(){
+        _agent.speed = 10;
+        _agent.SetDestination(currentTarget.position);
+        yield return new WaitForSeconds(0.2f);
+        _agent.ResetPath();
         float stareDownTime = UnityEngine.Random.Range(_enemyInfo.GetStareDownTime()-2f, _enemyInfo.GetStareDownTime()+2f);
         float elapsedTime = 0f;
         _agent.SetDestination(new Vector3(currentTarget.position.x, transform.position.y, currentTarget.position.z));
@@ -224,18 +235,21 @@ public class EnemyAI4 : MonoBehaviour{
 
     private IEnumerator RetreatCoroutine(){
         Vector3 directionAwayFromTarget = (transform.position - currentTarget.position).normalized;
-        float randomAngle = UnityEngine.Random.Range(-90f, 90f); // Adjust within a 45-degree cone
-        Quaternion rotation = Quaternion.Euler(0, randomAngle, 0);
-        Vector3 adjustedDirection = rotation * directionAwayFromTarget;
-        float retreatDistance = _enemyInfo.GetRetreatDistance();
-        Vector3 newPosition = transform.position + adjustedDirection * retreatDistance;
-        newPosition = FindNavMeshPosition(newPosition);
+        float retreatDistance = _enemyInfo.GetRetreatDistance() + _agent.stoppingDistance;
+        Vector3 newPosition = UtilityFunctions.GetRandomPositionInDirection(transform, directionAwayFromTarget, 90, retreatDistance);
+        newPosition = UtilityFunctions.FindNavMeshPosition(newPosition, transform.position);
         _agent.speed = _enemyInfo.GetRetreatSpeed();
         _agent.SetDestination(newPosition);
-        yield return new WaitForSeconds(0.1f);
+        yield return new WaitForNextFrameUnit();
         float elapsedTime = 0f;
         float giveUpTime = 10f;
+        NavMeshPath path = new NavMeshPath();
         while(_agent.remainingDistance > _agent.stoppingDistance && elapsedTime <= giveUpTime){
+            if (!(_agent.CalculatePath(newPosition, path) && path.status == NavMeshPathStatus.PathComplete)){
+                newPosition = UtilityFunctions.GetRandomPositionInDirection(transform, directionAwayFromTarget, 90, retreatDistance);
+                newPosition = UtilityFunctions.FindNavMeshPosition(newPosition, transform.position);
+                _agent.SetDestination(newPosition);
+            }
             elapsedTime += Time.deltaTime;
             yield return null;
         }
@@ -245,11 +259,11 @@ public class EnemyAI4 : MonoBehaviour{
         _agent.SetDestination(currentTarget.position);
         float baseSpeed = _enemyInfo.GetApproachSpeed();
         _agent.speed = baseSpeed;
-        yield return new WaitForSeconds(0.1f);
+        yield return new WaitForNextFrameUnit();
         if(currentTarget){
             float currentDistance = Vector3.Distance(transform.position, currentTarget.position);
             float maxDistance = currentDistance;
-            while (_agent.remainingDistance > _agent.stoppingDistance){
+            while (Vector3.Distance(transform.position, currentTarget.position) > _agent.stoppingDistance){
                 if(currentTarget){
                     _agent.SetDestination(currentTarget.position);
                     currentDistance = Vector3.Distance(transform.position, currentTarget.position);
@@ -263,7 +277,7 @@ public class EnemyAI4 : MonoBehaviour{
                     yield break;
                 }
             }
-            HandleAttackTransition();
+            Debug.Log("Reached agent stopping distance!");
             PerformAttack();
         }
         else{
@@ -272,19 +286,32 @@ public class EnemyAI4 : MonoBehaviour{
     }
     private IEnumerator JumpCoroutine(Vector3? newPos){ 
         currentJumpPosition = newPos.Value;
-        yield return new WaitForSeconds(_copyOverrider["Jump Placeholder"].length); //animation itself will take care of the jump logic
+        _agent.enabled = false;
+        _rb.useGravity = false;
+        yield return new WaitUntil(() => hasFinishedJump == true);
+        _agent.enabled = true;
+        if(NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 1f, _agent.areaMask)){
+            _agent.Warp(hit.position);
+        }
+        _rb.useGravity = true;
+        FinishedJumpReposition();
+        yield return new WaitForEndOfFrame();
+        hasFinishedJump = false;
+    }
 
-        if(attackChosen.GetAttackType() == 1){
+    private void FinishedJumpReposition(){
+        
+        if(attackChosen.GetAttackType() == 1 && Vector3.Distance(transform.position, currentTarget.position) > 1.5 * _agent.stoppingDistance){
             currentEnemyState = EnemyState.Approach;
             if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPosition(currentEnemyState);}
             _anim.SetInteger("EnemyState", (int)currentEnemyState);
             StartCoroutine(ApproachCoroutine());
         }
         else{
-            HandleAttackTransition();
             PerformAttack();
         }
     }
+
     private float DetermineTurnDirection(){
         Vector3 directionToTarget = (currentTarget.position - transform.position).normalized;
         directionToTarget.y = 0;
@@ -296,7 +323,7 @@ public class EnemyAI4 : MonoBehaviour{
 
     // Enemy will reposition itself before an attack
     private IEnumerator RepositionCoroutine(Vector3? newPos){
-        _agent.SetDestination(FindNavMeshPosition(newPos.Value));
+        _agent.SetDestination(UtilityFunctions.FindNavMeshPosition(newPos.Value, transform.position));
         _agent.speed = _enemyInfo.GetRepositionSpeed();
         yield return new WaitForSeconds(0.1f);
         float elapsedTime = 0f;
@@ -304,33 +331,30 @@ public class EnemyAI4 : MonoBehaviour{
             elapsedTime += Time.deltaTime;
             yield return null;
         }
-        if(attackChosen.GetAttackType() == 1){
-            currentEnemyState = EnemyState.Approach;
-            if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPosition(currentEnemyState);}
-            _anim.SetInteger("EnemyState", (int)currentEnemyState);
-            StartCoroutine(ApproachCoroutine());
-        }
-        else{
-            HandleAttackTransition();
-            PerformAttack();
-        }
+
+        FinishedJumpReposition();
+
     }
-    private void HandleAttackTransition(){
+    private void PerformAttack(){
+        if(IsVisible()){StartCoroutine(EasyTurnIntoAttack());}
+        else{StartCoroutine(ApproachUntilVisible());}
+    }
+    private IEnumerator EasyTurnIntoAttack(){
+        if(currentEnemyState != EnemyState.Approach){
+            _agent.speed = 10f;
+            _agent.SetDestination(currentTarget.position);
+            yield return new WaitForSeconds(0.2f);
+            _agent.ResetPath();
+        }
+        _agent.ResetPath();
         currentEnemyState = nextAttackState;
         _anim.SetInteger("EnemyState", (int)currentEnemyState);
         if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPositionForAttack(attackChosen);}
-    }
-    private void PerformAttack(){
         AnimationAttackEvent = null;
-        if(IsVisible()){
-            if(attackChosenInstance){Destroy(attackChosenInstance.gameObject);}
-            attackChosenInstance = Instantiate(attackChosen);
-            attackChosenInstance.SetGameObjectReference(this.gameObject);
-            AnimationAttackEvent += attackChosenInstance.ExecuteAttack;
-        }
-        else{
-            StartCoroutine(ApproachUntilVisible());
-        }
+        if(attackChosenInstance){Destroy(attackChosenInstance.gameObject);}
+        attackChosenInstance = Instantiate(attackChosen);
+        AnimationAttackEvent += attackChosenInstance.ExecuteAttack;
+        //AnimationAttackEvent += attackChosen.ExecuteAttack;
     }
 
     //if currently in a state where next decision can be an attack, first decide whether an attack makes sense before deciding that you definitely will attack
@@ -405,9 +429,11 @@ public class EnemyAI4 : MonoBehaviour{
     }
 
     private void HandleNextCombatDecision(EnemyState decision, Vector3? repositionLocation){
-        currentEnemyState = decision;
-        if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPosition(currentEnemyState);}
-        _anim.SetInteger("EnemyState", (int)currentEnemyState);
+        if(decision != EnemyState.AttackA && decision != EnemyState.AttackB){
+            currentEnemyState = decision;
+            if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPosition(currentEnemyState);}
+            _anim.SetInteger("EnemyState", (int)currentEnemyState);
+        } // this is because PerformAttack() will handle this, and that will first wait for a delay for a smooth turn towards its target
         switch(decision){
             case EnemyState.RightTurn:
                 float angle = DetermineTurnDirection();
@@ -556,17 +582,17 @@ public class EnemyAI4 : MonoBehaviour{
             if(attackType == 1){mode = 1;}
             else if(attackType == 2){mode = 2;}
             else{mode = 3;}
-            newPos = FindNavMeshPosition(GetRandomPositionInRange(mode));
-            return _enemyAttackManager.HasJump() ? (EnemyState.Jump, newPos) : (EnemyState.Reposition, newPos);
+            newPos = UtilityFunctions.FindNavMeshPosition(GetRandomPositionInRange(mode), transform.position);
+            return _enemyAttackManager.HasJump(isWeaponOut) ? (EnemyState.Jump, newPos) : (EnemyState.Reposition, newPos);
         }
-        if(attackType == 1){return (EnemyState.Approach, null);}
+        if(attackType == 1 && Vector3.Distance(transform.position, currentTarget.position) > 1.5 * _agent.stoppingDistance){return (EnemyState.Approach, null);}
         return (nextAttackState, null);
     }
     private BaseAttackScript DecideAttack(){
         
-        meleeAttacks = attackPool.FindAll(attack => attack.GetAttackType() == 1);
-        mediumAttacks = attackPool.FindAll(attack => attack.GetAttackType() == 2);
-        longAttacks = attackPool.FindAll(attack => attack.GetAttackType() == 3);
+        meleeAttacks = attackPool.FindAll(attackData => attackData.attack.GetAttackType() == 1);
+        mediumAttacks = attackPool.FindAll(attackData => attackData.attack.GetAttackType() == 2);
+        longAttacks = attackPool.FindAll(attackData => attackData.attack.GetAttackType() == 3);
         hasMelee = meleeAttacks.Count > 0;
         hasMedium = mediumAttacks.Count > 0;
         hasLong = longAttacks.Count > 0;
@@ -574,55 +600,56 @@ public class EnemyAI4 : MonoBehaviour{
         
         float distanceToPlayer = Vector3.Distance(feet.position, currentTarget.position);
         float playerProximityRatio = Mathf.Clamp(distanceToPlayer/_enemyInfo.GetAggroDistance(), 0f, 1f); //always <= 1
-        Dictionary<BaseAttackScript, float> originalWeights = new Dictionary<BaseAttackScript, float>();
+        Dictionary<EnemyAttackManager.AttackData, float> originalWeights = new Dictionary<EnemyAttackManager.AttackData, float>();
 
         /*
         accounting for if weapon is out, distance to player, attack range preference of enemy, 
         */
         float totalWeight = 0f;
-        foreach (var attack in attackPool){
-            float originalWeight = attack.GetAttackWeight();
-            originalWeights[attack] = originalWeight;
+        foreach (var attackData in attackPool){
+            float originalWeight = attackData.weight;
+            originalWeights[attackData] = originalWeight;
 
             float adjustedWeight = originalWeight;
-            if (isWeaponOut && attack.DoesRequireWeapon()) { adjustedWeight *= 2f; }
+            if (isWeaponOut && attackData.attack.DoesRequireWeapon()) { adjustedWeight *= 2f; }
 
-            if (attack.GetAttackType() == 1){
+            if (attackData.attack.GetAttackType() == 1){
                 adjustedWeight *= _enemyInfo.GetMeleeAffinity();
                 if (playerProximityRatio < 0.33f) { adjustedWeight *= 3f; }
                 else if (playerProximityRatio < 0.67f) { adjustedWeight *= 1.5f; }
             }
-            else if (attack.GetAttackType() == 2){
+            else if (attackData.attack.GetAttackType() == 2){
                 adjustedWeight *= _enemyInfo.GetMediumAffinity();
                 if (playerProximityRatio > 0.33f && playerProximityRatio < 0.67f) { adjustedWeight *= 3.5f; }
             }
-            else if (attack.GetAttackType() == 3){
+            else if (attackData.attack.GetAttackType() == 3){
                 adjustedWeight *= _enemyInfo.GetRangedAffinity();
                 if (playerProximityRatio > 0.33f && playerProximityRatio < 0.67f) { adjustedWeight *= 1.5f; }
                 else if (playerProximityRatio > 0.67f) { adjustedWeight *= 3f; }
             }
+            attackData.weight = adjustedWeight;
             totalWeight += adjustedWeight;
-            attack.SetAttackWeight(adjustedWeight);
         }
-
-        foreach (var attack in attackPool){attack.SetAttackWeight(attack.GetAttackWeight()/totalWeight);}
+        foreach (var attackData in attackPool){
+            attackData.weight /= totalWeight;
+            // Debug.Log("Adjusted weight of attack " + attackData.attack + ": " + attackData.weight);
+        }
         float randomValue = UnityEngine.Random.Range(0f, 1f);
         float cumulativeProbability = 0f;
         BaseAttackScript retAttack = null;
-        foreach (var attack in attackPool){
-            cumulativeProbability += attack.GetAttackWeight();
+        foreach (var attackData in attackPool){
+            cumulativeProbability += attackData.weight;
             if (randomValue <= cumulativeProbability){
-                //this is attack to pick
-                retAttack = attack;
+                retAttack = attackData.attack;
                 break;
             }
         }
         if(!retAttack){
-            retAttack = attackPool[0];
+            retAttack = attackPool[0].attack;
             Debug.Log("Assigned a default decided attack, THIS SHOULD NEVER HAPPEN!");
         }
         // Reset to original weights
-        foreach (var kvp in originalWeights){kvp.Key.SetAttackWeight(kvp.Value);}
+        foreach (var kvp in originalWeights){kvp.Key.weight = kvp.Value;}
         return retAttack;
     }
     private BaseAttackScript GetAttack(List<BaseAttackScript> filteredAttacks){
@@ -664,20 +691,11 @@ public class EnemyAI4 : MonoBehaviour{
         Vector3 randomPosition = currentTarget.position + randomDirection * randomDistance;
         return randomPosition;
     }
-    private Vector3 FindNavMeshPosition(Vector3 position){
-        RaycastHit hit; //this is to determine the exact y coordinate of the xz coordinate determined by newpos
-        if (Physics.Raycast(new Vector3(position.x, 500f, position.z), Vector3.down, out hit, Mathf.Infinity)){   
-            Debug.DrawRay(new Vector3(position.x, 500f, position.z), Vector3.down * 500f, Color.red, 3f);
-            NavMeshHit navHit;
-            if (NavMesh.SamplePosition(hit.point, out navHit, 1000f, NavMesh.AllAreas)){return navHit.position;} // Return the valid NavMesh position
-        }
-        return transform.position;
-    }
     private Vector3 GetNewRoamingPosition(){
         Vector3 randDir = new Vector3(UnityEngine.Random.Range(-1f, 1f), 0, UnityEngine.Random.Range(-1f, 1f)).normalized;
         float roamingRange = UnityEngine.Random.Range(_enemyInfo.GetMinRoamingRange(), _enemyInfo.GetMaxRoamingRange());
         Vector3 newPos = startPosition + (randDir * roamingRange);
-        return FindNavMeshPosition(newPos);
+        return UtilityFunctions.FindNavMeshPosition(newPos, transform.position);
     }
     private IEnumerator ApproachUntilVisible(){
         currentEnemyState = EnemyState.Approach;
@@ -710,7 +728,8 @@ public class EnemyAI4 : MonoBehaviour{
         return false;
     }
     private void AnimationEventNextStep(){
-        AnimationAttackEvent?.Invoke(this, new AttackEvent{AttackChosen = attackChosen, TargetTransform=currentTarget, AttackCenterForward=attackCenter, TargetL=targetL});
+        var attackEvent = new AttackEvent(this.gameObject, attackChosen, currentTarget, attackCenter, targetL);
+        AnimationAttackEvent?.Invoke(this, attackEvent);
     }
     private void SlowAnim(float time){SetAnimationSpeed(0, time);} // Slow mode
     private void SpeedAnim(float time){SetAnimationSpeed(1, time);} // Fast mode
@@ -744,7 +763,6 @@ public class EnemyAI4 : MonoBehaviour{
     public Transform GetEyesTransform(){return eyes;}
     public Transform GetFeetTransform(){return feet;}
     public Vector3 GetJumpPosition(){return currentJumpPosition;}
-    public Transform GetCurrentTarget(){return currentTarget;}
     private void OnDisable(){AnimationAttackEvent = null;}
 
     // at very minimum, need long range vs melee range, aggressive vs patient, smart vs dumb, combo tendency vs not, 
