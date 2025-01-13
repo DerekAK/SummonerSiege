@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 9624a55c514d0424c9483ac44daa604d
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 135167
+  packageName: 3D Game Kit - Environment Pack
+  packageVersion: 1.0
+  assetPath: Assets/3D Gamekit - Environment Pack/Shaders/GroundCover.shader
+  uploadId: 691810

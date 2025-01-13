@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 30c74dfc1deb0aa4db33e6f1b48b8e74
+timeCreated: 1505726826
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 135167
+  packageName: 3D Game Kit - Environment Pack
+  packageVersion: 1.0
+  assetPath: Assets/3D Gamekit - Environment Pack/Environment/Vegetation/Small/Materials/VegetationSmall04_Mat.mat
+  uploadId: 691810

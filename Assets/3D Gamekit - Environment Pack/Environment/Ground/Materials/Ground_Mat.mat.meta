@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 61be5fb840b83854a95a1ef4982462cd
+timeCreated: 1511196130
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 135167
+  packageName: 3D Game Kit - Environment Pack
+  packageVersion: 1.0
+  assetPath: Assets/3D Gamekit - Environment Pack/Environment/Ground/Materials/Ground_Mat.mat
+  uploadId: 691810

@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: f7f335b659c92cf468c6f87e8581c34a
+timeCreated: 1492609829
+licenseType: Store
+ShaderImporter:
+  defaultTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 135167
+  packageName: 3D Game Kit - Environment Pack
+  packageVersion: 1.0
+  assetPath: Assets/3D Gamekit - Environment Pack/Shaders/Terrain.shader
+  uploadId: 691810

@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 00036c34b5ae386428e7e2e5470124e9
+timeCreated: 1500992207
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 135167
+  packageName: 3D Game Kit - Environment Pack
+  packageVersion: 1.0
+  assetPath: Assets/3D Gamekit - Environment Pack/Environment/Rocks/Materials/RockLedge01_Mat.mat
+  uploadId: 691810

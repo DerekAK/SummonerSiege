@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 30b0f587813f86c44b82c48c7733af87
+timeCreated: 1500991062
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 135167
+  packageName: 3D Game Kit - Environment Pack
+  packageVersion: 1.0
+  assetPath: Assets/3D Gamekit - Environment Pack/Environment/Rocks/Materials/CliffEdge03_Mat.mat
+  uploadId: 691810

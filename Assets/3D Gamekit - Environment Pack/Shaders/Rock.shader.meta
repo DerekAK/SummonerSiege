@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 334962709511cd04e83c9de5f7e6bec8
+timeCreated: 1508333908
+licenseType: Store
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 135167
+  packageName: 3D Game Kit - Environment Pack
+  packageVersion: 1.0
+  assetPath: Assets/3D Gamekit - Environment Pack/Shaders/Rock.shader
+  uploadId: 691810
