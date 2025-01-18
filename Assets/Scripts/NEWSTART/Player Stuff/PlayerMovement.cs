@@ -1,7 +1,16 @@
+using System;
 using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
+
+    private string moveXParam = "InputX";
+    private string moveYParam = "InputY";
+    private string rollXParam = "RollX";
+    private string rollYParam = "RollY";
+    private string animMovementStateParam = "Movement State";
+    private float currentMoveSpeed = 0f;
+
     [SerializeField] private LayerMask groundLayers;
 
     [Header("Grounded Settings")]
@@ -10,24 +19,23 @@ public class PlayerMovement : MonoBehaviour
 
     [Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
     [SerializeField] private float groundedRadius = 0.5f;
-    private PlayerStats _playerStats;
     private float _verticalVelocity;
     private float gravity = Physics.gravity.y;
     [SerializeField] private float fastFallFactor = 100f;
     [SerializeField] private float jumpHeight = 100f;
-    [SerializeField] private float walkingSpeed = 5f;
-    [SerializeField] private float runningSpeed = 10f;
     [SerializeField] private float rotationSpeed = 3f;
     [SerializeField] private float rotationSmoothTime = 0.12f;
-    private float _targetRotation = 0.0f;
-    public enum PlayerState{Locomotion=0, Jumping=1, Falling=2}
-    public PlayerState currentPlayerState{get; private set;}
+    [SerializeField] private float smoothSpeed = 10f;
+    [SerializeField] private float lockOnFactor = 0.5f;
+    [SerializeField] private Transform eyesTransform;    
+    public enum MovementState{Locomotion=0, Jumping=1, Falling=2, Rolling=3}
+    public MovementState currentMovementState{get; private set;}
 
     private CharacterController _characterController;
     private Animator _anim;
-    private float currentAnimThreshold;
-    [SerializeField] private Transform eyesTransform;
-    
+    private PlayerStats _playerStats;
+    private PlayerState _playerState;
+    private int playerTargetIndex = 0;
     
     //camera shit
     [Header("Mouse Cursor Settings")]
@@ -46,6 +54,7 @@ public class PlayerMovement : MonoBehaviour
         _characterController = GetComponent<CharacterController>();
         _anim = GetComponent<Animator>();
         _playerStats = GetComponent<PlayerStats>();
+        _playerState = GetComponent<PlayerState>();
     }
     private void Start(){
         _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
@@ -58,99 +67,151 @@ public class PlayerMovement : MonoBehaviour
         GroundedCheck();
         UpdateVerticalVelocity(); //accounts for jumping
         Move();
-
         CursorStuffIDontUnderstand();
     }
-
     private void UpdateVerticalVelocity(){
-        Debug.Log(gravity);
         if(isGrounded){
             if (_verticalVelocity < 0.0f){
                 _verticalVelocity = -2f;
             }
-            if(GameInput.Instance.JumpPressed()){
-                _verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * fastFallFactor * gravity);
-            }
+            if(GameInput.Instance.JumpPressed()){_verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * fastFallFactor * gravity);}
         }
         else{_verticalVelocity += fastFallFactor * gravity * Time.deltaTime;}
     }
-    private void Move()
-    {
-        float targetAnimThreshold; // The desired animation threshold value
+    private void Move(){
         Vector2 moveDir = GameInput.Instance.GetPlayerMovementVectorNormalized();
 
         bool isMoving = moveDir != Vector2.zero;
         bool isSprinting = GameInput.Instance.SprintingPressed();
-        float moveSpeed;
+        bool isLockedOn = GameInput.Instance.RightClickPressed();
+        bool isLockedOnTriggered = GameInput.Instance.RightClickTriggered(); //for sorting the list of targets before locking to it
+        bool rollTriggered = GameInput.Instance.MouseMiddleTriggered();
 
-        // Determine the target values based on movement and sprinting
-        if (isMoving) // Moving
-        {
-            if (isSprinting) // Running
-            {
-                moveSpeed = runningSpeed;
-                targetAnimThreshold = 1f;
-            }
-            else // Walking
-            {
-                moveSpeed = walkingSpeed;
-                targetAnimThreshold = 0.5f;
-            }
-        }
-        else // Idle
-        {
-            moveSpeed = 0.0f;
-            targetAnimThreshold = 0f;
+        if(isLockedOnTriggered){
+            _playerState.lockOnTargets.Sort((a, b) => Vector3.Distance(a.position, transform.position).CompareTo(Vector3.Distance(b.position, transform.position)));
+            playerTargetIndex = 0;
         }
 
-        // Smoothly interpolate the animation threshold
-        currentAnimThreshold = _anim.GetFloat("Speed");
-        float smoothSpeed = 5f; // Adjust this value to control smoothing speed
-        float animThreshold;
-        if(currentAnimThreshold > 1e-4f){ //small threshold so Math.Lerp doesn't continue forever.
-            animThreshold = Mathf.Lerp(currentAnimThreshold, targetAnimThreshold, Time.deltaTime * smoothSpeed);
+        float targetMoveSpeed;
+        float targetY;
+        float targetX;
+
+        if (isMoving && !isLockedOn){
+            if (isSprinting){
+                targetMoveSpeed = _playerStats.speed * _playerStats.sprintFactor;
+                targetX = 0;
+                targetY = 2;
+            }
+            else{
+                targetMoveSpeed = _playerStats.speed;
+                targetX = 0;
+                targetY = 1;
+            }
         }
-        else{
-            animThreshold = targetAnimThreshold;
+        else if(isLockedOn){
+            targetMoveSpeed = _playerStats.speed * lockOnFactor;
+            targetX = moveDir.x;
+            targetY = moveDir.y;
         }
-        currentAnimThreshold = _anim.GetFloat("Speed");
-        // Handle jumping and grounded state
-        if (!isGrounded)
-        {
-            // Doesn't matter what animThreshold is because not in blend tree state, instead in jumping
-            if (_verticalVelocity < 0) { currentPlayerState = PlayerState.Falling; } // Falling
-            else { currentPlayerState = PlayerState.Jumping; }
+        else{ //not moving
+            targetMoveSpeed = 0.0f;
+            targetX = 0f;
+            targetY = 0f;        
         }
-        else
-        {
-            currentPlayerState = PlayerState.Locomotion;
+
+        float currentX = _anim.GetFloat(moveXParam);
+        float currentY = _anim.GetFloat(moveYParam);
+        float newX, newY, moveSpeed;
+
+        // become lerped value when its absolute value is very small and its approaching zero (idle). 
+
+        newX = (Math.Abs(currentX) > 1e-2 || Math.Abs(targetX) > Math.Abs(currentX))? Mathf.Lerp(currentX, targetX, Time.deltaTime * smoothSpeed) : 0f;
+        newY = (Math.Abs(currentY) > 1e-2 || Math.Abs(targetY) > Math.Abs(currentY))? Mathf.Lerp(currentY, targetY, Time.deltaTime * smoothSpeed) : 0f;;
+        moveSpeed = (Math.Abs(currentMoveSpeed) > 1e-2 || Math.Abs(targetMoveSpeed) > Math.Abs(currentMoveSpeed))? Mathf.Lerp(currentMoveSpeed, targetMoveSpeed, Time.deltaTime * smoothSpeed) : 0f;
+        
+        currentMoveSpeed = moveSpeed;
+
+        if (!isGrounded){
+            if (_verticalVelocity < 0) {currentMovementState = MovementState.Falling;}
+            else {currentMovementState = MovementState.Jumping;}
         }
+        else if(rollTriggered){
+            currentMovementState = MovementState.Rolling;
+            if(isLockedOn){
+                _anim.SetFloat(rollXParam, moveDir.x);
+                _anim.SetFloat(rollYParam, moveDir.y);
+            }
+            else{
+                _anim.SetFloat(rollXParam, 0);
+                _anim.SetFloat(rollYParam, 1);
+            }
+            
+        }
+        else{currentMovementState = MovementState.Locomotion;}
 
         // Update animator parameters
-        _anim.SetFloat("Speed", animThreshold);
-        _anim.SetInteger("PlayerState", (int)currentPlayerState);
+        _anim.SetFloat(moveXParam, newX);
+        _anim.SetFloat(moveYParam, newY);
+        _anim.SetInteger(animMovementStateParam, (int)currentMovementState);
 
-        // Calculate movement direction and rotate character
-        Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y).normalized;
-        if (isMoving)
-        {
-            _targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + _mainCamera.transform.eulerAngles.y;
-            float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, _targetRotation, ref rotationSpeed, rotationSmoothTime);
-            // Rotate to face input direction relative to camera position
-            transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
-        }
-
-        // Move the character
-        Vector3 targetDirection = Quaternion.Euler(0.0f, _targetRotation, 0.0f) * Vector3.forward;
-        _characterController.Move(targetDirection.normalized * (moveSpeed * Time.deltaTime) +
-                                new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+        Vector3 targetDirection = HandlePlayerAndCameraRotation(isLockedOn, moveDir, isMoving);
+        
+        _characterController.Move(targetDirection.normalized * (moveSpeed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
     }
 
-    private void LateUpdate()
-    {
-        if (cursorInputForLook && cursorLocked){
-            CameraRotation();
+    private Vector3 HandlePlayerAndCameraRotation(bool isLockedOn, Vector3 moveDir, bool isMoving){
+        Vector3 playerTargetDirection = Vector3.zero;
+        bool scrolledUp = GameInput.Instance.ScrolledUp();
+        bool scrolledDown = GameInput.Instance.ScrolledDown();
+        float targetRotation;
+
+        Debug.Log("Nearby targets: " + _playerState.lockOnTargets.Count);
+
+        if(isLockedOn){
+            bool hasLockOnTarget = _playerState.lockOnTargets.Count > 0;            
+            float playerRotation;
+            if(hasLockOnTarget){ //has a lock on target
+                if(scrolledUp){playerTargetIndex = (playerTargetIndex + 1) % _playerState.lockOnTargets.Count;} // count is guaranteed to be at least 1 here
+                if(scrolledDown){playerTargetIndex = (playerTargetIndex - 1 + _playerState.lockOnTargets.Count) % _playerState.lockOnTargets.Count;}
+
+                Transform lockOnTarget = _playerState.lockOnTargets[playerTargetIndex];
+                
+                Vector3 directionToTarget = (lockOnTarget.position - transform.position).normalized;
+                targetRotation = Mathf.Atan2(directionToTarget.x, directionToTarget.z) * Mathf.Rad2Deg; 
+                
+                playerRotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetRotation, ref rotationSpeed, rotationSmoothTime);
+                transform.rotation = Quaternion.Euler(0.0f, playerRotation, 0.0f);
+            }
+
+            else{
+                targetRotation = _mainCamera.transform.eulerAngles.y;
+                playerRotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetRotation, ref rotationSpeed, rotationSmoothTime);
+                transform.rotation = Quaternion.Euler(0.0f, playerRotation, 0.0f);
+            }
+            
+            Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y).normalized;
+            playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * inputDirection;
         }
+        else{
+            if(isMoving){
+                Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y).normalized;
+
+                //determines the desired rotation of the player based on the input direction and the camera's orientation
+                targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + _mainCamera.transform.eulerAngles.y;
+                
+                //rotate player towards target rotation
+                float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetRotation, ref rotationSpeed, rotationSmoothTime);
+                transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
+                
+                //target direction is just the forward vector in front of your target rotation
+                playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * Vector3.forward;
+            }
+        }
+        return playerTargetDirection;
+    }
+        
+    private void LateUpdate(){
+        if (cursorInputForLook && cursorLocked){CameraRotation();}
     }
     private void GroundedCheck()
     {
@@ -176,23 +237,15 @@ public class PlayerMovement : MonoBehaviour
         cinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch,
             _cinemachineTargetYaw, 0.0f);
     }
-    private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
-    {
+    private static float ClampAngle(float lfAngle, float lfMin, float lfMax){
         if (lfAngle < -360f) lfAngle += 360f;
         if (lfAngle > 360f) lfAngle -= 360f;
         return Mathf.Clamp(lfAngle, lfMin, lfMax);
     }
 
-    private void OnApplicationFocus(bool hasFocus)
-    {
-        if (hasFocus)
-        {
-            SetCursorState(cursorLocked);
-        }
-    }
+    private void OnApplicationFocus(bool hasFocus){if (hasFocus){SetCursorState(cursorLocked);}}
 
-    private void SetCursorState(bool newState)
-    {
+    private void SetCursorState(bool newState){
         Cursor.lockState = newState ? CursorLockMode.Locked : CursorLockMode.None;
         Cursor.visible = !newState;
     }
@@ -209,7 +262,5 @@ public class PlayerMovement : MonoBehaviour
             SetCursorState(cursorLocked);
         }
     }
-    public Transform GetEyesTransform(){
-        return eyesTransform;
-    }
+    public Transform GetEyesTransform(){return eyesTransform;}
 }

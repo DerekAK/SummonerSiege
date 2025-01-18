@@ -1,3 +1,6 @@
+using System.ComponentModel.Design.Serialization;
+using UnityEditor.Rendering;
+using UnityEditor.UIElements;
 using UnityEngine;
 
 
@@ -6,8 +9,10 @@ Responsible for handling all animation transitions of the player
 */
 public class PlayerClipsHandler : MonoBehaviour{
     
+    private PlayerState _playerState;
     private Animator _anim;
     private AnimatorOverrideController _templateOverrider;
+    private AnimatorOverrideController _copyOverrider;
 
     [SerializeField] private AnimationClip unarmedIdleClip;
     [SerializeField] private AnimationClip unarmedWalkForwardClip;
@@ -17,16 +22,47 @@ public class PlayerClipsHandler : MonoBehaviour{
     [SerializeField] private AnimationClip unarmedWalkBackwardLeftClip;
     [SerializeField] private AnimationClip unarmedWalkBackwardRightClip;
     [SerializeField] private AnimationClip unarmedRunForwardClip;
-    [SerializeField] private AnimationClip unarmedRunForwardLeftClip;
-    [SerializeField] private AnimationClip unarmedRunForwardRightClip;
-    [SerializeField] private AnimationClip unarmedRunBackwardClip;
-    [SerializeField] private AnimationClip unarmedRunBackwardLeftClip;
-    [SerializeField] private AnimationClip unarmedWRunBackwardRightClip;
     [SerializeField] private AnimationClip unarmedStrafeLeftClip;
     [SerializeField] private AnimationClip unarmedStrafeRightClip;
 
+    [SerializeField] private AnimationClip unarmedRollForwardClip;
+    [SerializeField] private AnimationClip unarmedRollBackwardClip;
+    [SerializeField] private AnimationClip unarmedRollLeftlip;
+    [SerializeField] private AnimationClip unarmedRollRightClip;
+
+
     private void Awake(){
-        
+        _anim = GetComponent<Animator>();
+        _templateOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
+        _copyOverrider = new AnimatorOverrideController(_templateOverrider);
+        _anim.runtimeAnimatorController = _copyOverrider;
     }
+    private void Start(){
+        HandleClips();
+    }
+
+    private void HandleClips(){
+        _copyOverrider["Idle Placeholder"] = unarmedIdleClip;
+        _copyOverrider["Run Forward Placeholder"] = unarmedRunForwardClip;
+        _copyOverrider["Walk Forward Placeholder"] = unarmedWalkForwardClip;
+        _copyOverrider["Walk Forward Left Placeholder"] = unarmedWalkForwardLeftClip;
+        _copyOverrider["Walk Forward Right Placeholder"] = unarmedWalkForwardRightClip;
+        _copyOverrider["Walk Backward Placeholder"] = unarmedWalkBackwardClip;
+        _copyOverrider["Walk Backward Left Placeholder"] = unarmedWalkBackwardLeftClip;
+        _copyOverrider["Walk Backward Right Placeholder"] = unarmedWalkBackwardRightClip;
+        _copyOverrider["Strafe Left Placeholder"] = unarmedStrafeLeftClip;
+        _copyOverrider["Strafe Right Placeholder"] = unarmedStrafeRightClip;
+
+        _copyOverrider["Roll Forward Placeholder"] = unarmedRollForwardClip;
+        _copyOverrider["Roll Backward Placeholder"] = unarmedRollBackwardClip;
+        _copyOverrider["Roll Left Placeholder"] = unarmedRollLeftlip;
+        _copyOverrider["Roll Right Placeholder"] = unarmedRollRightClip;
+    }
+
+
+    //unarmed => unarmed animations
+    //melee weapons => set weight of melee override layer to 1 for upperbody
+    //long range weapons => set weight of 
+
 
 }

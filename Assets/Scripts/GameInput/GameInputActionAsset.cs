@@ -98,6 +98,33 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""LockOn"",
+                    ""type"": ""Button"",
+                    ""id"": ""fb6c4e2b-3e6f-48aa-8196-73d9b31ba513"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""MouseScroll"",
+                    ""type"": ""Value"",
+                    ""id"": ""4be90aa1-8729-4e1d-8c6a-22f36e4beab2"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""MouseMiddle"",
+                    ""type"": ""Button"",
+                    ""id"": ""441a2000-cd38-4c0c-82f7-f08fe9333d78"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -272,8 +299,41 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
                     ""path"": ""<Mouse>/leftButton"",
                     ""interactions"": """",
                     ""processors"": """",
-                    ""groups"": """",
+                    ""groups"": "";KeyboardMouse"",
                     ""action"": ""LeftClickAction"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""7e5bd99b-0815-41fc-b764-ee61cd55f9b4"",
+                    ""path"": ""<Keyboard>/q"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";KeyboardMouse"",
+                    ""action"": ""LockOn"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""2a70e7fb-568d-4af6-a8b6-6a03376efb20"",
+                    ""path"": ""<Mouse>/scroll"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";KeyboardMouse"",
+                    ""action"": ""MouseScroll"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""5aeffe63-1d35-47d7-8b74-88f12e1b7aac"",
+                    ""path"": ""<Mouse>/middleButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";KeyboardMouse"",
+                    ""action"": ""MouseMiddle"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -340,6 +400,9 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
         m_Player_Crouch = m_Player.FindAction("Crouch", throwIfNotFound: true);
         m_Player_RightClickAction = m_Player.FindAction("RightClickAction", throwIfNotFound: true);
         m_Player_LeftClickAction = m_Player.FindAction("LeftClickAction", throwIfNotFound: true);
+        m_Player_LockOn = m_Player.FindAction("LockOn", throwIfNotFound: true);
+        m_Player_MouseScroll = m_Player.FindAction("MouseScroll", throwIfNotFound: true);
+        m_Player_MouseMiddle = m_Player.FindAction("MouseMiddle", throwIfNotFound: true);
     }
 
     ~@GameInputActionAsset()
@@ -414,6 +477,9 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Crouch;
     private readonly InputAction m_Player_RightClickAction;
     private readonly InputAction m_Player_LeftClickAction;
+    private readonly InputAction m_Player_LockOn;
+    private readonly InputAction m_Player_MouseScroll;
+    private readonly InputAction m_Player_MouseMiddle;
     public struct PlayerActions
     {
         private @GameInputActionAsset m_Wrapper;
@@ -426,6 +492,9 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
         public InputAction @Crouch => m_Wrapper.m_Player_Crouch;
         public InputAction @RightClickAction => m_Wrapper.m_Player_RightClickAction;
         public InputAction @LeftClickAction => m_Wrapper.m_Player_LeftClickAction;
+        public InputAction @LockOn => m_Wrapper.m_Player_LockOn;
+        public InputAction @MouseScroll => m_Wrapper.m_Player_MouseScroll;
+        public InputAction @MouseMiddle => m_Wrapper.m_Player_MouseMiddle;
         public InputActionMap Get() { return m_Wrapper.m_Player; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -459,6 +528,15 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
             @LeftClickAction.started += instance.OnLeftClickAction;
             @LeftClickAction.performed += instance.OnLeftClickAction;
             @LeftClickAction.canceled += instance.OnLeftClickAction;
+            @LockOn.started += instance.OnLockOn;
+            @LockOn.performed += instance.OnLockOn;
+            @LockOn.canceled += instance.OnLockOn;
+            @MouseScroll.started += instance.OnMouseScroll;
+            @MouseScroll.performed += instance.OnMouseScroll;
+            @MouseScroll.canceled += instance.OnMouseScroll;
+            @MouseMiddle.started += instance.OnMouseMiddle;
+            @MouseMiddle.performed += instance.OnMouseMiddle;
+            @MouseMiddle.canceled += instance.OnMouseMiddle;
         }
 
         private void UnregisterCallbacks(IPlayerActions instance)
@@ -487,6 +565,15 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
             @LeftClickAction.started -= instance.OnLeftClickAction;
             @LeftClickAction.performed -= instance.OnLeftClickAction;
             @LeftClickAction.canceled -= instance.OnLeftClickAction;
+            @LockOn.started -= instance.OnLockOn;
+            @LockOn.performed -= instance.OnLockOn;
+            @LockOn.canceled -= instance.OnLockOn;
+            @MouseScroll.started -= instance.OnMouseScroll;
+            @MouseScroll.performed -= instance.OnMouseScroll;
+            @MouseScroll.canceled -= instance.OnMouseScroll;
+            @MouseMiddle.started -= instance.OnMouseMiddle;
+            @MouseMiddle.performed -= instance.OnMouseMiddle;
+            @MouseMiddle.canceled -= instance.OnMouseMiddle;
         }
 
         public void RemoveCallbacks(IPlayerActions instance)
@@ -550,5 +637,8 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
         void OnCrouch(InputAction.CallbackContext context);
         void OnRightClickAction(InputAction.CallbackContext context);
         void OnLeftClickAction(InputAction.CallbackContext context);
+        void OnLockOn(InputAction.CallbackContext context);
+        void OnMouseScroll(InputAction.CallbackContext context);
+        void OnMouseMiddle(InputAction.CallbackContext context);
     }
 }
