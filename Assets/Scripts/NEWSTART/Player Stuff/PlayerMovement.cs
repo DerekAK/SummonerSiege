@@ -63,10 +63,10 @@ public class PlayerMovement : MonoBehaviour
         _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
         // Apply initial cursor state
         SetCursorState(cursorLocked);
-        GameInput.Instance.OnRightClickTriggered += OnRightClickPerform;
+        GameInput.Instance.OnAttackButtonStarted += OnRightClickPerform;
     }
     private void OnDisable(){
-        GameInput.Instance.OnRightClickTriggered -= OnRightClickPerform;
+        GameInput.Instance.OnAttackButtonStarted -= OnRightClickPerform;
     }
 
     private void Update(){
@@ -91,7 +91,7 @@ public class PlayerMovement : MonoBehaviour
 
         bool isMoving = moveDir != Vector2.zero;
         bool isSprinting = GameInput.Instance.SprintingPressed();
-        bool isLockedOn = GameInput.Instance.RightClickPressed();
+        bool isLockedOn = GameInput.Instance.IsButtonPressed(GameInput.AttackInput.RightMouse);
         bool rollTriggered = GameInput.Instance.MouseMiddleTriggered();
         bool crouchPressed = GameInput.Instance.CrouchPressed();
 
@@ -242,9 +242,11 @@ public class PlayerMovement : MonoBehaviour
         return playerTargetDirection;
     }
 
-    private void OnRightClickPerform(){
-        _playerState.lockOnTargets.Sort((a, b) => Vector3.Distance(a.position, transform.position).CompareTo(Vector3.Distance(b.position, transform.position)));
-        playerTargetIndex = 0;
+    private void OnRightClickPerform(GameInput.AttackInput input){
+        if(input == GameInput.AttackInput.RightMouse){
+            _playerState.lockOnTargets.Sort((a, b) => Vector3.Distance(a.position, transform.position).CompareTo(Vector3.Distance(b.position, transform.position)));
+            playerTargetIndex = 0;
+        }
     }
         
     private void LateUpdate(){

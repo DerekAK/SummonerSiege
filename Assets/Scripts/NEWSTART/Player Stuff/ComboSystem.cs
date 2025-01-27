@@ -3,19 +3,16 @@ using System.Collections.Generic;
 public class ComboSystem
 {
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    public enum AttackTrigger{
-        LeftClickQuick,
-        LeftClickHold,
-        RightClickHold,
-        One,
-        Two,
-        Three
+    public enum AttackPressType{
+        Quick,
+        Hold
     }
 
     [System.Serializable]
     public struct ComboStep{
         public AttackSO attack;
-        public AttackTrigger trigger;
+        public AttackPressType userPressType;
+        public GameInput.AttackInput userInput;
     }
 
     [System.Serializable]

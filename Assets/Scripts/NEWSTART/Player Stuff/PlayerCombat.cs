@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 /*
 IMPORTANT TO UNDERSTAND: any attack that might possibly lead into a combo must be in a combo. in other words,
@@ -7,6 +8,7 @@ the computer wouldn't know which one to use (no shit). so basically, need to fir
 listening for, and then only have one viable attack from that starting input at any time. in other words, at any
 given point, no matter the state, there is only one viable next move for any single input.
 */
+
 public class PlayerCombat : MonoBehaviour
 {
     private Animator _anim;
@@ -14,29 +16,26 @@ public class PlayerCombat : MonoBehaviour
     private PlayerClipsHandler _playerClipsHandler;
     private int attackParamA = Animator.StringToHash("AttackTriggerA");
     private int attackParamB = Animator.StringToHash("AttackTriggerB");
-    private float leftClickHoldTime = 0f;
+    private float inputHoldTime = 0f;
     private float weightedHoldThreshold = 0.2f;
-    private Coroutine leftClickHoldCoroutine;
+    private Coroutine inputHoldCoroutine;
     public bool isAttacking = false;
-    private bool checkingForLeftClickRelease = false;
+    private bool checkingForInputRelease = false;
     private ComboSystem.Combo currentCombo;
     private AttackSO currentAttackSO;
     private Coroutine comboCoroutine;
     private Coroutine attackCoroutine;
-    private bool comboTransition = false; //boolean for tracking when to transfer over to next combo
+    private bool comboTransition = false; 
     private bool inCombo = false;
-    int currAnimAttackState = 0; //0 or 1 for combo states in animator
-
-    [Header("Attack Data")]
-    // everything is a combo, worry about how to add combos later, but the idea is that 
-    // weapons will come with combos so you can just access it from weapon or other means
-    [SerializeField] private ComboSystem.Combo unarmedQuickAttackCombo;
-    [SerializeField] private ComboSystem.Combo unarmedHeavyAttackCombo;
-
-
+    int currAnimAttackState = 0;
+    
     [Tooltip("Time required before and after triggering the next attack in combo sequence")]
     [SerializeField] private float comboTimeBeforeThreshold = 0.3f;
     [SerializeField] private float comboTimeEndThreshold = 0.8f;
+
+    [Header("Attack Data")]
+    [SerializeField] private List<ComboSystem.Combo> possibleCombos = new List<ComboSystem.Combo>();
+    
 
     private void Awake(){
         _anim = GetComponent<Animator>();
@@ -45,36 +44,33 @@ public class PlayerCombat : MonoBehaviour
     }
 
     private void Start(){
-        GameInput.Instance.OnLeftClickStarted += LeftClickStart;
-        GameInput.Instance.OnLeftClickCanceled += LeftClickCanceled;
-        unarmedQuickAttackCombo.Initialize();
-        unarmedHeavyAttackCombo.Initialize();
-    }
-
-    private void Update(){
-        Debug.Log(inCombo);
-    }
-
-    private void OnDisable(){
-        GameInput.Instance.OnLeftClickStarted -= LeftClickStart;
-        GameInput.Instance.OnLeftClickCanceled -= LeftClickCanceled;
-    }
-  
-    private void LeftClickStart(){
-        //only want to start checking for an attack if he's either not attacking at all or if he's not in the combo window 
-        if(!isAttacking || inCombo){
-            checkingForLeftClickRelease = true;
-            leftClickHoldCoroutine = StartCoroutine(LeftClickHeldTime());
+        GameInput.Instance.OnAttackButtonStarted += AttackButtonStart;
+        GameInput.Instance.OnAttackButtonCanceled += AttackButtonCanceled;
+        
+        foreach(ComboSystem.Combo comboStep in possibleCombos){
+            comboStep.Initialize();
         }
     }
 
-    private void LeftClickCanceled(){
-        if(checkingForLeftClickRelease){
-            checkingForLeftClickRelease = false;
-            StopCoroutine(leftClickHoldCoroutine);
-            if(leftClickHoldTime < weightedHoldThreshold){
-                //want to perform a quick attack. that quick attack could be a normal quick attack or a quick attack in a combo if currently in a combo
-                currentAttackSO = DecideCurrentAttackSO(ComboSystem.AttackTrigger.LeftClickQuick);
+    private void OnDisable(){
+        GameInput.Instance.OnAttackButtonStarted -= AttackButtonStart;
+        GameInput.Instance.OnAttackButtonCanceled -= AttackButtonCanceled;
+    }
+
+    private void AttackButtonStart(GameInput.AttackInput inputButton){
+        if(!isAttacking || inCombo){
+            checkingForInputRelease = true;
+            inputHoldCoroutine = StartCoroutine(HandleInputHeldTime(inputButton));
+        }
+    }
+
+    private void AttackButtonCanceled(GameInput.AttackInput inputButton){
+        if(checkingForInputRelease){
+            checkingForInputRelease = false;
+            StopCoroutine(inputHoldCoroutine);
+            if(inputHoldTime < weightedHoldThreshold){
+                // Perform a quick attack based on input button type
+                currentAttackSO = DecideCurrentAttackSO(inputButton, ComboSystem.AttackPressType.Quick);
                 if(currentAttackSO){
                     if(attackCoroutine != null){StopCoroutine(attackCoroutine);}
                     attackCoroutine = StartCoroutine(HandlePerformAttack());
@@ -83,16 +79,16 @@ public class PlayerCombat : MonoBehaviour
         }
     }
 
-    private IEnumerator LeftClickHeldTime(){
-        leftClickHoldTime = 0;
-        while(GameInput.Instance.LeftClickPressed()){
-            leftClickHoldTime += Time.deltaTime;
-            if(leftClickHoldTime > weightedHoldThreshold){
-                currentAttackSO = DecideCurrentAttackSO(ComboSystem.AttackTrigger.LeftClickHold);
+    private IEnumerator HandleInputHeldTime(GameInput.AttackInput inputButton){
+        inputHoldTime = 0;
+        while(GameInput.Instance.IsButtonPressed(inputButton)){
+            inputHoldTime += Time.deltaTime;
+            if(inputHoldTime > weightedHoldThreshold){
+                currentAttackSO = DecideCurrentAttackSO(inputButton, ComboSystem.AttackPressType.Hold);
                 if(currentAttackSO){
                     if(attackCoroutine != null){StopCoroutine(attackCoroutine);}
                     attackCoroutine = StartCoroutine(HandlePerformAttack());
-                    checkingForLeftClickRelease = false; //because after this heavy attack is performed, 
+                    checkingForInputRelease = false;
                 }
                 yield break;
             }
@@ -100,37 +96,31 @@ public class PlayerCombat : MonoBehaviour
         }
     }
 
-    private AttackSO DecideCurrentAttackSO(ComboSystem.AttackTrigger trigger){
-        //if in combo window and input correct combo input
-        if(inCombo && currentCombo.currComboStep.trigger == trigger){
-            Debug.Log("registered combo input!");
+    private AttackSO DecideCurrentAttackSO(GameInput.AttackInput inputButton, ComboSystem.AttackPressType pressType){
+        if(inCombo && currentCombo.currComboStep.userPressType == pressType && currentCombo.currComboStep.userInput == inputButton){
+            Debug.Log("Registered combo input!");
             return currentCombo.currComboStep.attack;
         }
-        //if in combo and input wrong combo input
         else if(inCombo){
-            Debug.Log("in combo but wrong input");
+            Debug.Log("In combo but wrong input");
             return null;
         }
-        
         else{
-            //if not in combo window and not attacking, so just not in combat basically
             if(!isAttacking){
-                Debug.Log("normal attack");
-                switch(trigger){
-                    case ComboSystem.AttackTrigger.LeftClickQuick:
-                        currentCombo = unarmedQuickAttackCombo;
-                        break;
-                    case ComboSystem.AttackTrigger.LeftClickHold:
-                        currentCombo = unarmedHeavyAttackCombo;
-                        break;
-                    default:
-                        return unarmedQuickAttackCombo.comboSteps[0].attack;
+                //return the attack in which the first attack of that combo matches these inputs
+                foreach(ComboSystem.Combo combo in possibleCombos){
+                    ComboSystem.ComboStep firstComboStep = combo.comboSteps[0];
+                    if(firstComboStep.userInput == inputButton && firstComboStep.userPressType == pressType){
+                        Debug.Log("Found the correct normal attack!");
+                        currentCombo = combo;
+                        return firstComboStep.attack;
+                    }
                 }
-                return currentCombo.comboSteps[0].attack;
+                Debug.Log("No Normal attack matching these inputs!");
+                return null;
             }
-            //if not in combo window but in an attack, meaning that you are past the combo window, so don't want to register any attacks
-            else{ 
-                Debug.Log("in attack but past combat window");
+            else{
+                Debug.Log("In attack but past combat window");
                 return null;
             }
         }
@@ -138,7 +128,7 @@ public class PlayerCombat : MonoBehaviour
 
     private IEnumerator HandlePerformAttack(){
         if(((currentAttackSO.airAttack && _playerState.InAir) || (!currentAttackSO.airAttack && !_playerState.InAir)) && !_playerState.Rolling){
-            if(inCombo){ //in combo
+            if(inCombo){ 
                 while(!comboTransition){
                     yield return null;
                 }
@@ -146,21 +136,22 @@ public class PlayerCombat : MonoBehaviour
                 comboTransition = false;
             }
             else{
-                PerformAttack();}
+                PerformAttack();
                 comboTransition = false;
+            }
         }
     }
+
     private void PerformAttack(){
         isAttacking = true;
-        _playerState.currentAttack = currentAttackSO; //this has to go before because changeattackstatus depends on this somehow
+        _playerState.currentAttack = currentAttackSO;
         _playerState.ChangeAttackStatus(true);
         _playerClipsHandler.HandleAttackClip(currentAttackSO);
-        if(currAnimAttackState == 0){_anim.SetTrigger(attackParamA);}
-        else{_anim.SetTrigger(attackParamB);}
+        if(currAnimAttackState == 0){ _anim.SetTrigger(attackParamA); }
+        else { _anim.SetTrigger(attackParamB); }
         currAnimAttackState = (currAnimAttackState + 1) % 2;
 
-        currentCombo.UpdateComboStep(); //will update the currcombostep for this specific combo
-        //if it updated to something other than zero, we know that next attack is a combo
+        currentCombo.UpdateComboStep();
         inCombo = currentCombo.currIndex > 0;
         if(inCombo){
             if(comboCoroutine != null){StopCoroutine(comboCoroutine);}
@@ -182,37 +173,14 @@ public class PlayerCombat : MonoBehaviour
         }
         inCombo = false;
         currentCombo.ResetComboStep();
-        
     }
 
-    //called by attack events
     private void AttackFinish(){
         isAttacking = false;
         _playerState.ChangeAttackStatus(false);
     }
-    private void ComboTransfer(){comboTransition = true;}
+
+    private void ComboTransfer(){
+        comboTransition = true;
+    }
 }
-
-//pseudocode
-/*
-left click start: decide if taking in any input at this time (if !attacking or inside of a combo window)
-checking for left click release = true
-start left click holding coroutine
-
-left click release: if release and didn't reach threshold, perform light attack
-
-left click holding: if reaches threshold, perform heavy attack
-
-perform attack:
-attacking = true until attack finishes
-
-if the current attack is part of a combo (which is if the index of the attack just performed < the count of the combo-1), start the combo timer to check for the correct input for that combo
-
-if the combo window runs out, we set combowindow to closed
-
-
-
-
-
-
-*/
