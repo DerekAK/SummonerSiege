@@ -60,24 +60,6 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "RightClickPressed",
-                    "type": "Button",
-                    "id": "a7ad5633-7e26-4646-b761-a7e1ec37c290",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "LeftClickPressed",
-                    "type": "Button",
-                    "id": "2ee079ae-fc83-45ee-9677-45b73f1d7dac",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
                     "name": "LockOn",
                     "type": "Button",
                     "id": "fb6c4e2b-3e6f-48aa-8196-73d9b31ba513",
@@ -99,6 +81,42 @@
                     "name": "MouseMiddle",
                     "type": "Button",
                     "id": "441a2000-cd38-4c0c-82f7-f08fe9333d78",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "RightClick",
+                    "type": "Button",
+                    "id": "a7ad5633-7e26-4646-b761-a7e1ec37c290",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "LeftClick",
+                    "type": "Button",
+                    "id": "2ee079ae-fc83-45ee-9677-45b73f1d7dac",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "E",
+                    "type": "Button",
+                    "id": "63582ed8-e42b-402d-aed6-90d31481d35c",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "R",
+                    "type": "Button",
+                    "id": "f6e10d8a-40e2-42a1-8456-982557cdfd03",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -267,7 +285,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": ";KeyboardMouse",
-                    "action": "RightClickPressed",
+                    "action": "RightClick",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -278,7 +296,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": ";KeyboardMouse",
-                    "action": "LeftClickPressed",
+                    "action": "LeftClick",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -312,6 +330,28 @@
                     "processors": "",
                     "groups": ";KeyboardMouse",
                     "action": "MouseMiddle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e616196b-75d6-4124-9475-bc96083edc0c",
+                    "path": "<Keyboard>/e",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";KeyboardMouse",
+                    "action": "E",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "db45f9ef-f08d-4583-b7e2-5b6ece7711da",
+                    "path": "<Keyboard>/r",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";KeyboardMouse",
+                    "action": "R",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

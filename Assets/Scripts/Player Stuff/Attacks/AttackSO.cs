@@ -15,5 +15,4 @@ public class AttackSO : ScriptableObject
     public bool airAttack;
     public float movementSpeedFactor;
 
-    
 }

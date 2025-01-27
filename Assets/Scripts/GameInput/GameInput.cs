@@ -13,7 +13,9 @@ public class GameInput : MonoBehaviour
 
     public enum AttackInput{
         LeftMouse,
-        RightMouse
+        RightMouse,
+        E_Key,
+        R_Key,
     }
 
     private void Awake(){
@@ -27,23 +29,33 @@ public class GameInput : MonoBehaviour
     private void OnEnable(){
         gameInputScript.Enable();
         playerMap = gameInputScript.Player;
-        playerMap.LeftClickPressed.started += ctx => OnAttackButtonStarted?.Invoke(AttackInput.LeftMouse);
-        playerMap.LeftClickPressed.canceled += ctx => OnAttackButtonCanceled?.Invoke(AttackInput.LeftMouse);
-        playerMap.RightClickPressed.started += ctx => OnAttackButtonStarted?.Invoke(AttackInput.RightMouse);
-        playerMap.RightClickPressed.canceled += ctx => OnAttackButtonCanceled?.Invoke(AttackInput.RightMouse);
+        playerMap.LeftClick.started += ctx => OnAttackButtonStarted?.Invoke(AttackInput.LeftMouse);
+        playerMap.LeftClick.canceled += ctx => OnAttackButtonCanceled?.Invoke(AttackInput.LeftMouse);
+        playerMap.RightClick.started += ctx => OnAttackButtonStarted?.Invoke(AttackInput.RightMouse);
+        playerMap.RightClick.canceled += ctx => OnAttackButtonCanceled?.Invoke(AttackInput.RightMouse);
+        playerMap.E.started += ctx => OnAttackButtonStarted?.Invoke(AttackInput.E_Key);
+        playerMap.E.canceled += ctx => OnAttackButtonCanceled?.Invoke(AttackInput.E_Key);
+        playerMap.R.started += ctx => OnAttackButtonStarted?.Invoke(AttackInput.R_Key);
+        playerMap.R.canceled += ctx => OnAttackButtonCanceled?.Invoke(AttackInput.R_Key);
     }
     private void OnDisable(){
         gameInputScript.Disable();
     }
     
-    public bool IsButtonPressed(AttackInput input){
+    public bool IsAttackButtonPressed(AttackInput input){
         bool retVal;
         switch(input){
             case AttackInput.LeftMouse:
-                retVal = playerMap.LeftClickPressed.IsPressed();
+                retVal = playerMap.LeftClick.IsPressed();
                 break;
             case AttackInput.RightMouse:
-                retVal = playerMap.RightClickPressed.IsPressed();
+                retVal = playerMap.RightClick.IsPressed();
+                break;
+            case AttackInput.E_Key:
+                retVal = playerMap.E.IsPressed();
+                break;
+            case AttackInput.R_Key:
+                retVal = playerMap.R.IsPressed();
                 break;
             default:
                 retVal = false;

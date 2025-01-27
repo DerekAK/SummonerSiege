@@ -81,7 +81,7 @@ public class PlayerCombat : MonoBehaviour
 
     private IEnumerator HandleInputHeldTime(GameInput.AttackInput inputButton){
         inputHoldTime = 0;
-        while(GameInput.Instance.IsButtonPressed(inputButton)){
+        while(GameInput.Instance.IsAttackButtonPressed(inputButton)){
             inputHoldTime += Time.deltaTime;
             if(inputHoldTime > weightedHoldThreshold){
                 currentAttackSO = DecideCurrentAttackSO(inputButton, ComboSystem.AttackPressType.Hold);

@@ -91,7 +91,7 @@ public class PlayerMovement : MonoBehaviour
 
         bool isMoving = moveDir != Vector2.zero;
         bool isSprinting = GameInput.Instance.SprintingPressed();
-        bool isLockedOn = GameInput.Instance.IsButtonPressed(GameInput.AttackInput.RightMouse);
+        bool isLockedOn = GameInput.Instance.IsAttackButtonPressed(GameInput.AttackInput.RightMouse);
         bool rollTriggered = GameInput.Instance.MouseMiddleTriggered();
         bool crouchPressed = GameInput.Instance.CrouchPressed();
 

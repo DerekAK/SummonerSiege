@@ -82,24 +82,6 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
-                    ""name"": ""RightClickPressed"",
-                    ""type"": ""Button"",
-                    ""id"": ""a7ad5633-7e26-4646-b761-a7e1ec37c290"",
-                    ""expectedControlType"": """",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": false
-                },
-                {
-                    ""name"": ""LeftClickPressed"",
-                    ""type"": ""Button"",
-                    ""id"": ""2ee079ae-fc83-45ee-9677-45b73f1d7dac"",
-                    ""expectedControlType"": """",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": false
-                },
-                {
                     ""name"": ""LockOn"",
                     ""type"": ""Button"",
                     ""id"": ""fb6c4e2b-3e6f-48aa-8196-73d9b31ba513"",
@@ -121,6 +103,42 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
                     ""name"": ""MouseMiddle"",
                     ""type"": ""Button"",
                     ""id"": ""441a2000-cd38-4c0c-82f7-f08fe9333d78"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""RightClick"",
+                    ""type"": ""Button"",
+                    ""id"": ""a7ad5633-7e26-4646-b761-a7e1ec37c290"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""LeftClick"",
+                    ""type"": ""Button"",
+                    ""id"": ""2ee079ae-fc83-45ee-9677-45b73f1d7dac"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""E"",
+                    ""type"": ""Button"",
+                    ""id"": ""63582ed8-e42b-402d-aed6-90d31481d35c"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""R"",
+                    ""type"": ""Button"",
+                    ""id"": ""f6e10d8a-40e2-42a1-8456-982557cdfd03"",
                     ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
@@ -289,7 +307,7 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": "";KeyboardMouse"",
-                    ""action"": ""RightClickPressed"",
+                    ""action"": ""RightClick"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
@@ -300,7 +318,7 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": "";KeyboardMouse"",
-                    ""action"": ""LeftClickPressed"",
+                    ""action"": ""LeftClick"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
@@ -334,6 +352,28 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": "";KeyboardMouse"",
                     ""action"": ""MouseMiddle"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""e616196b-75d6-4124-9475-bc96083edc0c"",
+                    ""path"": ""<Keyboard>/e"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";KeyboardMouse"",
+                    ""action"": ""E"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""db45f9ef-f08d-4583-b7e2-5b6ece7711da"",
+                    ""path"": ""<Keyboard>/r"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";KeyboardMouse"",
+                    ""action"": ""R"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -398,11 +438,13 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
         m_Player_Sprint = m_Player.FindAction("Sprint", throwIfNotFound: true);
         m_Player_Roll = m_Player.FindAction("Roll", throwIfNotFound: true);
         m_Player_Crouch = m_Player.FindAction("Crouch", throwIfNotFound: true);
-        m_Player_RightClickPressed = m_Player.FindAction("RightClickPressed", throwIfNotFound: true);
-        m_Player_LeftClickPressed = m_Player.FindAction("LeftClickPressed", throwIfNotFound: true);
         m_Player_LockOn = m_Player.FindAction("LockOn", throwIfNotFound: true);
         m_Player_MouseScroll = m_Player.FindAction("MouseScroll", throwIfNotFound: true);
         m_Player_MouseMiddle = m_Player.FindAction("MouseMiddle", throwIfNotFound: true);
+        m_Player_RightClick = m_Player.FindAction("RightClick", throwIfNotFound: true);
+        m_Player_LeftClick = m_Player.FindAction("LeftClick", throwIfNotFound: true);
+        m_Player_E = m_Player.FindAction("E", throwIfNotFound: true);
+        m_Player_R = m_Player.FindAction("R", throwIfNotFound: true);
     }
 
     ~@GameInputActionAsset()
@@ -475,11 +517,13 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Sprint;
     private readonly InputAction m_Player_Roll;
     private readonly InputAction m_Player_Crouch;
-    private readonly InputAction m_Player_RightClickPressed;
-    private readonly InputAction m_Player_LeftClickPressed;
     private readonly InputAction m_Player_LockOn;
     private readonly InputAction m_Player_MouseScroll;
     private readonly InputAction m_Player_MouseMiddle;
+    private readonly InputAction m_Player_RightClick;
+    private readonly InputAction m_Player_LeftClick;
+    private readonly InputAction m_Player_E;
+    private readonly InputAction m_Player_R;
     public struct PlayerActions
     {
         private @GameInputActionAsset m_Wrapper;
@@ -490,11 +534,13 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
         public InputAction @Sprint => m_Wrapper.m_Player_Sprint;
         public InputAction @Roll => m_Wrapper.m_Player_Roll;
         public InputAction @Crouch => m_Wrapper.m_Player_Crouch;
-        public InputAction @RightClickPressed => m_Wrapper.m_Player_RightClickPressed;
-        public InputAction @LeftClickPressed => m_Wrapper.m_Player_LeftClickPressed;
         public InputAction @LockOn => m_Wrapper.m_Player_LockOn;
         public InputAction @MouseScroll => m_Wrapper.m_Player_MouseScroll;
         public InputAction @MouseMiddle => m_Wrapper.m_Player_MouseMiddle;
+        public InputAction @RightClick => m_Wrapper.m_Player_RightClick;
+        public InputAction @LeftClick => m_Wrapper.m_Player_LeftClick;
+        public InputAction @E => m_Wrapper.m_Player_E;
+        public InputAction @R => m_Wrapper.m_Player_R;
         public InputActionMap Get() { return m_Wrapper.m_Player; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -522,12 +568,6 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
             @Crouch.started += instance.OnCrouch;
             @Crouch.performed += instance.OnCrouch;
             @Crouch.canceled += instance.OnCrouch;
-            @RightClickPressed.started += instance.OnRightClickPressed;
-            @RightClickPressed.performed += instance.OnRightClickPressed;
-            @RightClickPressed.canceled += instance.OnRightClickPressed;
-            @LeftClickPressed.started += instance.OnLeftClickPressed;
-            @LeftClickPressed.performed += instance.OnLeftClickPressed;
-            @LeftClickPressed.canceled += instance.OnLeftClickPressed;
             @LockOn.started += instance.OnLockOn;
             @LockOn.performed += instance.OnLockOn;
             @LockOn.canceled += instance.OnLockOn;
@@ -537,6 +577,18 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
             @MouseMiddle.started += instance.OnMouseMiddle;
             @MouseMiddle.performed += instance.OnMouseMiddle;
             @MouseMiddle.canceled += instance.OnMouseMiddle;
+            @RightClick.started += instance.OnRightClick;
+            @RightClick.performed += instance.OnRightClick;
+            @RightClick.canceled += instance.OnRightClick;
+            @LeftClick.started += instance.OnLeftClick;
+            @LeftClick.performed += instance.OnLeftClick;
+            @LeftClick.canceled += instance.OnLeftClick;
+            @E.started += instance.OnE;
+            @E.performed += instance.OnE;
+            @E.canceled += instance.OnE;
+            @R.started += instance.OnR;
+            @R.performed += instance.OnR;
+            @R.canceled += instance.OnR;
         }
 
         private void UnregisterCallbacks(IPlayerActions instance)
@@ -559,12 +611,6 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
             @Crouch.started -= instance.OnCrouch;
             @Crouch.performed -= instance.OnCrouch;
             @Crouch.canceled -= instance.OnCrouch;
-            @RightClickPressed.started -= instance.OnRightClickPressed;
-            @RightClickPressed.performed -= instance.OnRightClickPressed;
-            @RightClickPressed.canceled -= instance.OnRightClickPressed;
-            @LeftClickPressed.started -= instance.OnLeftClickPressed;
-            @LeftClickPressed.performed -= instance.OnLeftClickPressed;
-            @LeftClickPressed.canceled -= instance.OnLeftClickPressed;
             @LockOn.started -= instance.OnLockOn;
             @LockOn.performed -= instance.OnLockOn;
             @LockOn.canceled -= instance.OnLockOn;
@@ -574,6 +620,18 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
             @MouseMiddle.started -= instance.OnMouseMiddle;
             @MouseMiddle.performed -= instance.OnMouseMiddle;
             @MouseMiddle.canceled -= instance.OnMouseMiddle;
+            @RightClick.started -= instance.OnRightClick;
+            @RightClick.performed -= instance.OnRightClick;
+            @RightClick.canceled -= instance.OnRightClick;
+            @LeftClick.started -= instance.OnLeftClick;
+            @LeftClick.performed -= instance.OnLeftClick;
+            @LeftClick.canceled -= instance.OnLeftClick;
+            @E.started -= instance.OnE;
+            @E.performed -= instance.OnE;
+            @E.canceled -= instance.OnE;
+            @R.started -= instance.OnR;
+            @R.performed -= instance.OnR;
+            @R.canceled -= instance.OnR;
         }
 
         public void RemoveCallbacks(IPlayerActions instance)
@@ -635,10 +693,12 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
         void OnSprint(InputAction.CallbackContext context);
         void OnRoll(InputAction.CallbackContext context);
         void OnCrouch(InputAction.CallbackContext context);
-        void OnRightClickPressed(InputAction.CallbackContext context);
-        void OnLeftClickPressed(InputAction.CallbackContext context);
         void OnLockOn(InputAction.CallbackContext context);
         void OnMouseScroll(InputAction.CallbackContext context);
         void OnMouseMiddle(InputAction.CallbackContext context);
+        void OnRightClick(InputAction.CallbackContext context);
+        void OnLeftClick(InputAction.CallbackContext context);
+        void OnE(InputAction.CallbackContext context);
+        void OnR(InputAction.CallbackContext context);
     }
 }
