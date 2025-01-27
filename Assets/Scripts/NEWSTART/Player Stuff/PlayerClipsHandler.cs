@@ -1,6 +1,3 @@
-using System.ComponentModel.Design.Serialization;
-using UnityEditor.Rendering;
-using UnityEditor.UIElements;
 using UnityEngine;
 
 
@@ -8,12 +5,14 @@ using UnityEngine;
 Responsible for handling all animation transitions of the player
 */
 public class PlayerClipsHandler : MonoBehaviour{
-    
+
     private PlayerState _playerState;
     private Animator _anim;
+    private PlayerCombat _playerCombat;
     private AnimatorOverrideController _templateOverrider;
     private AnimatorOverrideController _copyOverrider;
 
+    [Header("Movement Animations")]
     [SerializeField] private AnimationClip unarmedIdleClip;
     [SerializeField] private AnimationClip unarmedWalkForwardClip;
     [SerializeField] private AnimationClip unarmedWalkForwardLeftClip;
@@ -24,24 +23,24 @@ public class PlayerClipsHandler : MonoBehaviour{
     [SerializeField] private AnimationClip unarmedRunForwardClip;
     [SerializeField] private AnimationClip unarmedStrafeLeftClip;
     [SerializeField] private AnimationClip unarmedStrafeRightClip;
-
     [SerializeField] private AnimationClip unarmedRollForwardClip;
     [SerializeField] private AnimationClip unarmedRollBackwardClip;
     [SerializeField] private AnimationClip unarmedRollLeftlip;
     [SerializeField] private AnimationClip unarmedRollRightClip;
-
+    [SerializeField] private AnimationClip unarmedCrouchClip;
 
     private void Awake(){
         _anim = GetComponent<Animator>();
+        _playerCombat = GetComponent<PlayerCombat>();
         _templateOverrider = (AnimatorOverrideController)_anim.runtimeAnimatorController;
         _copyOverrider = new AnimatorOverrideController(_templateOverrider);
         _anim.runtimeAnimatorController = _copyOverrider;
     }
     private void Start(){
-        HandleClips();
+        HandleMovementClips();
     }
 
-    private void HandleClips(){
+    private void HandleMovementClips(){
         _copyOverrider["Idle Placeholder"] = unarmedIdleClip;
         _copyOverrider["Run Forward Placeholder"] = unarmedRunForwardClip;
         _copyOverrider["Walk Forward Placeholder"] = unarmedWalkForwardClip;
@@ -52,17 +51,16 @@ public class PlayerClipsHandler : MonoBehaviour{
         _copyOverrider["Walk Backward Right Placeholder"] = unarmedWalkBackwardRightClip;
         _copyOverrider["Strafe Left Placeholder"] = unarmedStrafeLeftClip;
         _copyOverrider["Strafe Right Placeholder"] = unarmedStrafeRightClip;
-
         _copyOverrider["Roll Forward Placeholder"] = unarmedRollForwardClip;
         _copyOverrider["Roll Backward Placeholder"] = unarmedRollBackwardClip;
         _copyOverrider["Roll Left Placeholder"] = unarmedRollLeftlip;
         _copyOverrider["Roll Right Placeholder"] = unarmedRollRightClip;
+        _copyOverrider["Crouch Frame Placeholder"] = unarmedCrouchClip;
     }
 
-
-    //unarmed => unarmed animations
-    //melee weapons => set weight of melee override layer to 1 for upperbody
-    //long range weapons => set weight of 
-
+    public void HandleAttackClip(AttackSO attack){
+        _copyOverrider["Attack A Placeholder"] = attack.attackClip;
+        _copyOverrider["Attack B Placeholder"] = attack.attackClip;
+    }
 
 }

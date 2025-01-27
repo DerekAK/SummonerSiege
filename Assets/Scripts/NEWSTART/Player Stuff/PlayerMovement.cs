@@ -1,22 +1,25 @@
 using System;
+using System.Collections;
 using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
 
-    private string moveXParam = "InputX";
-    private string moveYParam = "InputY";
-    private string rollXParam = "RollX";
-    private string rollYParam = "RollY";
-    private string animMovementStateParam = "Movement State";
+    private int moveXParam = Animator.StringToHash("InputX");
+    private int moveYParam = Animator.StringToHash("InputY");
+    private int rollXParam = Animator.StringToHash("RollX");
+    private int rollYParam = Animator.StringToHash("RollY");
+    private int animMovementStateParam = Animator.StringToHash("Movement State");
+    private int crouchLayerIndex = 1;
     private float currentMoveSpeed = 0f;
-
+    [SerializeField] private float rollTime = 1f;
+    private Coroutine rollCoroutine;
     [SerializeField] private LayerMask groundLayers;
-
+    
     [Header("Grounded Settings")]
     [SerializeField] private bool isGrounded = true;
-    [Tooltip("Useful for rough ground")][SerializeField] private float groundedOffset = -0.14f;
-
+    [Tooltip("Useful for rough ground")]
+    [SerializeField] private float groundedOffset = -0.14f;
     [Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
     [SerializeField] private float groundedRadius = 0.5f;
     private float _verticalVelocity;
@@ -58,43 +61,41 @@ public class PlayerMovement : MonoBehaviour
     }
     private void Start(){
         _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
-
         // Apply initial cursor state
         SetCursorState(cursorLocked);
+        GameInput.Instance.OnRightClickTriggered += OnRightClickPerform;
+    }
+    private void OnDisable(){
+        GameInput.Instance.OnRightClickTriggered -= OnRightClickPerform;
     }
 
     private void Update(){
         GroundedCheck();
         UpdateVerticalVelocity(); //accounts for jumping
-        Move();
+        HandleMovement();
         CursorStuffIDontUnderstand();
     }
     private void UpdateVerticalVelocity(){
         if(isGrounded){
             if (_verticalVelocity < 0.0f){
-                _verticalVelocity = -2f;
+                _verticalVelocity = 0f;
             }
-            if(GameInput.Instance.JumpPressed()){_verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * fastFallFactor * gravity);}
+            if(GameInput.Instance.JumpPressed()){
+                _verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * fastFallFactor * gravity);
+            }
         }
         else{_verticalVelocity += fastFallFactor * gravity * Time.deltaTime;}
     }
-    private void Move(){
+    private void HandleMovement(){
         Vector2 moveDir = GameInput.Instance.GetPlayerMovementVectorNormalized();
 
         bool isMoving = moveDir != Vector2.zero;
         bool isSprinting = GameInput.Instance.SprintingPressed();
         bool isLockedOn = GameInput.Instance.RightClickPressed();
-        bool isLockedOnTriggered = GameInput.Instance.RightClickTriggered(); //for sorting the list of targets before locking to it
         bool rollTriggered = GameInput.Instance.MouseMiddleTriggered();
+        bool crouchPressed = GameInput.Instance.CrouchPressed();
 
-        if(isLockedOnTriggered){
-            _playerState.lockOnTargets.Sort((a, b) => Vector3.Distance(a.position, transform.position).CompareTo(Vector3.Distance(b.position, transform.position)));
-            playerTargetIndex = 0;
-        }
-
-        float targetMoveSpeed;
-        float targetY;
-        float targetX;
+        float targetMoveSpeed, targetX, targetY, targetCrouchWeight;
 
         if (isMoving && !isLockedOn){
             if (isSprinting){
@@ -102,70 +103,101 @@ public class PlayerMovement : MonoBehaviour
                 targetX = 0;
                 targetY = 2;
             }
-            else{
+            else{ // walking
                 targetMoveSpeed = _playerStats.speed;
                 targetX = 0;
                 targetY = 1;
             }
+            if(crouchPressed){
+                targetMoveSpeed = _playerStats.speed * _playerStats.crouchFactor;
+                targetX = 0;
+                targetY = _playerStats.crouchFactor;
+                targetCrouchWeight = 1;
+            }
+            else{targetCrouchWeight = 0;}
         }
         else if(isLockedOn){
             targetMoveSpeed = _playerStats.speed * lockOnFactor;
             targetX = moveDir.x;
             targetY = moveDir.y;
+            if(crouchPressed){
+                targetMoveSpeed *= _playerStats.crouchFactor;
+                targetX *= _playerStats.crouchFactor;
+                targetY *= _playerStats.crouchFactor;
+                targetCrouchWeight = 1;
+            }
+            else{targetCrouchWeight = 0;}
         }
         else{ //not moving
             targetMoveSpeed = 0.0f;
             targetX = 0f;
-            targetY = 0f;        
+            targetY = 0f;       
+            if(crouchPressed){targetCrouchWeight = 1;} 
+            else{targetCrouchWeight = 0;}
         }
 
         float currentX = _anim.GetFloat(moveXParam);
         float currentY = _anim.GetFloat(moveYParam);
-        float newX, newY, moveSpeed;
+        float currCrouchWeight = _anim.GetLayerWeight(crouchLayerIndex);
+        float newX, newY, moveSpeed, newCrouchWeight;
 
         // become lerped value when its absolute value is very small and its approaching zero (idle). 
 
         newX = (Math.Abs(currentX) > 1e-2 || Math.Abs(targetX) > Math.Abs(currentX))? Mathf.Lerp(currentX, targetX, Time.deltaTime * smoothSpeed) : 0f;
-        newY = (Math.Abs(currentY) > 1e-2 || Math.Abs(targetY) > Math.Abs(currentY))? Mathf.Lerp(currentY, targetY, Time.deltaTime * smoothSpeed) : 0f;;
+        newY = (Math.Abs(currentY) > 1e-2 || Math.Abs(targetY) > Math.Abs(currentY))? Mathf.Lerp(currentY, targetY, Time.deltaTime * smoothSpeed) : 0f;
         moveSpeed = (Math.Abs(currentMoveSpeed) > 1e-2 || Math.Abs(targetMoveSpeed) > Math.Abs(currentMoveSpeed))? Mathf.Lerp(currentMoveSpeed, targetMoveSpeed, Time.deltaTime * smoothSpeed) : 0f;
-        
+        newCrouchWeight = (currCrouchWeight > 1e-2 || targetCrouchWeight > currCrouchWeight)? Mathf.Lerp(currCrouchWeight, targetCrouchWeight, Time.deltaTime * smoothSpeed) : 0f;
         currentMoveSpeed = moveSpeed;
 
         if (!isGrounded){
             if (_verticalVelocity < 0) {currentMovementState = MovementState.Falling;}
             else {currentMovementState = MovementState.Jumping;}
+            _playerState.InAir = true;
         }
-        else if(rollTriggered){
-            currentMovementState = MovementState.Rolling;
-            if(isLockedOn){
-                _anim.SetFloat(rollXParam, moveDir.x);
-                _anim.SetFloat(rollYParam, moveDir.y);
+        else{
+            _playerState.InAir = false;
+            if(rollTriggered){
+                rollCoroutine = StartCoroutine(WaitEndRoll());
+                currentMovementState = MovementState.Rolling;
+                if(isLockedOn){
+                    _anim.SetFloat(rollXParam, moveDir.x);
+                    _anim.SetFloat(rollYParam, moveDir.y);
+                }
+                else{
+                    _anim.SetFloat(rollXParam, 0);
+                    _anim.SetFloat(rollYParam, 1);
+                }
+                
             }
-            else{
-                _anim.SetFloat(rollXParam, 0);
-                _anim.SetFloat(rollYParam, 1);
-            }
-            
+            else{currentMovementState = MovementState.Locomotion;}
         }
-        else{currentMovementState = MovementState.Locomotion;}
 
         // Update animator parameters
         _anim.SetFloat(moveXParam, newX);
         _anim.SetFloat(moveYParam, newY);
         _anim.SetInteger(animMovementStateParam, (int)currentMovementState);
+        _anim.SetLayerWeight(crouchLayerIndex, newCrouchWeight);
 
         Vector3 targetDirection = HandlePlayerAndCameraRotation(isLockedOn, moveDir, isMoving);
         
+        if(_playerState.Attacking){moveSpeed *= _playerState.currentAttack.movementSpeedFactor;}
         _characterController.Move(targetDirection.normalized * (moveSpeed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
     }
 
+    private IEnumerator WaitEndRoll(){
+        _playerState.Rolling = true;
+        if(rollCoroutine != null){StopCoroutine(rollCoroutine);}
+        _anim.applyRootMotion = true;
+        yield return new WaitForSeconds(rollTime);
+        _anim.applyRootMotion = false;
+        _playerState.Rolling = false;
+    }
     private Vector3 HandlePlayerAndCameraRotation(bool isLockedOn, Vector3 moveDir, bool isMoving){
         Vector3 playerTargetDirection = Vector3.zero;
         bool scrolledUp = GameInput.Instance.ScrolledUp();
         bool scrolledDown = GameInput.Instance.ScrolledDown();
         float targetRotation;
-
-        Debug.Log("Nearby targets: " + _playerState.lockOnTargets.Count);
+        
 
         if(isLockedOn){
             bool hasLockOnTarget = _playerState.lockOnTargets.Count > 0;            
@@ -209,22 +241,24 @@ public class PlayerMovement : MonoBehaviour
         }
         return playerTargetDirection;
     }
+
+    private void OnRightClickPerform(){
+        _playerState.lockOnTargets.Sort((a, b) => Vector3.Distance(a.position, transform.position).CompareTo(Vector3.Distance(b.position, transform.position)));
+        playerTargetIndex = 0;
+    }
         
     private void LateUpdate(){
         if (cursorInputForLook && cursorLocked){CameraRotation();}
     }
-    private void GroundedCheck()
-    {
+    private void GroundedCheck(){
         // Set sphere position, with offset
         Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - groundedOffset, transform.position.z);
         isGrounded = Physics.CheckSphere(spherePosition, groundedRadius, groundLayers, QueryTriggerInteraction.Ignore);
     }
 
-    private void CameraRotation()
-    {
+    private void CameraRotation(){
         // If there is input and camera position is not fixed
-        if (GameInput.Instance.GetPlayerLookVectorNormalized().sqrMagnitude >= _threshold)
-        {
+        if (GameInput.Instance.GetPlayerLookVectorNormalized().sqrMagnitude >= _threshold){
             _cinemachineTargetYaw += GameInput.Instance.GetPlayerLookVectorNormalized().x * 1.2f;
             _cinemachineTargetPitch += GameInput.Instance.GetPlayerLookVectorNormalized().y * 1.2f;
         }
@@ -234,8 +268,7 @@ public class PlayerMovement : MonoBehaviour
         _cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, bottomClamp, topClamp);
 
         // Cinemachine will follow this target
-        cinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch,
-            _cinemachineTargetYaw, 0.0f);
+        cinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch, _cinemachineTargetYaw, 0.0f);
     }
     private static float ClampAngle(float lfAngle, float lfMin, float lfMax){
         if (lfAngle < -360f) lfAngle += 360f;

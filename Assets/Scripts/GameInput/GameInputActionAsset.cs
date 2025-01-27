@@ -82,7 +82,7 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
-                    ""name"": ""RightClickAction"",
+                    ""name"": ""RightClickPressed"",
                     ""type"": ""Button"",
                     ""id"": ""a7ad5633-7e26-4646-b761-a7e1ec37c290"",
                     ""expectedControlType"": """",
@@ -91,7 +91,7 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
-                    ""name"": ""LeftClickAction"",
+                    ""name"": ""LeftClickPressed"",
                     ""type"": ""Button"",
                     ""id"": ""2ee079ae-fc83-45ee-9677-45b73f1d7dac"",
                     ""expectedControlType"": """",
@@ -289,7 +289,7 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": "";KeyboardMouse"",
-                    ""action"": ""RightClickAction"",
+                    ""action"": ""RightClickPressed"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
@@ -300,7 +300,7 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": "";KeyboardMouse"",
-                    ""action"": ""LeftClickAction"",
+                    ""action"": ""LeftClickPressed"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
@@ -398,8 +398,8 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
         m_Player_Sprint = m_Player.FindAction("Sprint", throwIfNotFound: true);
         m_Player_Roll = m_Player.FindAction("Roll", throwIfNotFound: true);
         m_Player_Crouch = m_Player.FindAction("Crouch", throwIfNotFound: true);
-        m_Player_RightClickAction = m_Player.FindAction("RightClickAction", throwIfNotFound: true);
-        m_Player_LeftClickAction = m_Player.FindAction("LeftClickAction", throwIfNotFound: true);
+        m_Player_RightClickPressed = m_Player.FindAction("RightClickPressed", throwIfNotFound: true);
+        m_Player_LeftClickPressed = m_Player.FindAction("LeftClickPressed", throwIfNotFound: true);
         m_Player_LockOn = m_Player.FindAction("LockOn", throwIfNotFound: true);
         m_Player_MouseScroll = m_Player.FindAction("MouseScroll", throwIfNotFound: true);
         m_Player_MouseMiddle = m_Player.FindAction("MouseMiddle", throwIfNotFound: true);
@@ -475,8 +475,8 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Sprint;
     private readonly InputAction m_Player_Roll;
     private readonly InputAction m_Player_Crouch;
-    private readonly InputAction m_Player_RightClickAction;
-    private readonly InputAction m_Player_LeftClickAction;
+    private readonly InputAction m_Player_RightClickPressed;
+    private readonly InputAction m_Player_LeftClickPressed;
     private readonly InputAction m_Player_LockOn;
     private readonly InputAction m_Player_MouseScroll;
     private readonly InputAction m_Player_MouseMiddle;
@@ -490,8 +490,8 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
         public InputAction @Sprint => m_Wrapper.m_Player_Sprint;
         public InputAction @Roll => m_Wrapper.m_Player_Roll;
         public InputAction @Crouch => m_Wrapper.m_Player_Crouch;
-        public InputAction @RightClickAction => m_Wrapper.m_Player_RightClickAction;
-        public InputAction @LeftClickAction => m_Wrapper.m_Player_LeftClickAction;
+        public InputAction @RightClickPressed => m_Wrapper.m_Player_RightClickPressed;
+        public InputAction @LeftClickPressed => m_Wrapper.m_Player_LeftClickPressed;
         public InputAction @LockOn => m_Wrapper.m_Player_LockOn;
         public InputAction @MouseScroll => m_Wrapper.m_Player_MouseScroll;
         public InputAction @MouseMiddle => m_Wrapper.m_Player_MouseMiddle;
@@ -522,12 +522,12 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
             @Crouch.started += instance.OnCrouch;
             @Crouch.performed += instance.OnCrouch;
             @Crouch.canceled += instance.OnCrouch;
-            @RightClickAction.started += instance.OnRightClickAction;
-            @RightClickAction.performed += instance.OnRightClickAction;
-            @RightClickAction.canceled += instance.OnRightClickAction;
-            @LeftClickAction.started += instance.OnLeftClickAction;
-            @LeftClickAction.performed += instance.OnLeftClickAction;
-            @LeftClickAction.canceled += instance.OnLeftClickAction;
+            @RightClickPressed.started += instance.OnRightClickPressed;
+            @RightClickPressed.performed += instance.OnRightClickPressed;
+            @RightClickPressed.canceled += instance.OnRightClickPressed;
+            @LeftClickPressed.started += instance.OnLeftClickPressed;
+            @LeftClickPressed.performed += instance.OnLeftClickPressed;
+            @LeftClickPressed.canceled += instance.OnLeftClickPressed;
             @LockOn.started += instance.OnLockOn;
             @LockOn.performed += instance.OnLockOn;
             @LockOn.canceled += instance.OnLockOn;
@@ -559,12 +559,12 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
             @Crouch.started -= instance.OnCrouch;
             @Crouch.performed -= instance.OnCrouch;
             @Crouch.canceled -= instance.OnCrouch;
-            @RightClickAction.started -= instance.OnRightClickAction;
-            @RightClickAction.performed -= instance.OnRightClickAction;
-            @RightClickAction.canceled -= instance.OnRightClickAction;
-            @LeftClickAction.started -= instance.OnLeftClickAction;
-            @LeftClickAction.performed -= instance.OnLeftClickAction;
-            @LeftClickAction.canceled -= instance.OnLeftClickAction;
+            @RightClickPressed.started -= instance.OnRightClickPressed;
+            @RightClickPressed.performed -= instance.OnRightClickPressed;
+            @RightClickPressed.canceled -= instance.OnRightClickPressed;
+            @LeftClickPressed.started -= instance.OnLeftClickPressed;
+            @LeftClickPressed.performed -= instance.OnLeftClickPressed;
+            @LeftClickPressed.canceled -= instance.OnLeftClickPressed;
             @LockOn.started -= instance.OnLockOn;
             @LockOn.performed -= instance.OnLockOn;
             @LockOn.canceled -= instance.OnLockOn;
@@ -635,8 +635,8 @@ public partial class @GameInputActionAsset: IInputActionCollection2, IDisposable
         void OnSprint(InputAction.CallbackContext context);
         void OnRoll(InputAction.CallbackContext context);
         void OnCrouch(InputAction.CallbackContext context);
-        void OnRightClickAction(InputAction.CallbackContext context);
-        void OnLeftClickAction(InputAction.CallbackContext context);
+        void OnRightClickPressed(InputAction.CallbackContext context);
+        void OnLeftClickPressed(InputAction.CallbackContext context);
         void OnLockOn(InputAction.CallbackContext context);
         void OnMouseScroll(InputAction.CallbackContext context);
         void OnMouseMiddle(InputAction.CallbackContext context);

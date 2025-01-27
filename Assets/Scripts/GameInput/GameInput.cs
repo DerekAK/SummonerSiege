@@ -1,9 +1,13 @@
+using System;
 using UnityEngine;
 
 public class GameInput : MonoBehaviour
 {
     public static GameInput Instance { get; private set; }
     private GameInputActionAsset gameInputScript; //generated script from inputasset
+
+    //combat events to subscribe to
+    public event Action OnLeftClickStarted, OnLeftClickCanceled, OnRightClickTriggered;
 
     private void Awake(){
         if (Instance == null)
@@ -15,10 +19,18 @@ public class GameInput : MonoBehaviour
     }
     private void OnEnable(){
         gameInputScript.Enable();
+        
+        var playerMap = gameInputScript.Player;
+        playerMap.LeftClickPressed.started += ctx => OnLeftClickStarted?.Invoke();
+        playerMap.LeftClickPressed.canceled += ctx => OnLeftClickCanceled?.Invoke();
+        playerMap.RightClickPressed.performed += ctx => OnRightClickTriggered?.Invoke();
     }
     private void OnDisable(){
         gameInputScript.Disable();
     }
+    
+    public bool LeftClickPressed(){return gameInputScript.Player.LeftClickPressed.IsPressed();}
+
     public Vector2 GetPlayerMovementVectorNormalized(){return gameInputScript.Player.Move.ReadValue<Vector2>().normalized;}
 
     public Vector2 GetPlayerLookVectorNormalized(){return gameInputScript.Player.Look.ReadValue<Vector2>().normalized;}
@@ -35,13 +47,7 @@ public class GameInput : MonoBehaviour
 
     public bool RollPressed(){return gameInputScript.Player.Roll.IsPressed();}
 
-    public bool RightClickPressed(){return gameInputScript.Player.RightClickAction.IsPressed();}
+    public bool RightClickPressed(){return gameInputScript.Player.RightClickPressed.IsPressed();}
 
-    public bool RightClickTriggered(){return gameInputScript.Player.RightClickAction.triggered;}
-
-    public bool LeftClickPressed(){return gameInputScript.Player.LeftClickAction.IsPressed();}
-
-    public bool MouseMiddleTriggered(){return gameInputScript.Player.MouseMiddle.triggered;}
-
-
+    public bool MouseMiddleTriggered(){return gameInputScript.Player.MouseMiddle.triggered;}    
 }

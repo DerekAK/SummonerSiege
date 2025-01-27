@@ -60,7 +60,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "RightClickAction",
+                    "name": "RightClickPressed",
                     "type": "Button",
                     "id": "a7ad5633-7e26-4646-b761-a7e1ec37c290",
                     "expectedControlType": "",
@@ -69,7 +69,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "LeftClickAction",
+                    "name": "LeftClickPressed",
                     "type": "Button",
                     "id": "2ee079ae-fc83-45ee-9677-45b73f1d7dac",
                     "expectedControlType": "",
@@ -267,7 +267,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": ";KeyboardMouse",
-                    "action": "RightClickAction",
+                    "action": "RightClickPressed",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -278,7 +278,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": ";KeyboardMouse",
-                    "action": "LeftClickAction",
+                    "action": "LeftClickPressed",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
