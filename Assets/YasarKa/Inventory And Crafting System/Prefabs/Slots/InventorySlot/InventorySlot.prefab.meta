@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 88e8b81588d54dd41b723975db1a9123
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Prefabs/Slots/InventorySlot/InventorySlot.prefab
+  uploadId: 727146

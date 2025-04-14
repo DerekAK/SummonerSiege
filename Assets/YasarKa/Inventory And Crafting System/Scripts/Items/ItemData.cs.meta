@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 10d2f6ad78dc34f409015301c1c0f84b
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Scripts/Items/ItemData.cs
+  uploadId: 727146

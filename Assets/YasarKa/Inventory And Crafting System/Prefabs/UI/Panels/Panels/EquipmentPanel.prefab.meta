@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: fc23b7785fa4e0c46abca4bb53f041e7
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Prefabs/UI/Panels/Panels/EquipmentPanel.prefab
+  uploadId: 727146

@@ -1,10 +1,11 @@
+using Unity.Netcode;
 using UnityEngine;
 
 
 /**
 Responsible for handling all animation transitions of the player
 */
-public class PlayerClipsHandler : MonoBehaviour{
+public class PlayerClipsHandler : NetworkBehaviour{
 
     private PlayerState _playerState;
     private Animator _anim;
@@ -14,6 +15,7 @@ public class PlayerClipsHandler : MonoBehaviour{
 
     [Header("Movement Animations")]
     [SerializeField] private AnimationClip unarmedIdleClip;
+    [SerializeField] private AnimationClip unarmedStrafeIdleClip;
     [SerializeField] private AnimationClip unarmedWalkForwardClip;
     [SerializeField] private AnimationClip unarmedWalkForwardLeftClip;
     [SerializeField] private AnimationClip unarmedWalkForwardRightClip;
@@ -36,19 +38,21 @@ public class PlayerClipsHandler : MonoBehaviour{
         _copyOverrider = new AnimatorOverrideController(_templateOverrider);
         _anim.runtimeAnimatorController = _copyOverrider;
     }
+
     private void Start(){
         HandleMovementClips();
     }
 
     private void HandleMovementClips(){
         _copyOverrider["Idle Placeholder"] = unarmedIdleClip;
+        _copyOverrider["Strafe Idle Placeholder"] = unarmedStrafeIdleClip;
         _copyOverrider["Run Forward Placeholder"] = unarmedRunForwardClip;
         _copyOverrider["Walk Forward Placeholder"] = unarmedWalkForwardClip;
-        _copyOverrider["Walk Forward Left Placeholder"] = unarmedWalkForwardLeftClip;
-        _copyOverrider["Walk Forward Right Placeholder"] = unarmedWalkForwardRightClip;
-        _copyOverrider["Walk Backward Placeholder"] = unarmedWalkBackwardClip;
-        _copyOverrider["Walk Backward Left Placeholder"] = unarmedWalkBackwardLeftClip;
-        _copyOverrider["Walk Backward Right Placeholder"] = unarmedWalkBackwardRightClip;
+        _copyOverrider["Strafe Forward Left Placeholder"] = unarmedWalkForwardLeftClip;
+        _copyOverrider["Strafe Forward Right Placeholder"] = unarmedWalkForwardRightClip;
+        _copyOverrider["Strafe Backward Placeholder"] = unarmedWalkBackwardClip;
+        _copyOverrider["Strafe Backward Left Placeholder"] = unarmedWalkBackwardLeftClip;
+        _copyOverrider["Strafe Backward Right Placeholder"] = unarmedWalkBackwardRightClip;
         _copyOverrider["Strafe Left Placeholder"] = unarmedStrafeLeftClip;
         _copyOverrider["Strafe Right Placeholder"] = unarmedStrafeRightClip;
         _copyOverrider["Roll Forward Placeholder"] = unarmedRollForwardClip;
@@ -58,9 +62,37 @@ public class PlayerClipsHandler : MonoBehaviour{
         _copyOverrider["Crouch Frame Placeholder"] = unarmedCrouchClip;
     }
 
-    public void HandleAttackClip(AttackSO attack){
-        _copyOverrider["Attack A Placeholder"] = attack.attackClip;
-        _copyOverrider["Attack B Placeholder"] = attack.attackClip;
+
+    // will only be called by the local player (using isOwner)
+    public void HandleAttackClip(int newIndex){
+        if(IsOwner){
+            ChangeOverriderClips(newIndex);
+        }
     }
+
+    private void ChangeOverriderClips(int newIndex){ChangeOverriderClipsServerRpc(newIndex);}
+
+    [ServerRpc]
+    private void ChangeOverriderClipsServerRpc(int newIndex){
+        // will be called on the server by the owner (specific player)
+        ChangeOverriderClipsClientRpc(OwnerClientId, newIndex);
+    }
+
+    [ClientRpc]
+    private void ChangeOverriderClipsClientRpc(ulong ownerClientId, int newIndex){
+        NetworkObject playerNetworkObject = GetPlayerNetworkObjectById(ownerClientId);
+        if(!playerNetworkObject){return;}
+        AnimatorOverrideController copyController = (AnimatorOverrideController)playerNetworkObject.GetComponent<Animator>().runtimeAnimatorController;
+        AnimationClip attackClip = playerNetworkObject.GetComponent<PlayerCombat>().attackClipsList[newIndex];
+        copyController["Attack A Placeholder"] = attackClip;
+        copyController["Attack B Placeholder"] = attackClip;
+    }
+
+    private NetworkObject GetPlayerNetworkObjectById(ulong playerId){
+        foreach(NetworkObject playerObject in NetworkManager.SpawnManager.SpawnedObjects.Values){
+            if(playerObject.OwnerClientId == playerId){return playerObject;}
+        }
+        return null;
+    }   
 
 }

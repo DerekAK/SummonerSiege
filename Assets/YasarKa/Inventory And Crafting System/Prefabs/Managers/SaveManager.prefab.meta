@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 6328431ec38eaba46b7258756a00aee5
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Prefabs/Managers/SaveManager.prefab
+  uploadId: 727146

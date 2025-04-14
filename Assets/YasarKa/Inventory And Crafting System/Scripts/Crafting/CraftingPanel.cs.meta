@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 74512ff79a57367499a417e863f0d5e0
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Scripts/Crafting/CraftingPanel.cs
+  uploadId: 727146

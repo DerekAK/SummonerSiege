@@ -9,7 +9,6 @@ public class EnemyAI2 : MonoBehaviour
     private NavMeshAgent _agent;
     private Animator _anim;
     private SphereCollider _aggroCollider;
-    private List<Transform> playersInGame;
     private List<Transform> playersInRangeOfEnemy = new List<Transform>();
     private Transform currentPlayerTarget;
     private EnemyState currentEnemyState;
@@ -54,7 +53,6 @@ public class EnemyAI2 : MonoBehaviour
         attackCenterBoxRadius = enemyHeight/2; 
     }
     private void Start(){
-        playersInGame = GameManager.Instance.getPlayerTransforms();
         startPosition = transform.position;
         //can set to idle immediately because spawnscript will ensure no enemy is spawned in with a player in its aggrosphere
         Idle();

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 8db1e6b4ca2093e43ac1ff5e9c98bd05
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Prefabs/Managers/CraftingManager.prefab
+  uploadId: 727146

@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: ddcf00530c561ea4781b77f5fc25fd5a
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Scripts/Crafting/RecipeSlot.cs
+  uploadId: 727146

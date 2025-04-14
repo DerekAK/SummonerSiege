@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b733c6e683054ae4e98e2694af11cb81
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Prefabs/UI/Panels/Panels/ContextMenuPanel.prefab
+  uploadId: 727146

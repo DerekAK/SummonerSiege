@@ -12,3 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3175d770d2e534ac288faa1ed7204d8a, type: 3}
   m_Name: BasicPlayer
   m_EditorClassIdentifier: 
+  Strength: 10
+  Speed: 5
+  SprintFactor: 2
+  CrouchFactor: 0.5
+  Endurance: 10
+  Health: 100
+  SummoningCapacity: 1
+  BindingAffinity: 20

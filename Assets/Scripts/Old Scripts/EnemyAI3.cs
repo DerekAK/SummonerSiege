@@ -16,7 +16,6 @@ public class EnemyAI3 : MonoBehaviour{
     private AnimatorOverrideController _templateOverrider;
     private AnimatorOverrideController _copyOverrider;
     private SphereCollider _aggroCollider;
-    private List<Transform> playersInGame;
     private List<Transform> targetsInRangeOfEnemy = new List<Transform>();
     private List<BaseAttackScript> attackScripts;
     private Transform currentTarget;
@@ -90,7 +89,6 @@ public class EnemyAI3 : MonoBehaviour{
     }
     private void Start(){
         //attackScripts = _enemyAttackManager.GetCurrentAvailableAttacks();
-        playersInGame = GameManager.Instance.getPlayerTransforms();
         startPosition = feet.position;
         //can set to idle immediately because spawnscript will ensure no enemy is spawned in with a player in its aggrosphere
         Idle();

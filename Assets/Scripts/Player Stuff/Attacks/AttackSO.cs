@@ -14,5 +14,6 @@ public class AttackSO : ScriptableObject
     public AnimationClip attackClip;
     public bool airAttack;
     public float movementSpeedFactor;
+    public float rotationSpeedFactor;
 
 }

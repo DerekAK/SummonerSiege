@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 9bec9b3e2f54ef4448398589940fe7ed
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Prefabs/Slots/RecipeSlot/RecipeSlot.prefab
+  uploadId: 727146

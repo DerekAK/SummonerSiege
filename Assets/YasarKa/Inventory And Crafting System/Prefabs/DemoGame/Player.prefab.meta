@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 744b0d40fe68a8c4ea22ef5931561db4
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Prefabs/DemoGame/Player.prefab
+  uploadId: 727146

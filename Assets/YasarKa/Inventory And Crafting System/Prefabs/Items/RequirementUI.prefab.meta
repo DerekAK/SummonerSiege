@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 16ca1422d7995c04f934e10d2d58e152
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Prefabs/Items/RequirementUI.prefab
+  uploadId: 727146

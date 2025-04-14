@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 /*
 IMPORTANT TO UNDERSTAND: any attack that might possibly lead into a combo must be in a combo. in other words,
@@ -9,7 +10,7 @@ listening for, and then only have one viable attack from that starting input at 
 given point, no matter the state, there is only one viable next move for any single input.
 */
 
-public class PlayerCombat : MonoBehaviour
+public class PlayerCombat : NetworkBehaviour
 {
     private Animator _anim;
     private PlayerState _playerState;
@@ -36,6 +37,7 @@ public class PlayerCombat : MonoBehaviour
     [Header("Attack Data")]
     [SerializeField] private List<ComboSystem.Combo> possibleCombos = new List<ComboSystem.Combo>();
     
+    public List<AnimationClip> attackClipsList = new List<AnimationClip>();
 
     private void Awake(){
         _anim = GetComponent<Animator>();
@@ -47,8 +49,11 @@ public class PlayerCombat : MonoBehaviour
         GameInput.Instance.OnAttackButtonStarted += AttackButtonStart;
         GameInput.Instance.OnAttackButtonCanceled += AttackButtonCanceled;
         
-        foreach(ComboSystem.Combo comboStep in possibleCombos){
-            comboStep.Initialize();
+        foreach(ComboSystem.Combo combo in possibleCombos){
+            combo.Initialize();
+            foreach(var comboStep in combo.comboSteps){
+                attackClipsList.Add(comboStep.attack.attackClip);
+            }
         }
     }
 
@@ -58,6 +63,9 @@ public class PlayerCombat : MonoBehaviour
     }
 
     private void AttackButtonStart(GameInput.AttackInput inputButton){
+        if(!IsOwner){
+            return;
+        }
         if(!isAttacking || inCombo){
             checkingForInputRelease = true;
             inputHoldCoroutine = StartCoroutine(HandleInputHeldTime(inputButton));
@@ -98,11 +106,11 @@ public class PlayerCombat : MonoBehaviour
 
     private AttackSO DecideCurrentAttackSO(GameInput.AttackInput inputButton, ComboSystem.AttackPressType pressType){
         if(inCombo && currentCombo.currComboStep.userPressType == pressType && currentCombo.currComboStep.userInput == inputButton){
-            Debug.Log("Registered combo input!");
+            //Debug.Log("Registered combo input!");
             return currentCombo.currComboStep.attack;
         }
         else if(inCombo){
-            Debug.Log("In combo but wrong input");
+            //Debug.Log("In combo but wrong input");
             return null;
         }
         else{
@@ -111,16 +119,16 @@ public class PlayerCombat : MonoBehaviour
                 foreach(ComboSystem.Combo combo in possibleCombos){
                     ComboSystem.ComboStep firstComboStep = combo.comboSteps[0];
                     if(firstComboStep.userInput == inputButton && firstComboStep.userPressType == pressType){
-                        Debug.Log("Found the correct normal attack!");
+                        //Debug.Log("Found the correct normal attack!");
                         currentCombo = combo;
                         return firstComboStep.attack;
                     }
                 }
-                Debug.Log("No Normal attack matching these inputs!");
+                //Debug.Log("No Normal attack matching these inputs!");
                 return null;
             }
             else{
-                Debug.Log("In attack but past combat window");
+                //Debug.Log("In attack but past combat window");
                 return null;
             }
         }
@@ -146,8 +154,8 @@ public class PlayerCombat : MonoBehaviour
         isAttacking = true;
         _playerState.currentAttack = currentAttackSO;
         _playerState.ChangeAttackStatus(true);
-        _playerClipsHandler.HandleAttackClip(currentAttackSO);
-        if(currAnimAttackState == 0){ _anim.SetTrigger(attackParamA); }
+        _playerClipsHandler.HandleAttackClip(GetIndexByAttackSO(currentAttackSO));
+        if(currAnimAttackState == 0){_anim.SetTrigger(attackParamA);}
         else { _anim.SetTrigger(attackParamB); }
         currAnimAttackState = (currAnimAttackState + 1) % 2;
 
@@ -175,12 +183,19 @@ public class PlayerCombat : MonoBehaviour
         currentCombo.ResetComboStep();
     }
 
+    // called by animation event
     private void AttackFinish(){
         isAttacking = false;
         _playerState.ChangeAttackStatus(false);
     }
 
+    // called by animation event
     private void ComboTransfer(){
         comboTransition = true;
+    }
+
+    private int GetIndexByAttackSO(AttackSO attackSO){
+        int index = attackClipsList.IndexOf(attackSO.attackClip);
+        return index;
     }
 }

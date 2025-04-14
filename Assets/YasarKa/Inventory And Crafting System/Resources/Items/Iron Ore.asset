@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10d2f6ad78dc34f409015301c1c0f84b, type: 3}
+  m_Name: Iron Ore
+  m_EditorClassIdentifier: 
+  itemName: Iron Ore
+  itemIcon: {fileID: 21300000, guid: c93461dd8e06f6747942474a15dc0075, type: 3}
+  description: Raw iron ore that needs to be smelted into ingots.
+  tooltipText: Can be smelted into Iron Ingots.
+  itemType: 3
+  rarity: 1
+  isStackable: 1
+  useCustomStackSize: 0
+  maxStackSize: 24
+  basePrice: 5
+  isEquippable: 0
+  equipmentSlotType: 0
+  requiredLevel: 0
+  durability: 100
+  maxDurability: 100
+  damage: 0
+  attackSpeed: 0
+  criticalChance: 0
+  criticalMultiplier: 0
+  defense: 0
+  magicResistance: 0
+  weight: 0
+  healthRestore: 0
+  manaRestore: 0
+  staminaRestore: 0
+  duration: 0
+  hasTemporaryEffect: 0
+  appliesBuffs: 0
+  strengthBuff: 0
+  agilityBuff: 0
+  intelligenceBuff: 0
+  healthBuff: 0
+  manaBuff: 0

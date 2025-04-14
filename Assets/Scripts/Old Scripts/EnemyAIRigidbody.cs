@@ -16,7 +16,6 @@ public class EnemyAIRigidbody : MonoBehaviour
     private Animator _anim;
     private AnimatorOverrideController _animOverrider;
     private SphereCollider _aggroCollider;
-    private List<Transform> playersInGame;
     private List<Transform> playersInRangeOfEnemy = new List<Transform>();
     private Transform currentPlayerTarget;
     private Vector3 lastSeenTargetPosition;
@@ -72,7 +71,6 @@ public class EnemyAIRigidbody : MonoBehaviour
         _rightHand = transform.Find(transform.GetChild(0).name + "/mixamorig:Hips/mixamorig:Spine/mixamorig:Spine1/mixamorig:Spine2/mixamorig:RightShoulder/mixamorig:RightArm/mixamorig:RightForeArm/mixamorig:RightHand/mixamorig:RightHandIndex1/mixamorig:RightHandIndex2");
     }
     private void Start(){
-        playersInGame = GameManager.Instance.getPlayerTransforms();
         startPosition = feet.position;
         //can set to idle immediately because spawnscript will ensure no enemy is spawned in with a player in its aggrosphere
         Idle();

@@ -1,17 +1,16 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "PlayerStats", menuName = "Scriptable Objects/PlayerStatsConfiguration")]
+[CreateAssetMenu(fileName = "PlayerStatsConfiguration", menuName = "Scriptable Objects/PlayerStatsConfiguration")]
 public class PlayerStatsConfiguration : ScriptableObject
 {
-    public float Strength = 10f; //base damage
-    public float Speed = 5f; //base walking speed
-    public float SprintFactor = 5f;
-    public float CrouchFactor = 0.5f;
-    public float Endurance = 10f; //base endurance
-    public float Health = 100f; //base health
+    public float Strength{get; private set;} = 10f;
+    public float Speed{get; private set;} = 5f; 
+    public float Endurance{get; private set;} = 10f; 
+    public float Health{get; private set;} = 100f; 
     
 
-    public float SummoningCapacity = 1f; //total summoned weight of creatures you can hold
-    public float BindingAffinity = 20f; //chance to bind a creature
+    public float SummoningCapacity{get; private set;} = 1f; //total summoned weight of creatures you can hold
+    public float BindingAffinity{get; private set;} = 20f; //chance to bind a creature
+    public float Corruption{get; private set;} = 100f;
 
 }

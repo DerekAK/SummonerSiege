@@ -15,4 +15,4 @@ MonoBehaviour:
   ElementType: 0
   attackClip: {fileID: 7400000, guid: 2dc48c7bc3b5445dea808dbe646a5f2d, type: 2}
   airAttack: 0
-  movementSpeedFactor: 0.5
+  movementSpeedFactor: 0

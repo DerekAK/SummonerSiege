@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 0b486fd4ba155b24c9fa8b131be0a9b0
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Prefabs/Items/DraggableItem.prefab
+  uploadId: 727146

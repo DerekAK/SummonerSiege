@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 53cc3617ac58abd48ba45730c9345591
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Resources/Items/Health
+    Potion.asset
+  uploadId: 727146

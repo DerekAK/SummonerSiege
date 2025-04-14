@@ -6,9 +6,9 @@ using System;
 using System.Linq;
 using Unity.Mathematics;
 using Unity.VisualScripting;
-using UnityEditor;
+using Unity.Netcode;
 
-public class EnemyAI4 : MonoBehaviour{
+public class EnemyAI4 : NetworkBehaviour{
 
     public class AttackEvent : EventArgs{
         public GameObject EnemyInstance { get; }
@@ -25,6 +25,9 @@ public class EnemyAI4 : MonoBehaviour{
         }
     }
     public event EventHandler<AttackEvent> AnimationAttackEvent;
+
+    // for enemies, they will each have their own movement 
+    // [SerializeField] private attackAnimationClipListSO;
     private BaseAttackScript attackChosen;
     private bool hasMelee, hasMedium, hasLong;
     private int countMeleeInRow, countMediumInRow, countLongInRow = 0;
@@ -36,7 +39,6 @@ public class EnemyAI4 : MonoBehaviour{
     private AnimatorOverrideController _copyOverrider;
     private SphereCollider _aggroCollider;
     private CapsuleCollider _capsuleCollider;
-    private List<Transform> playersInGame;
     private List<Transform> targetsInRangeOfEnemy = new List<Transform>();
     private List<EnemyAttackManager.AttackData> attackPool;
     private Transform currentTarget;
@@ -64,11 +66,14 @@ public class EnemyAI4 : MonoBehaviour{
     private bool hasFinishedJump = false;
     public void SetHasFinishedJump(bool finished){hasFinishedJump = finished;}
 
+    public NetworkVariable<EnemyState> enemyAnimationState = new NetworkVariable<EnemyState>();
+
     private void Awake(){
         SetUpAnimator(); //sets up a unique copy of the animatorOverrider for each enemy instance
         _enemyAttackManager = GetComponent<EnemyAttackManager>();
         _enemyInfo = GetComponent<EnemySpecificInfo>();
         _agent = GetComponent<NavMeshAgent>();
+        _agent.enabled = false;
         _rb = GetComponent<Rigidbody>();
         _aggroCollider = GetComponent<SphereCollider>();
         enemyHeight = GetComponent<CapsuleCollider>().height * transform.localScale.y;
@@ -82,7 +87,10 @@ public class EnemyAI4 : MonoBehaviour{
         _anim.runtimeAnimatorController = _copyOverrider;
     }
 
-    private void Start(){
+    public override void OnNetworkSpawn(){
+        enemyAnimationState.OnValueChanged += ChangeAnimationState;
+        if(!IsServer){return;}
+        _agent.enabled = true;
         nextAttackState = EnemyState.AttackA;
         _aggroCollider.radius = (_enemyInfo.GetAggroDistance()-1)/transform.localScale.y;
         _agent.stoppingDistance = 1.5f * transform.root.localScale.x; //THIS IS REALLY IMPORTANT TO GET RIGHT
@@ -91,22 +99,22 @@ public class EnemyAI4 : MonoBehaviour{
         _agent.radius = 0.1f;
         isWeaponOut = false;
         attackPool = _enemyAttackManager.GetCurrentAvailableAttacks();
-        playersInGame = GameManager.Instance.getPlayerTransforms();
         startPosition = feet.position;
         //can set to idle immediately because spawnscript will ensure no enemy is spawned in with a player in its aggrosphere
         Idle();
     }
 
-    // private void FixedUpdate() {
-    //     _rb.MovePosition(transform.position);
-    // }
+    // will be called on all connected clients to change the animation of the enemy 
+    private void ChangeAnimationState(EnemyState prevState, EnemyState newState){
+        _anim.SetInteger("EnemyState", (int)newState);
+    }
+
     private void Idle(){
+        Debug.Log("CLIENT: " + OwnerClientId + " IDLE FUNCTION");
         _agent.ResetPath();
         currentEnemyState = EnemyState.Idle;
         if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPosition(currentEnemyState);}
-        _anim.SetInteger("EnemyState", (int)currentEnemyState);
-        //CancelIdle();
-        //CancelAlert();
+        enemyAnimationState.Value = currentEnemyState;
         StartCoroutine(IdleCoroutine());
     }
     IEnumerator IdleCoroutine(){
@@ -117,7 +125,7 @@ public class EnemyAI4 : MonoBehaviour{
     private void Roam(){
         currentEnemyState = EnemyState.Roaming;
         if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPosition(currentEnemyState);} //1 for roaming
-        _anim.SetInteger("EnemyState", (int)currentEnemyState);
+        enemyAnimationState.Value = currentEnemyState;
         _agent.speed = _enemyInfo.GetRoamingSpeed();
         roamPosition = GetNewRoamingPosition();
         _agent.SetDestination(roamPosition);
@@ -131,6 +139,7 @@ public class EnemyAI4 : MonoBehaviour{
         Idle();
     }
     private void OnTriggerEnter(Collider other){ //using triggers for player detection for computation optimization, need to set sphere collider to a trigger
+        if(!IsServer){return;}
         if(other.CompareTag(targetTag)){
             targetsInRangeOfEnemy.Add(other.transform);
             if(currentEnemyState == EnemyState.Idle || currentEnemyState == EnemyState.Roaming){ //only want to become alert if previously idle or roaming, because could be chasing, attacking etc.
@@ -160,10 +169,11 @@ public class EnemyAI4 : MonoBehaviour{
         yield break;
     }
     private void BecomeAlert(){
+        Debug.Log("CLIENT: " + OwnerClientId + " BECOME ALERT FUNCTION");
         _agent.ResetPath(); 
         currentEnemyState = EnemyState.Alert;
         if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPosition(currentEnemyState);}
-        _anim.SetInteger("EnemyState", (int)currentEnemyState);
+        enemyAnimationState.Value = currentEnemyState;
         StopAllCoroutines();
         alertCoroutine = StartCoroutine(AlertCoroutine());
     }
@@ -174,7 +184,6 @@ public class EnemyAI4 : MonoBehaviour{
                 TryDetectPlayer(); //this will cancel alertocourotine if finds a player, so will not go back to being idle
                 yield return null;
             }
-            Debug.Log("anspogiuanspudgiasjdngiusajngiulasjng");
             Idle();
         }
         else{Idle();} // no one in range
@@ -304,7 +313,7 @@ public class EnemyAI4 : MonoBehaviour{
         if(attackChosen.GetAttackType() == 1 && Vector3.Distance(transform.position, currentTarget.position) > 1.5 * _agent.stoppingDistance){
             currentEnemyState = EnemyState.Approach;
             if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPosition(currentEnemyState);}
-            _anim.SetInteger("EnemyState", (int)currentEnemyState);
+            enemyAnimationState.Value = currentEnemyState;
             StartCoroutine(ApproachCoroutine());
         }
         else{
@@ -348,7 +357,7 @@ public class EnemyAI4 : MonoBehaviour{
         }
         _agent.ResetPath();
         currentEnemyState = nextAttackState;
-        _anim.SetInteger("EnemyState", (int)currentEnemyState);
+        enemyAnimationState.Value = currentEnemyState;
         if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPositionForAttack(attackChosen);}
         AnimationAttackEvent = null;
         if(attackChosenInstance){Destroy(attackChosenInstance.gameObject);}
@@ -432,13 +441,13 @@ public class EnemyAI4 : MonoBehaviour{
         if(decision != EnemyState.AttackA && decision != EnemyState.AttackB){
             currentEnemyState = decision;
             if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPosition(currentEnemyState);}
-            _anim.SetInteger("EnemyState", (int)currentEnemyState);
+            enemyAnimationState.Value = currentEnemyState;
         } // this is because PerformAttack() will handle this, and that will first wait for a delay for a smooth turn towards its target
         switch(decision){
             case EnemyState.RightTurn:
                 float angle = DetermineTurnDirection();
                 currentEnemyState = angle > 0 ? EnemyState.RightTurn : EnemyState.LeftTurn;
-                _anim.SetInteger("EnemyState", (int)currentEnemyState);
+                enemyAnimationState.Value = currentEnemyState;
                 StartCoroutine(TurnCoroutine());
                 break;
             case EnemyState.StareDown:
@@ -552,9 +561,9 @@ public class EnemyAI4 : MonoBehaviour{
                     //need to determine which attack to use, and then determine if going to attack immediately or do some other stuff before
                     attackChosen = DecideAttack();
 
-                    //from here, might not attack directly, but can still set the attack to this because know that this is necessarily next attack
-                    if(nextAttackState == EnemyState.AttackA){_copyOverrider["AttackA Placeholder"] = attackChosen.getAnimationClip();}
-                    else{_copyOverrider["AttackB Placeholder"] = attackChosen.getAnimationClip();}
+                    //int attackChosenIndex = GetIndexFromAttack(attackChosen);
+
+                    //SetAttackAnimationClientRpc(attackChosenIndex);
 
                     if(attackChosen.DoesRequireWeapon() && !isWeaponOut){return (EnemyState.Equip, null);}
                     if(!attackChosen.DoesRequireWeapon() && isWeaponOut){return (EnemyState.Unequip, null);}
@@ -568,6 +577,24 @@ public class EnemyAI4 : MonoBehaviour{
         }
         Debug.Log("SHOULD NEVER GET HERE! Could not decide a combat transition");
         return (EnemyState.Alert, null);
+    }
+
+    // private int GetIndexFromAttack(BaseAttackScript attackChosen){
+    //     return animationsListSO.IndexOf(attackChosen);
+    // }
+
+    // private BaseAttackScript GetAttackFromIndex(int attackIndex){
+    //     return animationsListSO[attackIndex];
+    // }
+
+    [ClientRpc]
+    private void SetAttackAnimationClientRpc(int attackIndex){
+        //from here, might not attack directly, but can still set the attack to this because know that this is necessarily next attack
+        
+        //BaseAttackScript attackChosen = GetAttackFromIndex(attackIndex);
+        Debug.Log("Running this HERE!");
+        if(nextAttackState == EnemyState.AttackA){_copyOverrider["AttackA Placeholder"] = attackChosen.getAnimationClip();}
+        else{_copyOverrider["AttackB Placeholder"] = attackChosen.getAnimationClip();}
     }
 
     private (EnemyState, Vector3?) DecideNextTransitionForAttack(){
@@ -590,6 +617,7 @@ public class EnemyAI4 : MonoBehaviour{
     }
     private BaseAttackScript DecideAttack(){
         
+        Debug.Log(attackPool.Count);
         meleeAttacks = attackPool.FindAll(attackData => attackData.attack.GetAttackType() == 1);
         mediumAttacks = attackPool.FindAll(attackData => attackData.attack.GetAttackType() == 2);
         longAttacks = attackPool.FindAll(attackData => attackData.attack.GetAttackType() == 3);
@@ -699,7 +727,7 @@ public class EnemyAI4 : MonoBehaviour{
     }
     private IEnumerator ApproachUntilVisible(){
         currentEnemyState = EnemyState.Approach;
-        _anim.SetInteger("EnemyState", (int)currentEnemyState);
+        enemyAnimationState.Value = currentEnemyState;
         if(isWeaponOut){_enemyAttackManager.HandleWeaponShieldPosition(currentEnemyState);}
         _agent.speed = _enemyInfo.GetApproachSpeed();
         while(currentTarget && !IsVisible()){

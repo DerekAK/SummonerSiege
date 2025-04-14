@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: da93f301a7a268549ae9bdfe57ec5338
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Scripts/Save/SaveManager.cs
+  uploadId: 727146

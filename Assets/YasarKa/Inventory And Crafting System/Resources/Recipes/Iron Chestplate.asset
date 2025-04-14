@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6f3383fbf2ec3d4cb8d034f76b2deb0, type: 3}
+  m_Name: Iron Chestplate
+  m_EditorClassIdentifier: 
+  recipeName: Iron Chestplate
+  description: Craft a durable iron chestplate.
+  resultItem: {fileID: 11400000, guid: 799106082cd284044b8e4c11a079037d, type: 2}
+  resultAmount: 1
+  craftingTime: 6
+  requirements:
+  - item: {fileID: 11400000, guid: 08e9f7468f70cfb48842cb86db44c090, type: 2}
+    amount: 5
+  - item: {fileID: 11400000, guid: 23ca30f1ba0055442bf7ab4fb530aca8, type: 2}
+    amount: 3
+  unlocked: 1
+  category: 2

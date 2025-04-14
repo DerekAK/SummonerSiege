@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b08eca8cc576f3f4faaef2b53e4adb59
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 308906
+  packageName: Inventory And Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/YasarKa/Inventory And Crafting System/Prefabs/Managers/TooltipManager.prefab
+  uploadId: 727146
