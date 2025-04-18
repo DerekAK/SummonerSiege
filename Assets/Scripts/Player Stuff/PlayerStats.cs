@@ -1,10 +1,8 @@
 using UnityEngine;
 using Unity.Netcode;
-using System;
 using System.Collections;
 
-public class PlayerStats : NetworkStats
-{
+public class PlayerStats : NetworkStats{
     public PlayerStatsConfiguration playerStatsSO;
 
     // Declare NetworkVariables directly in PlayerStats

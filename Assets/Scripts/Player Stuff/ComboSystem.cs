@@ -10,7 +10,7 @@ public class ComboSystem
 
     [System.Serializable]
     public struct ComboStep{
-        public AttackSO attack;
+        public BaseAttackSO attack;
         public AttackPressType userPressType;
         public GameInput.AttackInput userInput;
     }

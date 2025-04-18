@@ -65,16 +65,18 @@ public class PlayerClipsHandler : NetworkBehaviour{
 
     // will only be called by the local player (using isOwner)
     public void HandleAttackClip(int newIndex){
-        if(IsOwner){
-            ChangeOverriderClips(newIndex);
-        }
+        if(!IsLocalPlayer){return;}
+        ChangeOverriderClipsServerRpc(newIndex);
     }
-
-    private void ChangeOverriderClips(int newIndex){ChangeOverriderClipsServerRpc(newIndex);}
 
     [ServerRpc]
     private void ChangeOverriderClipsServerRpc(int newIndex){
-        // will be called on the server by the owner (specific player)
+        /* 
+            will be called on the server by the owner (specific player). In server rpc, the OwnerClientId is not 
+            the client id of the server but the id of the client who sent the rpc
+            this has to be sent to all clients, not just the client in mind. so we send all 
+            clients the id of the client who is attacking
+        */
         ChangeOverriderClipsClientRpc(OwnerClientId, newIndex);
     }
 
@@ -83,13 +85,16 @@ public class PlayerClipsHandler : NetworkBehaviour{
         NetworkObject playerNetworkObject = GetPlayerNetworkObjectById(ownerClientId);
         if(!playerNetworkObject){return;}
         AnimatorOverrideController copyController = (AnimatorOverrideController)playerNetworkObject.GetComponent<Animator>().runtimeAnimatorController;
-        AnimationClip attackClip = playerNetworkObject.GetComponent<PlayerCombat>().attackClipsList[newIndex];
+        
+        // this will only work if attackClipsList is uniform across all clients, unless we serialize animation clips
+        // across the network for each attack which is not recommended
+        AnimationClip attackClip = playerNetworkObject.GetComponent<PlayerCombat>().attackSOList[newIndex].AttackClip;
         copyController["Attack A Placeholder"] = attackClip;
         copyController["Attack B Placeholder"] = attackClip;
     }
 
     private NetworkObject GetPlayerNetworkObjectById(ulong playerId){
-        foreach(NetworkObject playerObject in NetworkManager.SpawnManager.SpawnedObjects.Values){
+        foreach(NetworkObject playerObject in NetworkManager.SpawnManager.PlayerObjects){
             if(playerObject.OwnerClientId == playerId){return playerObject;}
         }
         return null;

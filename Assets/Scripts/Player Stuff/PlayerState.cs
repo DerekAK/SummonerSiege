@@ -9,7 +9,7 @@ public class PlayerState: MonoBehaviour
     public bool InAir = false;
     public bool Attacking{get; private set;} = false;
     public bool Rolling = false;
-    public AttackSO currentAttack;
+    public BaseAttackSO currentAttack;
 
     public float TimeSinceLastSpawn;
 

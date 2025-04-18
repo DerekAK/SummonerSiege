@@ -21,10 +21,10 @@ public class PlayerMovement : NetworkBehaviour
     
     [Header("Grounded Settings")]
     [SerializeField] private bool isGrounded = true;
-    [Tooltip("Useful for rough ground")]
-    [SerializeField] private float groundedOffset = -0.14f;
-    [Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
-    [SerializeField] private float groundedRadius = 0.5f;
+    [SerializeField, Tooltip("Useful for rough ground")]
+    private float groundedOffset = -0.14f;
+    [SerializeField, Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
+    private float groundedRadius = 0.5f;
     private float _verticalVelocity;
     private float gravity = Physics.gravity.y;
     [SerializeField] private float fastFallFactor = 100f;
@@ -35,8 +35,8 @@ public class PlayerMovement : NetworkBehaviour
     [SerializeField] private float sprintFactor = 3f;
     [SerializeField] private float crouchFactor = 0.5f;
     [SerializeField] private Transform eyesTransform;    
-    public enum MovementState{Locomotion=0, Jumping=1, Falling=2, Rolling=3}
-    public MovementState currentMovementState{get; private set;}
+    public enum MovementState { Locomotion = 0, Jumping = 1, Falling = 2, Rolling = 3 }
+    public MovementState currentMovementState { get; private set; }
     private CharacterController _characterController;
     private Animator _anim;
     private PlayerStats _playerStats;
@@ -44,7 +44,13 @@ public class PlayerMovement : NetworkBehaviour
     private int playerTargetIndex = 0;
     private bool statsConfigured = false;
     
-    //camera shit
+    [Header("Physics Settings")]
+    [SerializeField, Tooltip("Rate to dampen external forces (1/s).")]
+    private float forceDecay = 5f;
+    private NetworkVariable<Vector3> PhysicsVelocityNetworkVariable = new NetworkVariable<Vector3>(Vector3.zero);
+    private Vector3 physicsVelocity;
+
+    // Camera
     [Header("Mouse Cursor Settings")]
     public bool cursorLocked = true;
     public bool cursorInputForLook = true;
@@ -57,88 +63,88 @@ public class PlayerMovement : NetworkBehaviour
     public GameObject _mainCamera;
     [SerializeField] private GameObject _playerFollowCamera;
 
-    private void Awake(){
-        Debug.Log("Awake!");
+    private void Awake()
+    {
         _characterController = GetComponent<CharacterController>();
         _anim = GetComponent<Animator>();
         _playerStats = GetComponent<PlayerStats>();
         _playerState = GetComponent<PlayerState>();
     }
-    public override void OnNetworkSpawn(){
-        Debug.Log("OnNetworkSpawn!");
-        // Only activate the camera for the local player (the owner)
+
+    public override void OnNetworkSpawn()
+    {
         if (!IsLocalPlayer){
             Destroy(_mainCamera);
             Destroy(_playerFollowCamera);
             return;
         }
-        GetComponent<PlayerNetworkSyncHandler>().NetworkSyncEvent += SyncNetworkVariables;
         StartCoroutine(WaitForStatsLoaded());
         StartCoroutine(BillboardShit());
+        PhysicsVelocityNetworkVariable.OnValueChanged += PhysicsVelocityChanged;
     }
     
     private IEnumerator BillboardShit(){
-        while(isActiveAndEnabled){
+        while (isActiveAndEnabled){
             GameObject[] healthBars = GameObject.FindGameObjectsWithTag(billBoardTag);
             Debug.Log($"Length of healthbars is {healthBars.Length}");
-            foreach(GameObject healthBar in healthBars){
+            foreach (GameObject healthBar in healthBars){
                 healthBar.transform.LookAt(healthBar.transform.position + _mainCamera.transform.forward, _mainCamera.transform.up);
             }
             yield return null;
         }
     }
 
-    // idea is that this runs every [] seconds or so, that way it doesn't ove
     private void SyncNetworkVariables(object sender, EventArgs e){
-        if(!IsLocalPlayer){
+        if (!IsLocalPlayer)
             return;
-        }
         PlayerPosition.Value = transform.position;
     }
 
     private IEnumerator WaitForStatsLoaded(){
-        yield return new WaitForSeconds(0.5f); // wait enough time for stats to be loaded for joining clients
+        yield return new WaitForSeconds(0.5f);
         transform.position = PlayerPosition.Value;
+        GetComponent<PlayerNetworkSyncHandler>().NetworkSyncEvent += SyncNetworkVariables;
         statsConfigured = true;
     }
 
     private void Start(){
-        if(!IsLocalPlayer){return;}
+        if (!IsLocalPlayer) return;
         _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
-        // Apply initial cursor state
         SetCursorState(cursorLocked);
         GameInput.Instance.OnAttackButtonStarted += OnRightClickPerform;
     }
 
     public override void OnNetworkDespawn(){
         GameInput.Instance.OnAttackButtonStarted -= OnRightClickPerform;
-        GetComponent<PlayerNetworkSyncHandler>().NetworkSyncEvent += SyncNetworkVariables;
+        GetComponent<PlayerNetworkSyncHandler>().NetworkSyncEvent -= SyncNetworkVariables;
     }
 
-    private void Update(){
-        if(!IsLocalPlayer | !statsConfigured){
+    private void Update()
+    {
+        if (!IsLocalPlayer || !statsConfigured)
             return;
-        }
         GroundedCheck();
-        UpdateVerticalVelocity(); //accounts for jumping
+        UpdateVerticalVelocity();
         HandleMovement();
         CursorStuffIDontUnderstand();
     }
+
     private void UpdateVerticalVelocity(){
-        if(isGrounded){
-            if (_verticalVelocity < 0.0f){
+        if (isGrounded){
+            if (_verticalVelocity < 0.0f)
                 _verticalVelocity = 0f;
-            }
-            if(GameInput.Instance.JumpPressed()){
+            if (GameInput.Instance.JumpPressed())
                 _verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * fastFallFactor * gravity);
-            }
         }
-        else{_verticalVelocity += fastFallFactor * gravity * Time.deltaTime;}
+        else{
+            _verticalVelocity += fastFallFactor * gravity * Time.deltaTime;
+        }
     }
+
     private void HandleMovement(){
         Vector2 moveDir = GameInput.Instance.GetPlayerMovementVectorNormalized();
 
-        bool isMoving = moveDir != Vector2.zero;
+        bool isMoving = moveDir.sqrMagnitude > _threshold;
         bool isSprinting = GameInput.Instance.SprintingPressed();
         bool isLockedOn = GameInput.Instance.IsAttackButtonPressed(GameInput.AttackInput.RightMouse);
         bool rollTriggered = GameInput.Instance.MouseMiddleTriggered();
@@ -146,65 +152,66 @@ public class PlayerMovement : NetworkBehaviour
 
         float targetMoveSpeed, targetX, targetY, targetCrouchWeight, targetStrafeWeight;
 
-        if(isMoving){
+        if (isMoving){
             if (isSprinting && !isLockedOn){
                 targetMoveSpeed = _playerStats.SpeedStat.Stat.Value * sprintFactor;
                 targetX = 0;
                 targetY = 2;
             }
-            else{ // walking
+            else{
                 targetMoveSpeed = _playerStats.SpeedStat.Stat.Value;
                 targetX = 0;
                 targetY = 1;
             }
         }
-        else{ //not moving
+        else{
             targetMoveSpeed = 0;
             targetX = 0;
-            targetY = 0;       
+            targetY = 0;
         }
 
-        if(isLockedOn){
+        if (isLockedOn){
             targetMoveSpeed = _playerStats.SpeedStat.Stat.Value * lockOnFactor;
             targetX = moveDir.x;
             targetY = moveDir.y;
             targetStrafeWeight = 1;
-        } 
-        else{targetStrafeWeight = 0;}
+        }
+        else{
+            targetStrafeWeight = 0;
+        }
 
-        if(crouchPressed){
-            if(!isLockedOn)
+        if (crouchPressed){
+            if (!isLockedOn)
                 targetMoveSpeed *= crouchFactor;
             targetCrouchWeight = 1;
         }
-        else{targetCrouchWeight = 0;}
+        else{
+            targetCrouchWeight = 0;
+        }
 
         float currentX = _anim.GetFloat(moveXParam);
         float currentY = _anim.GetFloat(moveYParam);
         float currCrouchWeight = _anim.GetLayerWeight(crouchLayerIndex);
         float currStrafeWeight = _anim.GetLayerWeight(strafeLayerIndex);
-        float newX, newY, moveSpeed, newCrouchWeight, newStrafeWeight;
 
-        // become lerped value when its absolute value is very small and its approaching zero (idle). 
-
-        newX = (Math.Abs(currentX) > 1e-2 || Math.Abs(targetX) > Math.Abs(currentX))? Mathf.Lerp(currentX, targetX, Time.deltaTime * animationSmoothSpeed) : 0f;
-        newY = (Math.Abs(currentY) > 1e-2 || Math.Abs(targetY) > Math.Abs(currentY))? Mathf.Lerp(currentY, targetY, Time.deltaTime * animationSmoothSpeed) : 0f;
-        moveSpeed = (Math.Abs(currentMoveSpeed) > 1e-2 || Math.Abs(targetMoveSpeed) > Math.Abs(currentMoveSpeed))? Mathf.Lerp(currentMoveSpeed, targetMoveSpeed, Time.deltaTime * animationSmoothSpeed) : 0f;
-        newCrouchWeight = (currCrouchWeight > 1e-2 || targetCrouchWeight > currCrouchWeight)? Mathf.Lerp(currCrouchWeight, targetCrouchWeight, Time.deltaTime * animationSmoothSpeed) : 0f;
-        newStrafeWeight = (currStrafeWeight > 1e-2 || targetStrafeWeight > currStrafeWeight)? Mathf.Lerp(currStrafeWeight, targetStrafeWeight, Time.deltaTime * animationSmoothSpeed) : 0f;
+        float newX = Mathf.Lerp(currentX, targetX, Time.deltaTime * animationSmoothSpeed);
+        float newY = Mathf.Lerp(currentY, targetY, Time.deltaTime * animationSmoothSpeed);
+        float moveSpeed = Mathf.Lerp(currentMoveSpeed, targetMoveSpeed, Time.deltaTime * animationSmoothSpeed);
+        float newCrouchWeight = Mathf.Lerp(currCrouchWeight, targetCrouchWeight, Time.deltaTime * animationSmoothSpeed);
+        float newStrafeWeight = Mathf.Lerp(currStrafeWeight, targetStrafeWeight, Time.deltaTime * animationSmoothSpeed);
         currentMoveSpeed = moveSpeed;
 
         if (!isGrounded){
-            if (_verticalVelocity < 0) {currentMovementState = MovementState.Falling;}
-            else {currentMovementState = MovementState.Jumping;}
+            if (_verticalVelocity < 0) currentMovementState = MovementState.Falling;
+            else currentMovementState = MovementState.Jumping;
             _playerState.InAir = true;
         }
         else{
             _playerState.InAir = false;
-            if(rollTriggered){
+            if (rollTriggered){
                 rollCoroutine = StartCoroutine(WaitEndRoll());
                 currentMovementState = MovementState.Rolling;
-                if(isLockedOn){
+                if (isLockedOn){
                     _anim.SetFloat(rollXParam, moveDir.x);
                     _anim.SetFloat(rollYParam, moveDir.y);
                 }
@@ -212,12 +219,12 @@ public class PlayerMovement : NetworkBehaviour
                     _anim.SetFloat(rollXParam, 0);
                     _anim.SetFloat(rollYParam, 1);
                 }
-                
             }
-            else{currentMovementState = MovementState.Locomotion;}
+            else{
+                currentMovementState = MovementState.Locomotion;
+            }
         }
 
-        // Update animator parameters
         _anim.SetFloat(moveXParam, newX);
         _anim.SetFloat(moveYParam, newY);
         _anim.SetInteger(animMovementStateParam, (int)currentMovementState);
@@ -225,36 +232,53 @@ public class PlayerMovement : NetworkBehaviour
         _anim.SetLayerWeight(strafeLayerIndex, newStrafeWeight);
 
         Vector3 targetDirection = HandlePlayerAndCameraRotation(isLockedOn, moveDir, isMoving);
-        
-        if(_playerState.Attacking){
-            moveSpeed *= _playerState.currentAttack.movementSpeedFactor;
+
+        if (_playerState.Attacking){
+            moveSpeed *= _playerState.currentAttack.MovementSpeedFactor;
         }
-        _characterController.Move(targetDirection.normalized * (moveSpeed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+
+        // Combine input movement, vertical velocity, and physics velocity
+        Vector3 moveVector = targetDirection.normalized * moveSpeed + new Vector3(0.0f, _verticalVelocity, 0.0f);
+        moveVector += physicsVelocity;
+        if (moveVector.sqrMagnitude > _threshold){
+            _characterController.Move(moveVector * Time.deltaTime);
+        }
     }
 
-    private IEnumerator WaitEndRoll(){
-        _playerState.Rolling = true;
-        if(rollCoroutine != null){StopCoroutine(rollCoroutine);}
-        _anim.applyRootMotion = true;
-        yield return new WaitForSeconds(rollTime);
-        _anim.applyRootMotion = false;
-        _playerState.Rolling = false;
+    public void ApplyForce(Vector3 force){
+        if (!IsServer) return;
+        PhysicsVelocityNetworkVariable.Value = force;
+        Debug.Log($"Server applied force: {force}, Velocity: {PhysicsVelocityNetworkVariable.Value}, ID: {OwnerClientId}");
     }
-    private Vector3 HandlePlayerAndCameraRotation(bool isLockedOn, Vector3 moveDir, bool isMoving){
+
+    private void PhysicsVelocityChanged(Vector3 oldValue, Vector3 newValue){
+        if(!IsLocalPlayer){return;}
+        StartCoroutine(UpdateLocalPhysicsVelocity(newValue));
+    }
+
+    private IEnumerator UpdateLocalPhysicsVelocity(Vector3 newValue){
+        physicsVelocity = newValue;
+        while(physicsVelocity != Vector3.zero){
+            physicsVelocity.x = Mathf.Lerp(physicsVelocity.x, 0, forceDecay * Time.deltaTime);
+            physicsVelocity.z = Mathf.Lerp(physicsVelocity.z, 0, forceDecay * Time.deltaTime);
+            physicsVelocity.y = Math.Abs(physicsVelocity.y) < 3f? 0 : 
+                Mathf.Lerp(physicsVelocity.y, 0, forceDecay * Time.deltaTime);
+            yield return null;
+        }
+    }
+
+    private Vector3 HandlePlayerAndCameraRotation(bool isLockedOn, Vector2 moveDir, bool isMoving){
         Vector3 playerTargetDirection = Vector3.zero;
         bool scrolledUp = GameInput.Instance.ScrolledUp();
         bool scrolledDown = GameInput.Instance.ScrolledDown();
         float targetRotation;
-        Quaternion targetRot;
-
-        float rotationSpeedFactor = 1f;
-        if(_playerState.Attacking){rotationSpeedFactor *= _playerState.currentAttack.rotationSpeedFactor;}
+        float rotationSpeedFactor = _playerState.Attacking ? _playerState.currentAttack.RotationSpeedFactor : 1f;
 
         if (isLockedOn){
             bool hasLockOnTarget = _playerState.lockOnTargets.Count > 0;
             if (hasLockOnTarget){
-                if (scrolledUp) { playerTargetIndex = (playerTargetIndex + 1) % _playerState.lockOnTargets.Count; }
-                if (scrolledDown) { playerTargetIndex = (playerTargetIndex - 1 + _playerState.lockOnTargets.Count) % _playerState.lockOnTargets.Count; }
+                if (scrolledUp) playerTargetIndex = (playerTargetIndex + 1) % _playerState.lockOnTargets.Count;
+                if (scrolledDown) playerTargetIndex = (playerTargetIndex - 1 + _playerState.lockOnTargets.Count) % _playerState.lockOnTargets.Count;
 
                 Transform lockOnTarget = _playerState.lockOnTargets[playerTargetIndex];
                 Vector3 directionToTarget = (lockOnTarget.position - transform.position).normalized;
@@ -264,81 +288,93 @@ public class PlayerMovement : NetworkBehaviour
                 targetRotation = _mainCamera.transform.eulerAngles.y;
             }
 
-            Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y).normalized;
-            playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * inputDirection;
+            Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y);
+            if (inputDirection.sqrMagnitude > _threshold){
+                playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * inputDirection.normalized;
+            }
 
-            targetRot = Quaternion.Euler(0.0f, targetRotation, 0.0f);
+            Quaternion targetRot = Quaternion.Euler(0.0f, targetRotation, 0.0f);
             transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotationSpeed * rotationSpeedFactor * Time.deltaTime);
         }
-
         else{
-            Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y).normalized;
-            targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + _mainCamera.transform.eulerAngles.y;
-            playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * Vector3.forward;
+            if (isMoving){
+                Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y).normalized;
+                targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + _mainCamera.transform.eulerAngles.y;
+                playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * Vector3.forward;
 
-            if(isMoving){
-                targetRot = Quaternion.Euler(0.0f, targetRotation, 0.0f);
+                Quaternion targetRot = Quaternion.Euler(0.0f, targetRotation, 0.0f);
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotationSpeed * rotationSpeedFactor * Time.deltaTime);
             }
         }
-
         return playerTargetDirection;
     }
 
+    private IEnumerator WaitEndRoll(){
+        _playerState.Rolling = true;
+        if (rollCoroutine != null) { StopCoroutine(rollCoroutine); }
+        _anim.applyRootMotion = true;
+        yield return new WaitForSeconds(rollTime);
+        _anim.applyRootMotion = false;
+        _playerState.Rolling = false;
+    }
+
     private void OnRightClickPerform(GameInput.AttackInput input){
-        if(input == GameInput.AttackInput.RightMouse){
+        if (input == GameInput.AttackInput.RightMouse){
             _playerState.lockOnTargets.Sort((a, b) => Vector3.Distance(a.position, transform.position).CompareTo(Vector3.Distance(b.position, transform.position)));
             playerTargetIndex = 0;
         }
     }
         
     private void LateUpdate(){
-        if (cursorInputForLook && cursorLocked){CameraRotation();}
+        if (cursorInputForLook && cursorLocked) { CameraRotation(); }
     }
+
     private void GroundedCheck(){
-        // Set sphere position, with offset
         Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - groundedOffset, transform.position.z);
         isGrounded = Physics.CheckSphere(spherePosition, groundedRadius, groundLayers, QueryTriggerInteraction.Ignore);
     }
 
     private void CameraRotation(){
-        // If there is input and camera position is not fixed
-        if (GameInput.Instance.GetPlayerLookVectorNormalized().sqrMagnitude >= _threshold){
+        if (GameInput.Instance.GetPlayerLookVectorNormalized().sqrMagnitude >= _threshold)
+        {
             _cinemachineTargetYaw += GameInput.Instance.GetPlayerLookVectorNormalized().x * 1.2f;
             _cinemachineTargetPitch += GameInput.Instance.GetPlayerLookVectorNormalized().y * 1.2f;
         }
 
-        // Clamp our rotations so our values are limited 360 degrees
         _cinemachineTargetYaw = ClampAngle(_cinemachineTargetYaw, float.MinValue, float.MaxValue);
         _cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, bottomClamp, topClamp);
 
-        // Cinemachine will follow this target
         cinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch, _cinemachineTargetYaw, 0.0f);
     }
+
     private static float ClampAngle(float lfAngle, float lfMin, float lfMax){
         if (lfAngle < -360f) lfAngle += 360f;
         if (lfAngle > 360f) lfAngle -= 360f;
         return Mathf.Clamp(lfAngle, lfMin, lfMax);
     }
 
-    private void OnApplicationFocus(bool hasFocus){if (hasFocus){SetCursorState(cursorLocked);}}
+    private void OnApplicationFocus(bool hasFocus){
+        if (hasFocus) { SetCursorState(cursorLocked); }
+    }
 
     private void SetCursorState(bool newState){
         Cursor.lockState = newState ? CursorLockMode.Locked : CursorLockMode.None;
         Cursor.visible = !newState;
     }
+
     private void CursorStuffIDontUnderstand(){
-        // Toggle cursor lock with Escape key
         if (Input.GetKeyDown(KeyCode.Escape)){
             cursorLocked = false;
             SetCursorState(cursorLocked);
         }
 
-        // Relock cursor when clicking after unlocking
         if (!cursorLocked && Input.GetMouseButtonDown(0)){
             cursorLocked = true;
             SetCursorState(cursorLocked);
         }
     }
-    public Transform GetEyesTransform(){return eyesTransform;}
+
+    public Transform GetEyesTransform(){
+        return eyesTransform;
+    }
 }

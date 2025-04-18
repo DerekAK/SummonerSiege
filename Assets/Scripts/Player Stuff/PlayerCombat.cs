@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
@@ -23,22 +24,30 @@ public class PlayerCombat : NetworkBehaviour
     public bool isAttacking = false;
     private bool checkingForInputRelease = false;
     private ComboSystem.Combo currentCombo;
-    private AttackSO currentAttackSO;
+    private BaseAttackSO currentAttackSO;
     private Coroutine comboCoroutine;
     private Coroutine attackCoroutine;
     private bool comboTransition = false; 
     private bool inCombo = false;
     int currAnimAttackState = 0;
+    public static string HitboxTag = "Hitbox";
+    public static string WeaponTag = "Weapon";
     
     [Tooltip("Time required before and after triggering the next attack in combo sequence")]
     [SerializeField] private float comboTimeBeforeThreshold = 0.3f;
     [SerializeField] private float comboTimeEndThreshold = 0.8f;
 
     [Header("Attack Data")]
-    [SerializeField] private List<ComboSystem.Combo> possibleCombos = new List<ComboSystem.Combo>();
-    
-    public List<AnimationClip> attackClipsList = new List<AnimationClip>();
+    public BaseAttackSO[] attackSOList; 
+    public int CurrHitboxIndex;
+    public NetworkVariable<int> attackSOIndexNetworkVariable = new NetworkVariable<int>();
 
+    // this is a List instead of array because Lists are better for dynamically scaling size
+    [SerializeField] private List<ComboSystem.Combo> defaultCombos = new List<ComboSystem.Combo>();
+    [SerializeField] private List<ComboSystem.Combo> possibleCombos = new List<ComboSystem.Combo>();
+
+    public List<Transform> EquippedWeapons = new List<Transform>();
+    
     private void Awake(){
         _anim = GetComponent<Animator>();
         _playerState = GetComponent<PlayerState>();
@@ -49,11 +58,9 @@ public class PlayerCombat : NetworkBehaviour
         GameInput.Instance.OnAttackButtonStarted += AttackButtonStart;
         GameInput.Instance.OnAttackButtonCanceled += AttackButtonCanceled;
         
-        foreach(ComboSystem.Combo combo in possibleCombos){
+        foreach(ComboSystem.Combo combo in defaultCombos){
+            possibleCombos.Add(combo);
             combo.Initialize();
-            foreach(var comboStep in combo.comboSteps){
-                attackClipsList.Add(comboStep.attack.attackClip);
-            }
         }
     }
 
@@ -63,7 +70,7 @@ public class PlayerCombat : NetworkBehaviour
     }
 
     private void AttackButtonStart(GameInput.AttackInput inputButton){
-        if(!IsOwner){
+        if(!IsLocalPlayer){
             return;
         }
         if(!isAttacking || inCombo){
@@ -104,7 +111,7 @@ public class PlayerCombat : NetworkBehaviour
         }
     }
 
-    private AttackSO DecideCurrentAttackSO(GameInput.AttackInput inputButton, ComboSystem.AttackPressType pressType){
+    private BaseAttackSO DecideCurrentAttackSO(GameInput.AttackInput inputButton, ComboSystem.AttackPressType pressType){
         if(inCombo && currentCombo.currComboStep.userPressType == pressType && currentCombo.currComboStep.userInput == inputButton){
             //Debug.Log("Registered combo input!");
             return currentCombo.currComboStep.attack;
@@ -135,7 +142,7 @@ public class PlayerCombat : NetworkBehaviour
     }
 
     private IEnumerator HandlePerformAttack(){
-        if(((currentAttackSO.airAttack && _playerState.InAir) || (!currentAttackSO.airAttack && !_playerState.InAir)) && !_playerState.Rolling){
+        if(((currentAttackSO.AirAttack && _playerState.InAir) || (!currentAttackSO.AirAttack && !_playerState.InAir)) && !_playerState.Rolling){
             if(inCombo){ 
                 while(!comboTransition){
                     yield return null;
@@ -151,10 +158,13 @@ public class PlayerCombat : NetworkBehaviour
     }
 
     private void PerformAttack(){
+        if(!IsLocalPlayer){return;} 
         isAttacking = true;
         _playerState.currentAttack = currentAttackSO;
         _playerState.ChangeAttackStatus(true);
+        ChangeAttackSOIndexServerRpc(GetIndexByAttackSO(currentAttackSO)); // sync the AttackSO across the network
         _playerClipsHandler.HandleAttackClip(GetIndexByAttackSO(currentAttackSO));
+        
         if(currAnimAttackState == 0){_anim.SetTrigger(attackParamA);}
         else { _anim.SetTrigger(attackParamB); }
         currAnimAttackState = (currAnimAttackState + 1) % 2;
@@ -165,6 +175,11 @@ public class PlayerCombat : NetworkBehaviour
             if(comboCoroutine != null){StopCoroutine(comboCoroutine);}
             comboCoroutine = StartCoroutine(TrackComboWindow());
         }
+    }
+
+    [ServerRpc]
+    private void ChangeAttackSOIndexServerRpc(int newIndex){
+        attackSOIndexNetworkVariable.Value = newIndex;
     }
 
     private IEnumerator TrackComboWindow(){
@@ -182,20 +197,31 @@ public class PlayerCombat : NetworkBehaviour
         inCombo = false;
         currentCombo.ResetComboStep();
     }
-
-    // called by animation event
+    
+    // following functions called by animation events
     private void AttackFinish(){
+        Debug.Log("Attack Finished!");
         isAttacking = false;
         _playerState.ChangeAttackStatus(false);
     }
 
-    // called by animation event
-    private void ComboTransfer(){
-        comboTransition = true;
+    private void ComboTransfer(){comboTransition = true;}
+
+    private void EnableHitBoxes(){
+        if(!IsServer){return;}
+        GetAttackSOByIndex(attackSOIndexNetworkVariable.Value).Enable(this, _anim);
     }
 
-    private int GetIndexByAttackSO(AttackSO attackSO){
-        int index = attackClipsList.IndexOf(attackSO.attackClip);
-        return index;
+    private void DisableHitBoxes(){
+        if(!IsServer){return;}
+        GetAttackSOByIndex(attackSOIndexNetworkVariable.Value).Disable(this, _anim);
+    }
+
+    public int GetIndexByAttackSO(BaseAttackSO attackSO){
+        return Array.IndexOf(attackSOList, attackSO);
+    }
+
+    public BaseAttackSO GetAttackSOByIndex(int attackSOIndex){
+        return attackSOList[attackSOIndex];
     }
 }
