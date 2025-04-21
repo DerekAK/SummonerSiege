@@ -16,6 +16,7 @@ public class GameInput : MonoBehaviour
         RightMouse,
         E_Key,
         R_Key,
+        None
     }
 
     private void Awake(){

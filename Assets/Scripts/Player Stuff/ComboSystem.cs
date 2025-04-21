@@ -5,6 +5,7 @@ public class ComboSystem
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     public enum AttackPressType{
         Quick,
+        Long,
         Hold
     }
 

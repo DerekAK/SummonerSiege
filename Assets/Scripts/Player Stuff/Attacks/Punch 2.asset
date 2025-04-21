@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   AttackClip: {fileID: 7400000, guid: 2dc48c7bc3b5445dea808dbe646a5f2d, type: 2}
   AirAttack: 0
+  Holdable: 1
   MovementSpeedFactor: 1
   RotationSpeedFactor: 1
   Cooldown: 0

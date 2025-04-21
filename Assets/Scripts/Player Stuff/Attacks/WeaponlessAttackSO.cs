@@ -7,7 +7,7 @@ public class WeaponlessAttackSO : BaseAttackSO{
     public override void Enable(PlayerCombat combat, Animator anim){
         if (!NetworkManager.Singleton.IsServer) return;
         foreach (Hitbox hitbox in MatrixHitboxes[combat.CurrHitboxIndex].Hitboxes){
-            Debug.Log($"Index: {combat.CurrHitboxIndex} and bone: {hitbox.AttachBone}");
+            // Debug.Log($"Index: {combat.CurrHitboxIndex} and bone: {hitbox.AttachBone}");
 
             Transform bone = anim.GetBoneTransform(hitbox.AttachBone);
             if (bone == null){

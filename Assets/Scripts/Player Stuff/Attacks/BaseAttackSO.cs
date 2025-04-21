@@ -19,6 +19,7 @@ public abstract class BaseAttackSO : ScriptableObject
     [Header("General Settings")]
     public AnimationClip AttackClip;
     public bool AirAttack;
+    public bool Holdable;
     public float MovementSpeedFactor = 1f;
     public float RotationSpeedFactor = 1f;
     public float Cooldown;
