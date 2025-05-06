@@ -51,5 +51,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "Siege of Summoners.sln"
+    "dotnet.defaultSolution": "SummonerSiege.sln"
 }
