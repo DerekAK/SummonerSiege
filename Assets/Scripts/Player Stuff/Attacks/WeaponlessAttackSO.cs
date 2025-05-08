@@ -6,8 +6,8 @@ public class WeaponlessAttackSO : BaseAttackSO{
 
     public override void Enable(PlayerCombat combat, Animator anim){
         if (!NetworkManager.Singleton.IsServer) return;
-        foreach (Hitbox hitbox in MatrixHitboxes[combat.CurrHitboxIndex].Hitboxes){
-            // Debug.Log($"Index: {combat.CurrHitboxIndex} and bone: {hitbox.AttachBone}");
+        foreach (Hitbox hitbox in MatrixHitboxes[currHitboxIndex].Hitboxes){
+            // Debug.Log($"Index: {currHitboxIndex} and bone: {hitbox.AttachBone}");
 
             Transform bone = anim.GetBoneTransform(hitbox.AttachBone);
             if (bone == null){
@@ -26,7 +26,6 @@ public class WeaponlessAttackSO : BaseAttackSO{
                 continue;
             }
             SphereCollider collider = hitboxTransform.GetComponent<SphereCollider>();
-            collider.gameObject.SetActive(true);
             collider.enabled = true;
             collider.radius = hitbox.Size;
             DamageCollider damageColliderScript = hitboxTransform.GetComponent<DamageCollider>();
@@ -36,18 +35,14 @@ public class WeaponlessAttackSO : BaseAttackSO{
 
     public override void Disable(PlayerCombat combat, Animator anim){
         if (!NetworkManager.Singleton.IsServer) return;
-        foreach (Hitbox hitbox in MatrixHitboxes[combat.CurrHitboxIndex].Hitboxes){
+        foreach (Hitbox hitbox in MatrixHitboxes[currHitboxIndex].Hitboxes){
             Transform bone = anim.GetBoneTransform(hitbox.AttachBone);
-            Transform hitboxTransform = null;
             foreach (Transform child in bone){
                 if (child.CompareTag(PlayerCombat.HitboxTag)){
-                    hitboxTransform = child;
-                    break;
+                    child.GetComponent<SphereCollider>().enabled = false;
                 }
             }
-            hitboxTransform.gameObject.SetActive(false);
         }
-        if(MatrixHitboxes.Count == 1){return;}
-        combat.CurrHitboxIndex = (combat.CurrHitboxIndex + 1) % MatrixHitboxes.Count;
+        UpdateCurrHitboxIndex();
     }
 }

@@ -8,6 +8,8 @@ TagManager:
   - Enemy
   - BillBoard
   - Hitbox
+  - Resource
+  - AttachPoint
   layers:
   - Default
   - TransparentFX

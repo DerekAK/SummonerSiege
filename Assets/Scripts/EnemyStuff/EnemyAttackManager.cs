@@ -126,7 +126,7 @@ public class EnemyAttackManager : NetworkBehaviour
         if(defaultSpawnWeapon && Random.value < _enemyInfo.GetWeaponSpawnProbability()){
             InstantiateWeapon(defaultSpawnWeapon);
         }
-        if(defaultShield && Random.value < _enemyInfo.GetShieldSpawnProbability() && defaultSpawnWeapon.GetComponent<BaseWeaponScript>().GetWeaponType() == 1){
+        if(defaultShield && Random.value < _enemyInfo.GetShieldSpawnProbability() && defaultSpawnWeapon.GetComponent<BaseWeapon>().GetWeaponType() == 1){
             InstantiateShield(defaultShield);
         } 
     }
@@ -144,7 +144,7 @@ public class EnemyAttackManager : NetworkBehaviour
     }
     private void InstantiateWeapon(Transform weaponPf){//will always be instantiated in attachpoint, and when adding a new weapon, align it to fit in the attach point
         if(currentWeaponsEquipped.Count > 0){currentWeaponsEquipped.Clear();} //if instantiating a new weapon(s), remove old one(s)
-        int weaponType = weaponPf.GetComponent<BaseWeaponScript>().GetWeaponType();
+        int weaponType = weaponPf.GetComponent<BaseWeapon>().GetWeaponType();
         if(weaponType == 1){ //single weapon, spawn one of them at attachpoints
             Transform attachPoint = _enemyInfo.GetSingleWeaponAttachPointTransform();
             currentWeaponsEquipped.Add(Instantiate(weaponPf, attachPoint.position, Quaternion.identity));

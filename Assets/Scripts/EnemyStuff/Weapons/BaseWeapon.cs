@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class BaseWeaponScript : MonoBehaviour
+public class BaseWeapon : MonoBehaviour
 {
     [Tooltip("1-one-handed, 2-double-handed, 3-double-wielding")]
     [SerializeField] private int weaponType; 

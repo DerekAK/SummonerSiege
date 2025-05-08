@@ -47,7 +47,7 @@ public class PlayerMovement : NetworkBehaviour
     [Header("Physics Settings")]
     [SerializeField, Tooltip("Rate to dampen external forces (1/s).")]
     private float forceDecay = 5f;
-    private NetworkVariable<Vector3> PhysicsVelocityNetworkVariable = new NetworkVariable<Vector3>(Vector3.zero);
+    private NetworkVariable<Vector3> nvPhysicsVelocity = new NetworkVariable<Vector3>(Vector3.zero);
     private Vector3 physicsVelocity;
 
     // Camera
@@ -80,7 +80,7 @@ public class PlayerMovement : NetworkBehaviour
         }
         StartCoroutine(WaitForStatsLoaded());
         StartCoroutine(BillboardShit());
-        PhysicsVelocityNetworkVariable.OnValueChanged += PhysicsVelocityChanged;
+        nvPhysicsVelocity.OnValueChanged += PhysicsVelocityChanged;
     }
     
     private IEnumerator BillboardShit(){
@@ -247,8 +247,8 @@ public class PlayerMovement : NetworkBehaviour
 
     public void ApplyForce(Vector3 force){
         if (!IsServer) return;
-        PhysicsVelocityNetworkVariable.Value = force;
-        Debug.Log($"Server applied force: {force}, Velocity: {PhysicsVelocityNetworkVariable.Value}, ID: {OwnerClientId}");
+        nvPhysicsVelocity.Value = force;
+        Debug.Log($"Server applied force: {force}, Velocity: {nvPhysicsVelocity.Value}, ID: {OwnerClientId}");
     }
 
     private void PhysicsVelocityChanged(Vector3 oldValue, Vector3 newValue){

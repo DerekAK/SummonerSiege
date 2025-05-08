@@ -6,15 +6,19 @@ using UnityEngine;
 
 public class PlayerCombat : NetworkBehaviour
 {
+
+    [SerializeField] private Transform pfTmpSword;
+    [SerializeField] private Transform rightHandTransform;
     private Animator _anim;
     private PlayerState _playerState;
     private PlayerClipsHandler _playerClipsHandler;
     private int attackParamA = Animator.StringToHash("AttackTriggerA");
     private int attackParamB = Animator.StringToHash("AttackTriggerB");
+    private int abortAttack = Animator.StringToHash("AbortAttack");
     private float inputHoldTime = 0f;
     private float longAttackThreshold = 0.2f;
     private Coroutine inputHoldCoroutine;
-    public bool isAttacking = false;
+    private bool isAttacking = false;
     private bool checkingForInputRelease = false;
     private ComboSystem.Combo currentCombo;
     private BaseAttackSO currentAttackSO;
@@ -23,9 +27,9 @@ public class PlayerCombat : NetworkBehaviour
     private bool comboTransition = false;
     private bool inCombo = false;
     private bool inHoldCombo = false;
-    int currAnimAttackState = 0;
+    private int currAnimAttackState = 0;
     public static string HitboxTag = "Hitbox";
-    public static string WeaponTag = "Weapon";
+    public static string AttachPointTag = "AttachPoint";
 
     [Tooltip("Time required before and after triggering the next attack in combo sequence")]
     [SerializeField] private float comboTimeBeforeThreshold = 0.3f;
@@ -33,90 +37,55 @@ public class PlayerCombat : NetworkBehaviour
 
     [Header("Attack Data")]
     public BaseAttackSO[] attackSOList;
-    public int CurrHitboxIndex;
-    public NetworkVariable<int> attackSOIndexNetworkVariable = new NetworkVariable<int>();
+    [HideInInspector] public NetworkVariable<int> nvAttackSOIndex = new NetworkVariable<int>();
 
     [SerializeField] private List<ComboSystem.Combo> defaultCombos = new List<ComboSystem.Combo>();
     [SerializeField] private List<ComboSystem.Combo> possibleCombos = new List<ComboSystem.Combo>();
-    [SerializeField] private List<GameObject> ActiveHitboxes = new List<GameObject>();
-    public List<Transform> EquippedWeapons = new List<Transform>();
 
-    private void Awake()
-    {
+    private void Awake(){
         _anim = GetComponent<Animator>();
         _playerState = GetComponent<PlayerState>();
         _playerClipsHandler = GetComponent<PlayerClipsHandler>();
     }
 
-    private void Start()
-    {
+    private void Update(){
+        if(!IsServer) {return;}
+        if(Input.GetKeyDown(KeyCode.P)){
+            GameObject equippedWeapon = Instantiate(pfTmpSword.gameObject, rightHandTransform.position, rightHandTransform.rotation);
+            equippedWeapon.GetComponent<NetworkObject>().Spawn();
+            equippedWeapon.transform.SetParent(rightHandTransform, worldPositionStays:true);
+        }
+    }
+
+    private void Start(){
         GameInput.Instance.OnAttackButtonStarted += AttackButtonStart;
         GameInput.Instance.OnAttackButtonCanceled += AttackButtonCanceled;
 
-        foreach (ComboSystem.Combo combo in defaultCombos)
-        {
+        foreach (ComboSystem.Combo combo in defaultCombos){
             possibleCombos.Add(combo);
             combo.Initialize();
         }
     }
 
-    private void OnDisable()
-    {
+    private void OnDisable(){
         GameInput.Instance.OnAttackButtonStarted -= AttackButtonStart;
         GameInput.Instance.OnAttackButtonCanceled -= AttackButtonCanceled;
     }
 
-    private void AttackButtonStart(GameInput.AttackInput inputButton)
-    {
+    private void AttackButtonStart(GameInput.AttackInput inputButton){        
         if (!IsLocalPlayer) return;
         if (inHoldCombo) return;
 
-        if (!isAttacking || inCombo)
-        {
+        if (!isAttacking || inCombo){
             checkingForInputRelease = true;
+            if(inputHoldCoroutine != null) StopCoroutine(inputHoldCoroutine);
             inputHoldCoroutine = StartCoroutine(HandleInputHeldTime(inputButton));
         }
     }
 
-    private void AttackButtonCanceled(GameInput.AttackInput inputButton)
-    {
-        if (!checkingForInputRelease) return;
-        checkingForInputRelease = false;
-        if (inputHoldCoroutine != null) StopCoroutine(inputHoldCoroutine);
-
-        if (inHoldCombo)
-        {
-            // Advance to release attack if holdable
-            if (currentAttackSO?.Holdable == true)
-            {
-                currentAttackSO = DecideCurrentAttackSO(GameInput.AttackInput.None, ComboSystem.AttackPressType.Hold);
-                if (currentAttackSO)
-                {
-                    if (attackCoroutine != null) StopCoroutine(attackCoroutine);
-                    attackCoroutine = StartCoroutine(HandlePerformAttack());
-                }
-            }
-            inHoldCombo = false;
-            currentCombo?.ResetComboStep(); // Reset after release
-            return;
-        }
-
-        if (inputHoldTime < longAttackThreshold)
-        {
-            currentAttackSO = DecideCurrentAttackSO(inputButton, ComboSystem.AttackPressType.Quick);
-            if (currentAttackSO)
-            {
-                if (attackCoroutine != null) StopCoroutine(attackCoroutine);
-                attackCoroutine = StartCoroutine(HandlePerformAttack());
-            }
-        }
-    }
-
-    private IEnumerator HandleInputHeldTime(GameInput.AttackInput inputButton)
-    {
+    private IEnumerator HandleInputHeldTime(GameInput.AttackInput inputButton){
         currentAttackSO = DecideCurrentAttackSO(inputButton, ComboSystem.AttackPressType.Hold);
-        if (currentAttackSO)
-        {
+        if (currentAttackSO){
             inHoldCombo = true;
             if (attackCoroutine != null) StopCoroutine(attackCoroutine);
             attackCoroutine = StartCoroutine(HandlePerformAttack());
@@ -125,14 +94,11 @@ public class PlayerCombat : NetworkBehaviour
 
         inputHoldTime = 0;
 
-        while (GameInput.Instance.IsAttackButtonPressed(inputButton))
-        {
+        while (GameInput.Instance.IsAttackButtonPressed(inputButton)){
             inputHoldTime += Time.deltaTime;
-            if (inputHoldTime > longAttackThreshold)
-            {
+            if (inputHoldTime > longAttackThreshold){
                 currentAttackSO = DecideCurrentAttackSO(inputButton, ComboSystem.AttackPressType.Long);
-                if (currentAttackSO)
-                {
+                if (currentAttackSO){
                     if (attackCoroutine != null) StopCoroutine(attackCoroutine);
                     attackCoroutine = StartCoroutine(HandlePerformAttack());
                     checkingForInputRelease = false;
@@ -143,52 +109,73 @@ public class PlayerCombat : NetworkBehaviour
         }
     }
 
-    private BaseAttackSO DecideCurrentAttackSO(GameInput.AttackInput inputButton, ComboSystem.AttackPressType pressType)
-    {
-        if (inCombo && currentCombo.currComboStep.userPressType == pressType && currentCombo.currComboStep.userInput == inputButton)
-        {
-            Debug.Log("Registered combo input!");
+    private void AttackButtonCanceled(GameInput.AttackInput inputButton){
+        if (!checkingForInputRelease) return;
+        checkingForInputRelease = false;
+        if (inputHoldCoroutine != null) StopCoroutine(inputHoldCoroutine);
+
+        if (inHoldCombo){
+            // Advance to release attack if holdable
+            if (currentAttackSO?.Holdable == true){
+                currentAttackSO = DecideCurrentAttackSO(GameInput.AttackInput.None, ComboSystem.AttackPressType.Hold);
+                if (currentAttackSO){
+                    if (attackCoroutine != null) StopCoroutine(attackCoroutine);
+                    attackCoroutine = StartCoroutine(HandlePerformAttack());
+                }
+            }
+            else{
+                _anim.SetTrigger(abortAttack);
+                AttackFinish();
+
+            }
+            inHoldCombo = false;
+            currentCombo?.ResetComboStep(); // Reset after release
+            return;
+        }
+
+        if (inputHoldTime < longAttackThreshold){
+            currentAttackSO = DecideCurrentAttackSO(inputButton, ComboSystem.AttackPressType.Quick);
+            if (currentAttackSO){ 
+                if (attackCoroutine != null) StopCoroutine(attackCoroutine);
+                attackCoroutine = StartCoroutine(HandlePerformAttack());
+            }
+        }
+    }
+
+
+    private BaseAttackSO DecideCurrentAttackSO(GameInput.AttackInput inputButton, ComboSystem.AttackPressType pressType){
+        if (inCombo && currentCombo.currComboStep.userPressType == pressType && currentCombo.currComboStep.userInput == inputButton){
+            // Debug.Log("Registered combo input!");
             return currentCombo.currComboStep.attack;
         }
-        else if (inCombo)
-        {
-            Debug.Log("In combo but wrong input");
+        else if (inCombo){
+            // Debug.Log("In combo but wrong input");
             return null;
         }
-        else
-        {
-            if (!isAttacking)
-            {
-                foreach (ComboSystem.Combo combo in possibleCombos)
-                {
+        else{
+            if (!isAttacking){
+                foreach (ComboSystem.Combo combo in possibleCombos){
                     ComboSystem.ComboStep firstComboStep = combo.comboSteps[0];
-                    if (firstComboStep.userInput == inputButton && firstComboStep.userPressType == pressType)
-                    {
-                        Debug.Log("Found the correct normal attack!");
+                    if (firstComboStep.userInput == inputButton && firstComboStep.userPressType == pressType){
+                        // Debug.Log("Found the correct normal attack!");
                         currentCombo = combo;
                         return firstComboStep.attack;
                     }
                 }
-                Debug.Log("No Normal attack matching these inputs!");
+                // Debug.Log("No Normal attack matching these inputs!");
                 return null;
             }
-            else
-            {
-                Debug.Log("In attack but past combat window");
+            else{
+                // Debug.Log("In attack but past combat window");
                 return null;
             }
         }
     }
 
-    private IEnumerator HandlePerformAttack()
-    {
-        Debug.Log("Starting HandlePerformAttack!");
-        if (((currentAttackSO.AirAttack && _playerState.InAir) || (!currentAttackSO.AirAttack && !_playerState.InAir)) && !_playerState.Rolling)
-        {
-            if (inCombo)
-            {
-                while (!comboTransition)
-                {
+    private IEnumerator HandlePerformAttack(){
+        if (((currentAttackSO.AirAttack && _playerState.InAir) || (!currentAttackSO.AirAttack && !_playerState.InAir)) && !_playerState.Rolling){
+            if (inCombo && !inHoldCombo){
+                while (!comboTransition){
                     yield return null;
                 }
             }
@@ -196,16 +183,14 @@ public class PlayerCombat : NetworkBehaviour
             comboTransition = false;
             currentCombo.UpdateComboStep();
             inCombo = currentCombo.currIndex > 0;
-            if (inCombo)
-            {
+            if (inCombo){
                 if (comboCoroutine != null) StopCoroutine(comboCoroutine);
                 comboCoroutine = StartCoroutine(TrackComboWindow());
             }
         }
     }
 
-    private void PerformAttack()
-    {
+    private void PerformAttack(){
         if (!IsLocalPlayer) return;
         isAttacking = true;
         _playerState.currentAttack = currentAttackSO;
@@ -219,24 +204,20 @@ public class PlayerCombat : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void ChangeAttackSOIndexServerRpc(int newIndex)
-    {
-        attackSOIndexNetworkVariable.Value = newIndex;
+    private void ChangeAttackSOIndexServerRpc(int newIndex){
+        nvAttackSOIndex.Value = newIndex;
     }
 
-    private IEnumerator TrackComboWindow()
-    {
-        if (inHoldCombo) yield break;
+    private IEnumerator TrackComboWindow(){
+        if(inHoldCombo) yield break;
         float elapsedTime = 0f;
         inCombo = false;
-        while (elapsedTime < comboTimeBeforeThreshold)
-        {
+        while (elapsedTime < comboTimeBeforeThreshold){
             elapsedTime += Time.deltaTime;
             yield return null;
         }
         inCombo = true;
-        while (elapsedTime < comboTimeEndThreshold)
-        {
+        while (elapsedTime < comboTimeEndThreshold){
             elapsedTime += Time.deltaTime;
             yield return null;
         }
@@ -244,55 +225,45 @@ public class PlayerCombat : NetworkBehaviour
         currentCombo.ResetComboStep();
     }
 
-    private void AttackFinish()
-    {
+    private void AttackFinish(){
         isAttacking = false;
         _playerState.ChangeAttackStatus(false);
         inCombo = false;
     }
 
-    private void ComboTransfer()
-    {
+    private void ComboTransfer(){
         comboTransition = true;
     }
 
-    private void HoldAttackTransfer()
-    {
+    private void HoldAttackTransfer(){
         if (!inHoldCombo) return;
-        else if (currentAttackSO.Holdable)
-        {
+        else if (currentAttackSO.Holdable){
             PerformAttack();
         }
-        else
-        {
+        else{
             currentAttackSO = DecideCurrentAttackSO(GameInput.AttackInput.None, ComboSystem.AttackPressType.Hold);
-            if (currentAttackSO)
-            {
+            if (currentAttackSO){
                 if (attackCoroutine != null) StopCoroutine(attackCoroutine);
                 attackCoroutine = StartCoroutine(HandlePerformAttack());
             }
         }
     }
 
-    private void EnableHitBoxes()
-    {
+    private void EnableHitBoxes(){
         if (!IsServer) return;
-        GetAttackSOByIndex(attackSOIndexNetworkVariable.Value).Enable(this, _anim);
+        GetAttackSOByIndex(nvAttackSOIndex.Value).Enable(this, _anim);
     }
 
-    private void DisableHitBoxes()
-    {
+    private void DisableHitBoxes(){
         if (!IsServer) return;
-        GetAttackSOByIndex(attackSOIndexNetworkVariable.Value).Disable(this, _anim);
+        GetAttackSOByIndex(nvAttackSOIndex.Value).Disable(this, _anim);
     }
 
-    public int GetIndexByAttackSO(BaseAttackSO attackSO)
-    {
+    public int GetIndexByAttackSO(BaseAttackSO attackSO){
         return Array.IndexOf(attackSOList, attackSO);
     }
 
-    public BaseAttackSO GetAttackSOByIndex(int attackSOIndex)
-    {
+    public BaseAttackSO GetAttackSOByIndex(int attackSOIndex){
         return attackSOList[attackSOIndex];
     }
 }

@@ -36,6 +36,7 @@ public class PushZone : NetworkBehaviour
     }
 
     private void ApplyPushToAllPlayers(){
+        if(!IsServer) return;
         foreach (PlayerMovement movementComponent in playersInZone){
             Vector3 force = (movementComponent.transform.position - transform.position).normalized;
             force.y = 0.5f;
