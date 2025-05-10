@@ -25,11 +25,9 @@ public class WeaponlessAttackSO : BaseAttackSO{
                 Debug.LogWarning($"No hitbox found for {combat.name}, bone: {hitbox.AttachBone}");
                 continue;
             }
-            SphereCollider collider = hitboxTransform.GetComponent<SphereCollider>();
-            collider.enabled = true;
-            collider.radius = hitbox.Size;
-            DamageCollider damageColliderScript = hitboxTransform.GetComponent<DamageCollider>();
-            damageColliderScript.SetInfo(hitbox);
+            hitboxTransform.GetComponent<SphereCollider>().radius = hitbox.Size;
+            hitboxTransform.GetComponent<SphereCollider>().enabled = true;
+            hitboxTransform.GetComponent<DamageCollider>().SetInfo(hitbox);
         }
     }
 
@@ -39,7 +37,7 @@ public class WeaponlessAttackSO : BaseAttackSO{
             Transform bone = anim.GetBoneTransform(hitbox.AttachBone);
             foreach (Transform child in bone){
                 if (child.CompareTag(PlayerCombat.HitboxTag)){
-                    child.GetComponent<SphereCollider>().enabled = false;
+                    child.gameObject.GetComponent<SphereCollider>().enabled = false;
                 }
             }
         }

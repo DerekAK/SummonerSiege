@@ -1,6 +1,7 @@
 using UnityEngine;
 using Unity.Netcode;
 using System.Collections;
+using System.Collections.Generic;
 
 public class DamageCollider : NetworkBehaviour
 {
@@ -12,7 +13,7 @@ public class DamageCollider : NetworkBehaviour
     private float damageMultiplier;
     private float knockbackMultiplier;
     //private StatusEffect[] statusEffects;
-    private Coroutine continuousDamageCoroutine;
+    private List<HealthComponent> healthComponentsToDamage = new List<HealthComponent>();
 
     public void SetInfo(BaseAttackSO.Hitbox hitbox){
         elementType = hitbox.ElementType;
@@ -34,30 +35,36 @@ public class DamageCollider : NetworkBehaviour
         NetworkObject ownNetworkObject = GetComponentInParent<NetworkObject>();
         if (hitNetworkObject == null || hitNetworkObject == ownNetworkObject) return;
 
-        if (other.TryGetComponent(out HealthComponent healthComponentToDamage)){
+        if (other.TryGetComponent(out HealthComponent healthComponent)){
             float totalDamage = ComputeDamage(baseDamage, damageMultiplier, elementType);
             Debug.Log($"Total damage: {totalDamage}");
             if (damageType == BaseAttackSO.Damage.Single){
-                healthComponentToDamage.TakeDamage(totalDamage);
+                healthComponent.TakeDamage(totalDamage);
                 ApplyKnockback(other);
             }
             else{
-                continuousDamageCoroutine = StartCoroutine(TakeContinuousDamage(totalDamage, healthComponentToDamage, other));
+                StartCoroutine(TakeContinuousDamage(totalDamage, healthComponent, other));
             }
         }
     }
 
     private void OnTriggerExit(Collider other){
-        if (continuousDamageCoroutine != null){
-            StopCoroutine(continuousDamageCoroutine);
+        if(other.TryGetComponent(out HealthComponent health)){
+            if(healthComponentsToDamage.Contains(health)){
+                healthComponentsToDamage.Remove(health);
+            }
         }
     }
 
-    private IEnumerator TakeContinuousDamage(float damage, HealthComponent healthComponent, Collider other){
+    private void OnDisable(){healthComponentsToDamage.Clear();}
+
+    private IEnumerator TakeContinuousDamage(float damage, HealthComponent health, Collider other){
+        
         float timeSinceLastTick = tickRate + 1; // First tick instant
-        while (true){
+        healthComponentsToDamage.Add(health);
+        while (healthComponentsToDamage.Contains(health)){
             if (timeSinceLastTick > tickRate){
-                healthComponent.TakeDamage(damage);
+                health.TakeDamage(damage);
                 ApplyKnockback(other);
                 timeSinceLastTick = 0;
             }

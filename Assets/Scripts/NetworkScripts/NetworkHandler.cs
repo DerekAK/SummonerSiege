@@ -21,7 +21,7 @@ public class NetworkHandler : NetworkBehaviour
     public override void OnNetworkSpawn(){
         base.OnNetworkSpawn();
         if(!IsServer){
-            enabled = false; // Disable this script on clients
+            Destroy(this); // Disable this script on clients
             return;
         }
     }

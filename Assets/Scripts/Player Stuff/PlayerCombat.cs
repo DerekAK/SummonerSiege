@@ -6,9 +6,7 @@ using UnityEngine;
 
 public class PlayerCombat : NetworkBehaviour
 {
-
-    [SerializeField] private Transform pfTmpSword;
-    [SerializeField] private Transform rightHandTransform;
+    [SerializeField] private GameObject pfTmpSword;
     private Animator _anim;
     private PlayerState _playerState;
     private PlayerClipsHandler _playerClipsHandler;
@@ -38,9 +36,8 @@ public class PlayerCombat : NetworkBehaviour
     [Header("Attack Data")]
     public BaseAttackSO[] attackSOList;
     [HideInInspector] public NetworkVariable<int> nvAttackSOIndex = new NetworkVariable<int>();
-
     [SerializeField] private List<ComboSystem.Combo> defaultCombos = new List<ComboSystem.Combo>();
-    [SerializeField] private List<ComboSystem.Combo> possibleCombos = new List<ComboSystem.Combo>();
+    private List<ComboSystem.Combo> possibleCombos = new List<ComboSystem.Combo>();
 
     private void Awake(){
         _anim = GetComponent<Animator>();
@@ -49,11 +46,13 @@ public class PlayerCombat : NetworkBehaviour
     }
 
     private void Update(){
-        if(!IsServer) {return;}
+        if(!IsServer) return;
         if(Input.GetKeyDown(KeyCode.P)){
-            GameObject equippedWeapon = Instantiate(pfTmpSword.gameObject, rightHandTransform.position, rightHandTransform.rotation);
-            equippedWeapon.GetComponent<NetworkObject>().Spawn();
-            equippedWeapon.transform.SetParent(rightHandTransform, worldPositionStays:true);
+
+            Debug.Log(NetworkManager.Singleton.NetworkConfig.Prefabs.Contains(pfTmpSword));
+
+            NetworkObject obj = NetworkObjectPool.Singleton.GetNetworkObject(pfTmpSword, transform.position, transform.rotation);
+            obj.Spawn();
         }
     }
 
