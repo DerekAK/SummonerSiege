@@ -6,5 +6,6 @@ public class BaseWeapon : MonoBehaviour
     [SerializeField] private int weaponType; 
     public int GetWeaponType(){return weaponType;}
     [SerializeField] private int weaponQuality;
-    public int GetWeaponQuality(){return weaponQuality;}  
+    public int GetWeaponQuality(){return weaponQuality;} 
+    public HumanBodyBones AttachedBone;
 }

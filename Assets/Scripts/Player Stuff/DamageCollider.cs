@@ -7,11 +7,12 @@ public class DamageCollider : NetworkBehaviour
 {
     [Header("General settings inherent to the collider")]
     [SerializeField] private float baseDamage;
+    [SerializeField] private float baseKnockback;
     private BaseAttackSO.Element elementType;
-    private BaseAttackSO.Damage damageType;
+    private BaseAttackSO.eDamageType damageType;
     private float tickRate;
-    private float damageMultiplier;
-    private float knockbackMultiplier;
+    private float damageMultiplier = 1;
+    private float knockbackMultiplier = 1;
     //private StatusEffect[] statusEffects;
     private List<HealthComponent> healthComponentsToDamage = new List<HealthComponent>();
 
@@ -38,7 +39,7 @@ public class DamageCollider : NetworkBehaviour
         if (other.TryGetComponent(out HealthComponent healthComponent)){
             float totalDamage = ComputeDamage(baseDamage, damageMultiplier, elementType);
             Debug.Log($"Total damage: {totalDamage}");
-            if (damageType == BaseAttackSO.Damage.Single){
+            if (damageType == BaseAttackSO.eDamageType.Single){
                 healthComponent.TakeDamage(totalDamage);
                 ApplyKnockback(other);
             }
@@ -56,7 +57,7 @@ public class DamageCollider : NetworkBehaviour
         }
     }
 
-    private void OnDisable(){healthComponentsToDamage.Clear();}
+    public void DisableManually(){healthComponentsToDamage.Clear();}
 
     private IEnumerator TakeContinuousDamage(float damage, HealthComponent health, Collider other){
         
@@ -81,7 +82,7 @@ public class DamageCollider : NetworkBehaviour
         if (other.TryGetComponent(out PlayerMovement movementComponent)){
             Vector3 forceDir = (other.transform.position - transform.position).normalized;
             forceDir.y = Random.Range(0.2f, 0.5f);
-            forceDir *= knockbackMultiplier;
+            forceDir *= baseKnockback * knockbackMultiplier;
             movementComponent.ApplyForce(forceDir);
         }
     }

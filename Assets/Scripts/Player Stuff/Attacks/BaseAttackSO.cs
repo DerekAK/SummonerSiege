@@ -12,7 +12,7 @@ public abstract class BaseAttackSO : ScriptableObject
         Lightning
     }
 
-    public enum Damage{
+    public enum eDamageType{
         Single,
         Continuous
     }
@@ -36,9 +36,10 @@ public abstract class BaseAttackSO : ScriptableObject
         public HumanBodyBones AttachBone;
         public float Size;
         public Element ElementType;
+        public List<BaseStatusEffect> StatusEffects;
 
         [Header("Damage Settings")]
-        public Damage DamageType;
+        public eDamageType DamageType;
         [Tooltip("For continuous damage (e.g., fire tick)")]
         public float TickRate;
         public float DamageMultiplier;

@@ -38,6 +38,7 @@ public class WeaponlessAttackSO : BaseAttackSO{
             foreach (Transform child in bone){
                 if (child.CompareTag(PlayerCombat.HitboxTag)){
                     child.gameObject.GetComponent<SphereCollider>().enabled = false;
+                    child.gameObject.GetComponent<DamageCollider>().DisableManually();
                 }
             }
         }

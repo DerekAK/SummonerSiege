@@ -7,20 +7,10 @@ public class MeleeWeaponAttackSO : BaseAttackSO{
         if (!NetworkManager.Singleton.IsServer) return;
         foreach (Hitbox hitbox in MatrixHitboxes[currHitboxIndex].Hitboxes){
 
-            Transform boneWithWeapon = anim.GetBoneTransform(hitbox.AttachBone);
-            if (boneWithWeapon == null){
-                Debug.LogWarning($"Bone {boneWithWeapon} not found for {combat.name}");
-                continue;
-            }
-            foreach (Transform child in boneWithWeapon){
-                if (child.CompareTag(PlayerCombat.AttachPointTag)){
-                    foreach(Transform grandchild in child){
-                        if(grandchild.TryGetComponent(out BaseWeapon weapon)){
-                            grandchild.gameObject.GetComponent<Collider>().enabled = true;
-                            grandchild.GetComponent<DamageCollider>().SetInfo(hitbox);
-                            break;
-                        }
-                    }
+            foreach(BaseWeapon weapon in combat.EquippedWeapons){
+                if(weapon.AttachedBone == hitbox.AttachBone){
+                    weapon.GetComponent<Collider>().enabled = true;
+                    weapon.GetComponent<DamageCollider>().SetInfo(hitbox);
                     break;
                 }
             }
@@ -30,15 +20,10 @@ public class MeleeWeaponAttackSO : BaseAttackSO{
     public override void Disable(PlayerCombat combat, Animator anim){
         if (!NetworkManager.Singleton.IsServer) return;
         foreach (Hitbox hitbox in MatrixHitboxes[currHitboxIndex].Hitboxes){
-            Transform boneWithWeapon = anim.GetBoneTransform(hitbox.AttachBone);
-            foreach (Transform child in boneWithWeapon){
-                if (child.CompareTag(PlayerCombat.AttachPointTag)){
-                    foreach(Transform grandchild in child){
-                        if(grandchild.TryGetComponent(out BaseWeapon weapon)){
-                            grandchild.gameObject.GetComponent<Collider>().enabled = false;
-                            break;
-                        }
-                    }
+
+            foreach(BaseWeapon weapon in combat.EquippedWeapons){
+                if(weapon.AttachedBone == hitbox.AttachBone){
+                    weapon.GetComponent<Collider>().enabled = false;
                     break;
                 }
             }

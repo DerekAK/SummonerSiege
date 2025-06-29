@@ -1,16 +1,17 @@
 using UnityEngine;
+using System.Collections;
 
 public class FollowTarget: MonoBehaviour
 {
 
-    public Transform FollowTargetTransform;
-    private void LateUpdate(){
-        if(FollowTargetTransform is null){
-            Debug.LogError($"No target to follow for {name}!");
-            return;
-        }
+    [SerializeField] private Vector3 positionOffset;
+    [SerializeField] private Vector3 rotationOffset;
 
-        transform.position = FollowTargetTransform.position;
-        transform.rotation = FollowTargetTransform.rotation;
+    public IEnumerator FollowTargetCoroutine(Transform target){
+        while(true){
+            transform.position = target.position + positionOffset;
+            transform.eulerAngles = target.eulerAngles + rotationOffset;
+            yield return null;
+        }
     }
 }

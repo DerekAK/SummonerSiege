@@ -6,6 +6,14 @@ using UnityEngine;
 
 public class PlayerCombat : NetworkBehaviour
 {
+
+    /**
+        Errors so far: spawning a network weapon object won't be synced if client joins in after
+        it was spawned
+
+    */
+
+
     [SerializeField] private GameObject pfTmpSword;
     private Animator _anim;
     private PlayerState _playerState;
@@ -26,6 +34,7 @@ public class PlayerCombat : NetworkBehaviour
     private bool inCombo = false;
     private bool inHoldCombo = false;
     private int currAnimAttackState = 0;
+    [HideInInspector] public List<BaseWeapon> EquippedWeapons = new List<BaseWeapon>();
     public static string HitboxTag = "Hitbox";
     public static string AttachPointTag = "AttachPoint";
 
@@ -46,14 +55,35 @@ public class PlayerCombat : NetworkBehaviour
     }
 
     private void Update(){
-        if(!IsServer) return;
+        if(!IsLocalPlayer) return;
         if(Input.GetKeyDown(KeyCode.P)){
-
-            Debug.Log(NetworkManager.Singleton.NetworkConfig.Prefabs.Contains(pfTmpSword));
-
-            NetworkObject obj = NetworkObjectPool.Singleton.GetNetworkObject(pfTmpSword, transform.position, transform.rotation);
-            obj.Spawn();
+            WeaponSpawnServerRpc();            
         }
+    }
+
+    [ServerRpc]
+    private void WeaponSpawnServerRpc(){
+        //Debug.Log(NetworkManager.Singleton.NetworkConfig.Prefabs.Contains(pfTmpSword));
+        NetworkObject weaponObj = NetworkObjectPool.Singleton.GetNetworkObject(pfTmpSword, transform.position, transform.rotation);            
+        weaponObj.Spawn();
+        EquippedWeapons.Add(weaponObj.GetComponent<BaseWeapon>());
+        FollowTargetClientRpc(weaponObj);
+    }
+
+    [ClientRpc]
+    private void FollowTargetClientRpc(NetworkObjectReference networkObjectReference){
+        networkObjectReference.TryGet(out NetworkObject networkObjectWeapon);
+        
+        Transform attachPoint = null;
+        foreach(Transform child in _anim.GetBoneTransform(networkObjectWeapon.GetComponent<BaseWeapon>().AttachedBone)){
+            if(child.CompareTag(AttachPointTag)){
+                attachPoint = child;
+            }
+        }
+        if(attachPoint == null){Debug.LogError("Attachpoint is NULL!");}
+
+        StartCoroutine(networkObjectWeapon.GetComponent<FollowTarget>().
+            FollowTargetCoroutine(attachPoint));
     }
 
     private void Start(){
@@ -195,7 +225,7 @@ public class PlayerCombat : NetworkBehaviour
         _playerState.currentAttack = currentAttackSO;
         _playerState.ChangeAttackStatus(true);
         ChangeAttackSOIndexServerRpc(GetIndexByAttackSO(currentAttackSO));
-        _playerClipsHandler.HandleAttackClip(GetIndexByAttackSO(currentAttackSO));
+        _playerClipsHandler.ChangeOverriderClipsServerRpc(GetIndexByAttackSO(currentAttackSO));
 
         if (currAnimAttackState == 0) _anim.SetTrigger(attackParamA);
         else _anim.SetTrigger(attackParamB);
