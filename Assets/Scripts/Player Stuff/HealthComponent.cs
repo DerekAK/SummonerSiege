@@ -28,8 +28,6 @@ public class HealthComponent: NetworkBehaviour
         OnNetworkHealthChanged(healthNetworkStat.Stat.Value, healthNetworkStat.Stat.Value);
     }
 
-    
-
     public override void OnNetworkDespawn(){
         base.OnNetworkDespawn();
         healthNetworkStat.Stat.OnValueChanged -= OnNetworkHealthChanged;

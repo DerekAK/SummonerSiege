@@ -49,8 +49,9 @@ public class NetworkHandler : NetworkBehaviour
         Debug.Log($"Client {clientId} disconnected");
         if (connectedPlayers.ContainsKey(clientId)){
             // Save player data before removal
-            string playerId = DeterminePlayerId(clientId);
             NetworkObject playerObject = connectedPlayers[clientId];
+
+            string playerId = DeterminePlayerId(clientId);
             SaveLoadSystem.PlayerSaveData playerData = ExtractPlayerData(clientId, playerObject);
             SaveLoadSystem.SavePlayerData(playerId, playerData);
             connectedPlayers.Remove(clientId);

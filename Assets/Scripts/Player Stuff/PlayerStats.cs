@@ -105,13 +105,13 @@ public class PlayerStats : NetworkStats{
             CorruptionStat.MaxStat.Value = playerStatsSO.Corruption;
         }
 
-        OwnerAuthorititativeData playerData = new OwnerAuthorititativeData { Position = position };
+        OwnerAuthoritativeData playerData = new OwnerAuthoritativeData { Position = position };
         ClientRpcParams rpcParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { clientId } } };
         SendOwnerAuthoritativeDataClientRpc(playerData, rpcParams);
     }
 
     [ClientRpc]
-    private void SendOwnerAuthoritativeDataClientRpc(OwnerAuthorititativeData data, ClientRpcParams rpcParams){
+    private void SendOwnerAuthoritativeDataClientRpc(OwnerAuthoritativeData data, ClientRpcParams rpcParams){
         Debug.Log($"ClientRpc called for client {NetworkManager.Singleton.LocalClientId}. LocalClient null: {NetworkManager.Singleton.LocalClient == null}");
 
         // Wait until the player object is available
@@ -131,7 +131,7 @@ public class PlayerStats : NetworkStats{
         }
     }
 
-    private IEnumerator TrySetPlayerPosition(OwnerAuthorititativeData data, ClientRpcParams rpcParams){
+    private IEnumerator TrySetPlayerPosition(OwnerAuthoritativeData data, ClientRpcParams rpcParams){
         yield return null; // Wait one frame
 
         NetworkObject playerObject = NetworkManager.Singleton.LocalClient?.PlayerObject;
@@ -144,7 +144,7 @@ public class PlayerStats : NetworkStats{
         }
     }
 
-    public struct OwnerAuthorititativeData : INetworkSerializable{
+    public struct OwnerAuthoritativeData : INetworkSerializable{
         public Vector3 Position;
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter{

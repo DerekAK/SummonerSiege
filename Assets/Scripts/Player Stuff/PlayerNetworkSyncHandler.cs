@@ -7,7 +7,7 @@ public class PlayerNetworkSyncHandler : NetworkBehaviour
 {
     
     public event EventHandler NetworkSyncEvent;
-    private float syncInterval = 10f;
+    private float syncInterval = 1f;
     private float timeSinceLastSync;
 
     public override void OnNetworkSpawn(){
