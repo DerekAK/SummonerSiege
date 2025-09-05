@@ -1,0 +1,73 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: baf9d4918580e49388e755054f3e8edb, type: 3}
+  m_Name: Normal Biome
+  m_EditorClassIdentifier: 
+  BiomeName: Normal
+  ColorIntervals:
+  - IntervalColor: {r: 0.12517802, g: 0.37117335, b: 0.9150943, a: 1}
+    StartNoise: 0
+    EndNoise: 0.3
+  - IntervalColor: {r: 0.9622642, g: 0.85399765, b: 0.63999647, a: 1}
+    StartNoise: 0.3
+    EndNoise: 0.4
+  - IntervalColor: {r: 0.5022864, g: 0.8962264, b: 0.36779106, a: 1}
+    StartNoise: 0.4
+    EndNoise: 0.6
+  - IntervalColor: {r: 0.5188679, g: 0.32050464, b: 0.12482198, a: 1}
+    StartNoise: 0.6
+    EndNoise: 0.85
+  - IntervalColor: {r: 1, g: 1, b: 1, a: 1}
+    StartNoise: 0.85
+    EndNoise: 1
+  NoiseSplineCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.2977859
+      value: 0.006531328
+      inSlope: 0.06505719
+      outSlope: 0.06505719
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.21539322
+      outWeight: 1
+    - serializedVersion: 3
+      time: 0.39685875
+      value: 0.016015895
+      inSlope: 0.2912852
+      outSlope: 0.2912852
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 1
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 2
+      outSlope: 2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
