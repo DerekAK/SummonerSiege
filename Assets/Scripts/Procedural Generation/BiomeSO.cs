@@ -6,12 +6,9 @@ using UnityEngine.VFX;
 [CreateAssetMenu(fileName = "NewBiome", menuName = "Procedural/Biome")]
 public class BiomeSO : ScriptableObject
 {
-    [Header("Terrain Shape Settings")]
-    [Tooltip("The average height of the terrain, acting as the 'sea level' for this biome.")]
-    public float baseHeight = 32f;
 
     [Tooltip("The maximum height variation. Higher values create taller mountains and deeper valleys.")]
-    public float terrainAmplitude = 50f;
+    public float terrainAmplitude;
 
     [Tooltip("Maps the low-frequency Continentalness noise to a height factor. Controls the largest landmass shapes.")]
     public AnimationCurve continentalnessCurve;
@@ -28,10 +25,6 @@ public class BiomeSO : ScriptableObject
     public NoiseSettings peaksAndValleysNoise;
 
     [Header("3D Detail Settings")]
-    [Tooltip("Overall strength of the 3D noise used for caves and overhangs. 0 = no 3D noise, 1 = full effect.")]
-    [Range(0, 1)]
-    public float threeDNoiseInfluence = 0.5f;
-
     public NoiseSettings threeDNoise;
 
     [Tooltip("Controls the 3D noise influence based on world height (Y-axis, normalized 0-1). Allows making the ground solid at the bottom and removing noise high in the sky.")]

@@ -3,7 +3,7 @@ using Unity.Burst;
 using Unity.Mathematics;
 using Unity.Collections;
 using UnityEngine;
-using System;
+using System.Runtime.CompilerServices;
 
 [BurstCompile]
 public struct ThreeDJob : IJob
@@ -12,7 +12,8 @@ public struct ThreeDJob : IJob
     public int2 chunkCoord;
     public int3 chunkSize;
     public float isoLevel;
-    public int lod; // NEW: LOD level
+    public int lod;
+    [ReadOnly] public float2 noiseOffset;
 
     // --- Reusable Input/Output Arrays ---
     public NativeArray<float> cubeDensities;
@@ -24,7 +25,6 @@ public struct ThreeDJob : IJob
     public NativeList<int> triangles;
 
     // --- Biome Data ---  
-    public float baseHeight;
     public float terrainAmplitude;
     [ReadOnly] public NativeArray<float> continentalnessCurveSamples;
     [ReadOnly] public NativeArray<float> erosionCurveSamples;
@@ -32,13 +32,12 @@ public struct ThreeDJob : IJob
     public NoiseSettings continentalnessNoise;
     public NoiseSettings erosionNoise;
     public NoiseSettings peaksAndValleysNoise;
-    public float threeDNoiseInfluence;
     public NoiseSettings threeDNoiseSettings;
     [ReadOnly] public NativeArray<float> verticalGradientCurveSamples;
     [ReadOnly] public NativeArray<float2> octaveOffsetsContinentalness;
     [ReadOnly] public NativeArray<float2> octaveOffsetsErosion;
     [ReadOnly] public NativeArray<float2> octaveOffsetsPeaksAndValleys;
-    [ReadOnly] public NativeArray<float2> octaveOffsets3D;
+    [ReadOnly] public NativeArray<float3> octaveOffsets3D;
 
     public void Execute()
     {
@@ -64,7 +63,6 @@ public struct ThreeDJob : IJob
                     densityField[index] = CalculateDensity(
                         worldPos,
                         chunkSize.y,
-                        baseHeight,
                         terrainAmplitude,
                         continentalnessCurveSamples,
                         erosionCurveSamples,
@@ -72,7 +70,6 @@ public struct ThreeDJob : IJob
                         continentalnessNoise,
                         erosionNoise,
                         peaksAndValleysNoise,
-                        threeDNoiseInfluence,
                         threeDNoiseSettings,
                         verticalGradientCurveSamples
                     );
@@ -124,7 +121,6 @@ public struct ThreeDJob : IJob
         float chunkHeight, // Needed for normalizing Y for the vertical gradient
 
         // --- Biome Parameters Passed from the BiomeSO ---
-        float baseHeight,
         float terrainAmplitude,
         NativeArray<float> continentalnessCurveSamples,
         NativeArray<float> erosionCurveSamples,
@@ -132,11 +128,10 @@ public struct ThreeDJob : IJob
         NoiseSettings continentalnessNoise,
         NoiseSettings erosionNoise,
         NoiseSettings peaksAndValleysNoise,
-        float threeDNoiseInfluence,
         NoiseSettings threeDNoiseSettings,
         NativeArray<float> verticalGradientCurveSamples)
     {
-        // 1: Calculate the 2D Base Shape, these will be normalized from [-1,1]
+        // 1: Calculate the 2D Base Shape, these will be normalized from [0,1]
 
         float continentalness = EvaluateUsingCurveArray(FBM2D(worldPos, continentalnessNoise, octaveOffsetsContinentalness), continentalnessCurveSamples) * continentalnessNoise.scale;
         float erosion = EvaluateUsingCurveArray(FBM2D(worldPos, erosionNoise, octaveOffsetsErosion), erosionCurveSamples) * erosionNoise.scale;
@@ -148,30 +143,34 @@ public struct ThreeDJob : IJob
         float normalizedNoise = (continentalness + erosion + peaksAndValleys) / divideFactor;
 
         // Calculate the final height of the 2D surface.
-        float surfaceHeight = baseHeight + normalizedNoise * terrainAmplitude;
+        float surfaceHeight = normalizedNoise * (terrainAmplitude-1);
         float clampedSurfaceHeight = Mathf.Clamp(surfaceHeight, 0, chunkHeight - 1);
-        float baseDensity = clampedSurfaceHeight - worldPos.y;
+        float baseDensity = clampedSurfaceHeight - worldPos.y; // in range of [-terrain amplitude, terrain amplitude], which should just be [-chunkheight, chunkheight] (assuming terrain amplitude is set to chunk height)
 
         // --- Step 2: Calculate the 3D Detail Modifier ---
         // Get a raw 3D noise value. This will be our "carving" value.
-        float raw3DNoise = FBM3D(worldPos, threeDNoiseSettings, octaveOffsets3D); // Using the full 3D position
+
+        // returns [0, 1]
+        float centered3DNoise = FBM3D(worldPos, threeDNoiseSettings, octaveOffsets3D); // Using the full 3D position
 
         // Apply the vertical gradient "squashing" curve.
         // This makes 3D noise weaker deep underground and high in the sky.
         float normalizedY = worldPos.y / chunkHeight; // Assumes chunk starts at y=0
 
         float gradient = EvaluateUsingCurveArray(normalizedY, verticalGradientCurveSamples);
-
+        float clampedGradient = math.saturate(gradient);
         // The final 3D modifier is scaled by the biome's overall influence and the gradient.
         // We multiply by amplitude to make the carving proportional to the terrain height.
 
-        float threeDModifier = raw3DNoise * threeDNoiseInfluence * gradient * terrainAmplitude;
-
+        float threeDModifier = centered3DNoise * threeDNoiseSettings.scale * clampedGradient * terrainAmplitude;
 
         // --- Step 3: Combine 2D and 3D ---
         // Add the 3D modifier to the base density. This will push the surface inwards
         // (carving caves) or outwards (creating overhangs) from its original 2D position.
-        float finalDensity = baseDensity + threeDModifier;
+        float finalDensity = baseDensity - threeDModifier;
+        //  THIS WILL HAVE A CARVING EFFECT INTO THE TERRAIN WHEN THE THREEDMODIFER IS POSITIVE,
+        // WHILE IT WILL HAVE AN ADDING EFFECT INTO THE TERRAIN WHEN THE THREEDMODIFER IS NEGATIVE
+        // SO MAKE IT SUPER POSITIVE WHERE YOU WANT CAVES, AND NEGATIVE WHERE YOU WANT OVERHANGS (in the vertical gradient animation curve)
 
         return finalDensity;
     }
@@ -201,7 +200,7 @@ public struct ThreeDJob : IJob
 
         for (int i = 0; i < octaves; i++)
         {
-            float noiseValue = noise.snoise((new float2(worldPos.x, worldPos.z) + octaveOffsets[i]) * frequency);
+            float noiseValue = noise.snoise((new float2(worldPos.x, worldPos.z) + octaveOffsets[i] + noiseOffset) * frequency);
             noiseHeight += noiseValue * amplitude;
 
             maxPossibleAmplitude += amplitude; // Add the current amplitude to the max
@@ -219,7 +218,7 @@ public struct ThreeDJob : IJob
         return normalizedNoise;
     }
 
-    private float FBM3D(float3 worldPos, NoiseSettings noiseSettings, NativeArray<float2> octaveOffsets)
+    private float FBM3D(float3 worldPos, NoiseSettings noiseSettings, NativeArray<float3> octaveOffsets)
     {
         float lacunarity = noiseSettings.lacunarity;
         float persistence = noiseSettings.persistence;
@@ -234,8 +233,8 @@ public struct ThreeDJob : IJob
         {
             // Sample 3D noise. We add a large number to the z-component of the offset
             // to ensure it samples a different "slice" of 2D offset noise.
-            float3 offset = new float3(octaveOffsets[i].x, octaveOffsets[i].y, octaveOffsets[i].x + 1000f);
-            
+            float3 offset = new float3(octaveOffsets[i].x + noiseOffset.x, octaveOffsets[i].y, octaveOffsets[i].z + noiseOffset.y);
+
             noiseValue += noise.snoise(worldPos * frequency + offset) * amplitude;
             maxPossibleAmplitude += amplitude;
             frequency *= lacunarity;
@@ -243,6 +242,10 @@ public struct ThreeDJob : IJob
         }
 
         // Remap the noise from [-max, +max] to [0, 1]
-        return (noiseValue + maxPossibleAmplitude) / (2 * maxPossibleAmplitude);
+        float normalizedNoise = (noiseValue + maxPossibleAmplitude) / (2 * maxPossibleAmplitude);
+
+        // remap the noise from [0, 1] to [-1, 1]
+        return (normalizedNoise - 0.5f) * 2f;
+        // return normalizedNoise;
     }
 }
