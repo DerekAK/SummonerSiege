@@ -3,7 +3,6 @@ using Unity.Burst;
 using Unity.Mathematics;
 using Unity.Collections;
 using UnityEngine;
-using System.Runtime.CompilerServices;
 
 [BurstCompile]
 public struct ThreeDJob : IJob
@@ -13,7 +12,6 @@ public struct ThreeDJob : IJob
     public int3 chunkSize;
     public float isoLevel;
     public int lod;
-    [ReadOnly] public float2 noiseOffset;
 
     // --- Reusable Input/Output Arrays ---
     public NativeArray<float> cubeDensities;
@@ -33,11 +31,15 @@ public struct ThreeDJob : IJob
     public NoiseSettings erosionNoise;
     public NoiseSettings peaksAndValleysNoise;
     public NoiseSettings threeDNoiseSettings;
+    public NoiseSettings cavernNoiseSettings;
+    public NoiseSettings warpNoiseSettings;
     [ReadOnly] public NativeArray<float> verticalGradientCurveSamples;
+    [ReadOnly] public NativeArray<float> cavernShapeCurveSamples;
     [ReadOnly] public NativeArray<float2> octaveOffsetsContinentalness;
     [ReadOnly] public NativeArray<float2> octaveOffsetsErosion;
     [ReadOnly] public NativeArray<float2> octaveOffsetsPeaksAndValleys;
     [ReadOnly] public NativeArray<float3> octaveOffsets3D;
+    [ReadOnly] public NativeArray<float3> octaveOffsetsWarp;
 
     public void Execute()
     {
@@ -71,7 +73,10 @@ public struct ThreeDJob : IJob
                         erosionNoise,
                         peaksAndValleysNoise,
                         threeDNoiseSettings,
-                        verticalGradientCurveSamples
+                        cavernNoiseSettings,
+                        warpNoiseSettings,
+                        verticalGradientCurveSamples,
+                        cavernShapeCurveSamples
                     );
                 }
             }
@@ -129,7 +134,10 @@ public struct ThreeDJob : IJob
         NoiseSettings erosionNoise,
         NoiseSettings peaksAndValleysNoise,
         NoiseSettings threeDNoiseSettings,
-        NativeArray<float> verticalGradientCurveSamples)
+        NoiseSettings cavernNoiseSettings,
+        NoiseSettings warpNoiseSettings,
+        NativeArray<float> verticalGradientCurveSamples,
+        NativeArray<float> cavernShapeCurveSamples)
     {
         // 1: Calculate the 2D Base Shape, these will be normalized from [0,1]
 
@@ -143,34 +151,40 @@ public struct ThreeDJob : IJob
         float normalizedNoise = (continentalness + erosion + peaksAndValleys) / divideFactor;
 
         // Calculate the final height of the 2D surface.
-        float surfaceHeight = normalizedNoise * (terrainAmplitude-1);
+        float surfaceHeight = normalizedNoise * (terrainAmplitude - 1);
         float clampedSurfaceHeight = Mathf.Clamp(surfaceHeight, 0, chunkHeight - 1);
         float baseDensity = clampedSurfaceHeight - worldPos.y; // in range of [-terrain amplitude, terrain amplitude], which should just be [-chunkheight, chunkheight] (assuming terrain amplitude is set to chunk height)
 
-        // --- Step 2: Calculate the 3D Detail Modifier ---
-        // Get a raw 3D noise value. This will be our "carving" value.
-
-        // returns [0, 1]
+        // returns [-1, 1]
         float centered3DNoise = FBM3D(worldPos, threeDNoiseSettings, octaveOffsets3D); // Using the full 3D position
-
-        // Apply the vertical gradient "squashing" curve.
-        // This makes 3D noise weaker deep underground and high in the sky.
         float normalizedY = worldPos.y / chunkHeight; // Assumes chunk starts at y=0
-
         float gradient = EvaluateUsingCurveArray(normalizedY, verticalGradientCurveSamples);
         float clampedGradient = math.saturate(gradient);
-        // The final 3D modifier is scaled by the biome's overall influence and the gradient.
-        // We multiply by amplitude to make the carving proportional to the terrain height.
-
         float threeDModifier = centered3DNoise * threeDNoiseSettings.scale * clampedGradient * terrainAmplitude;
+
+
+        float3 warpOffset = FBM3D(worldPos, warpNoiseSettings, octaveOffsetsWarp) * warpNoiseSettings.amplitude;
+        float3 warpPos = worldPos + warpOffset;
+        float2 worleyValues = GetWorleyF1F2(warpPos * cavernNoiseSettings.frequency);
+        float f1 = worleyValues.x;
+        float f2 = worleyValues.y;
+    
+        // This value is low on the ridges and high in the cell centers
+        float ridgeValue = f2 - f1;
+
+        // We invert it so the ridges have a high value (close to 1)
+        float invertedRidgeValue = 1.0f - ridgeValue;
+
+        float cavernGradient = EvaluateUsingCurveArray(normalizedY, cavernShapeCurveSamples);
+        float sharpenedWorley = math.pow(invertedRidgeValue, cavernNoiseSettings.caveSharpness);
+        float cavernCarvingValue = sharpenedWorley * terrainAmplitude * cavernGradient * cavernNoiseSettings.scale;
+
+        float final3DModifier = threeDModifier + cavernCarvingValue;
 
         // --- Step 3: Combine 2D and 3D ---
         // Add the 3D modifier to the base density. This will push the surface inwards
         // (carving caves) or outwards (creating overhangs) from its original 2D position.
-        float finalDensity = baseDensity - threeDModifier;
-        //  THIS WILL HAVE A CARVING EFFECT INTO THE TERRAIN WHEN THE THREEDMODIFER IS POSITIVE,
-        // WHILE IT WILL HAVE AN ADDING EFFECT INTO THE TERRAIN WHEN THE THREEDMODIFER IS NEGATIVE
-        // SO MAKE IT SUPER POSITIVE WHERE YOU WANT CAVES, AND NEGATIVE WHERE YOU WANT OVERHANGS (in the vertical gradient animation curve)
+        float finalDensity = baseDensity - final3DModifier;
 
         return finalDensity;
     }
@@ -178,6 +192,7 @@ public struct ThreeDJob : IJob
     // this function is meant to simulate the .evaluate() function for animation curves, but instead its using a native<float> array
     private float EvaluateUsingCurveArray(float value, NativeArray<float> curves)
     {
+        value = math.saturate(value);
         float floatIndex = value * (curves.Length - 1);
         int floorIndex = (int)floatIndex;
         int ceilIndex = math.min(floorIndex + 1, curves.Length - 1);
@@ -192,7 +207,7 @@ public struct ThreeDJob : IJob
         float lacunarity = noiseSettings.lacunarity;
         float persistence = noiseSettings.persistence;
         float frequency = noiseSettings.frequency;
-        float amplitude = 1;
+        float amplitude = noiseSettings.amplitude;
         int octaves = noiseSettings.octaves;
 
         float noiseHeight = 0f;
@@ -200,7 +215,7 @@ public struct ThreeDJob : IJob
 
         for (int i = 0; i < octaves; i++)
         {
-            float noiseValue = noise.snoise((new float2(worldPos.x, worldPos.z) + octaveOffsets[i] + noiseOffset) * frequency);
+            float noiseValue = noise.snoise((new float2(worldPos.x, worldPos.z) + octaveOffsets[i]) * frequency);
             noiseHeight += noiseValue * amplitude;
 
             maxPossibleAmplitude += amplitude; // Add the current amplitude to the max
@@ -223,7 +238,7 @@ public struct ThreeDJob : IJob
         float lacunarity = noiseSettings.lacunarity;
         float persistence = noiseSettings.persistence;
         float frequency = noiseSettings.frequency;
-        float amplitude = 1;
+        float amplitude = noiseSettings.amplitude;
         int octaves = noiseSettings.octaves;
 
         float noiseValue = 0f;
@@ -233,7 +248,7 @@ public struct ThreeDJob : IJob
         {
             // Sample 3D noise. We add a large number to the z-component of the offset
             // to ensure it samples a different "slice" of 2D offset noise.
-            float3 offset = new float3(octaveOffsets[i].x + noiseOffset.x, octaveOffsets[i].y, octaveOffsets[i].z + noiseOffset.y);
+            float3 offset = new float3(octaveOffsets[i].x, octaveOffsets[i].y, octaveOffsets[i].z);
 
             noiseValue += noise.snoise(worldPos * frequency + offset) * amplitude;
             maxPossibleAmplitude += amplitude;
@@ -241,11 +256,59 @@ public struct ThreeDJob : IJob
             amplitude *= persistence;
         }
 
+        float carveBias = noiseSettings.carveBias;
+        float center = carveBias * 0.5f;
+        float carveScale = 1f - 0.5f * math.abs(carveBias);
+
         // Remap the noise from [-max, +max] to [0, 1]
         float normalizedNoise = (noiseValue + maxPossibleAmplitude) / (2 * maxPossibleAmplitude);
 
-        // remap the noise from [0, 1] to [-1, 1]
-        return (normalizedNoise - 0.5f) * 2f;
-        // return normalizedNoise;
+        float initialNoise = (normalizedNoise - 0.5f) * 2f;
+        return initialNoise * carveScale + center;
     }
+
+    // A simple hashing function to get a deterministic "random" float3 from an int3 position.
+    private static float3 Hash(int3 p)
+    {
+        // This is a common, more chaotic hash function used in procedural generation
+        // to break up grid-like artifacts.
+        float3 p3 = math.frac((float3)p * new float3(.1031f, .1030f, .0973f));
+        p3 += math.dot(p3, p3.yzx + 33.33f);
+        return math.frac((p3.xxy + p3.yzz) * p3.zyx);
+    }
+
+    // returns normalized value [0,1]
+    public static float2 GetWorleyF1F2(float3 pos)
+    {
+        int3 cell = (int3)math.floor(pos);
+        float2 minDistance = new float2(2.0f, 2.0f); // Initialize F1 and F2 to a high value
+
+        for (int x = -1; x <= 1; x++)
+        {
+            for (int y = -1; y <= 1; y++)
+            {
+                for (int z = -1; z <= 1; z++)
+                {
+                    int3 neighborCell = cell + new int3(x, y, z);
+                    float3 featurePoint = neighborCell + Hash(neighborCell);
+                    
+                    float dist = math.distance(pos, featurePoint);
+
+                    // Check if this distance is a new F1 or F2
+                    if (dist < minDistance.x)
+                    {
+                        minDistance.y = minDistance.x; // The old F1 becomes the new F2
+                        minDistance.x = dist;          // We have a new F1
+                    }
+                    else if (dist < minDistance.y)
+                    {
+                        minDistance.y = dist;          // We have a new F2
+                    }
+                }
+            }
+        }
+        return minDistance;
+    }
+    
+    
 }

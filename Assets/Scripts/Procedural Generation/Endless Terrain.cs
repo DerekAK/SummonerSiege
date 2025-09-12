@@ -23,15 +23,16 @@ public class EndlessTerrain : MonoBehaviour
     private static NativeArray<float> erosionSamples;
     private static NativeArray<float> peaksAndValleysSamples;
     private static NativeArray<float> verticalGradientSamples;
+    private static NativeArray<float> cavernShapeCurveSamples;
     private static NativeArray<float2> octaveOffsetsContinentalness;
     private static NativeArray<float2> octaveOffsetsErosion;
     private static NativeArray<float2> octaveOffsetsPeaksAndValleys;
     private static NativeArray<float3> octaveOffsets3D;
+    private static NativeArray<float3> octaveOffsetsWarp;
 
     private Dictionary<int2, TerrainChunk> terrainChunkDict = new();
     private int3 chunkDimensions;
     private MapGenerator mapGenerator;
-    public float2 noiseOffset { private get; set; }
 
     private void Start()
     {
@@ -46,27 +47,6 @@ public class EndlessTerrain : MonoBehaviour
     }
 
 
-    public void ClearAllChunks()
-    {
-        foreach (var chunk in terrainChunkDict.Values)
-        {
-            chunk.DestroyChunk();
-        }
-        terrainChunkDict.Clear();
-    }
-
-    public void RequestChunkGeneration(int2 chunkCoord, float2 noiseOffset)
-    {
-        this.noiseOffset = noiseOffset;
-        ClearAllChunks();
-
-        if (!terrainChunkDict.ContainsKey(chunkCoord))
-        {
-            var newChunk = new TerrainChunk(mapGenerator, chunkCoord, chunkDimensions, lodInfoList, transform, terrainMaterial, noiseOffset);
-            terrainChunkDict.Add(chunkCoord, newChunk);
-        }
-    }
-
     private void GenerateNewBiomeArrays()
     {
         int curveResolution = 256;
@@ -74,11 +54,13 @@ public class EndlessTerrain : MonoBehaviour
         erosionSamples = BakeCurve(staticActiveBiomeSO.erosionCurve, curveResolution);
         peaksAndValleysSamples = BakeCurve(staticActiveBiomeSO.peaksAndValleysCurve, curveResolution);
         verticalGradientSamples = BakeCurve(staticActiveBiomeSO.verticalGradientCurve, curveResolution);
+        cavernShapeCurveSamples = BakeCurve(staticActiveBiomeSO.cavernShapeCurve, curveResolution);
 
         octaveOffsetsContinentalness = Get2DOctaveOffsets(mapGenerator.seed, staticActiveBiomeSO.continentalnessNoise.octaves);
         octaveOffsetsErosion = Get2DOctaveOffsets(mapGenerator.seed + 10, staticActiveBiomeSO.erosionNoise.octaves);
         octaveOffsetsPeaksAndValleys = Get2DOctaveOffsets(mapGenerator.seed + 20, staticActiveBiomeSO.peaksAndValleysNoise.octaves);
         octaveOffsets3D = Get3DOctaveOffsets(mapGenerator.seed + 30, staticActiveBiomeSO.threeDNoise.octaves);
+        octaveOffsetsWarp = Get3DOctaveOffsets(mapGenerator.seed + 40, staticActiveBiomeSO.warpNoise.octaves);
     }
 
     private void Update()
@@ -112,7 +94,7 @@ public class EndlessTerrain : MonoBehaviour
                 }
                 else
                 {
-                    var newChunk = new TerrainChunk(mapGenerator, chunkCoord, chunkDimensions, lodInfoList, transform, terrainMaterial, noiseOffset);
+                    var newChunk = new TerrainChunk(mapGenerator, chunkCoord, chunkDimensions, lodInfoList, transform, terrainMaterial);
                     terrainChunkDict.Add(chunkCoord, newChunk);
                 }
             }
@@ -144,21 +126,22 @@ public class EndlessTerrain : MonoBehaviour
     }
 
     private void OnDestroy()
-        {
-            if (continentalnessSamples.IsCreated) continentalnessSamples.Dispose();
-            if (erosionSamples.IsCreated) erosionSamples.Dispose();
-            if (peaksAndValleysSamples.IsCreated) peaksAndValleysSamples.Dispose();
-            if (verticalGradientSamples.IsCreated) verticalGradientSamples.Dispose();
-            if (octaveOffsetsContinentalness.IsCreated) octaveOffsetsContinentalness.Dispose();
-            if (octaveOffsetsErosion.IsCreated) octaveOffsetsErosion.Dispose();
-            if (octaveOffsetsPeaksAndValleys.IsCreated) octaveOffsetsPeaksAndValleys.Dispose();
-            if (octaveOffsets3D.IsCreated) octaveOffsets3D.Dispose();
-        }
+    {
+        if (continentalnessSamples.IsCreated) continentalnessSamples.Dispose();
+        if (erosionSamples.IsCreated) erosionSamples.Dispose();
+        if (peaksAndValleysSamples.IsCreated) peaksAndValleysSamples.Dispose();
+        if (verticalGradientSamples.IsCreated) verticalGradientSamples.Dispose();
+        if (cavernShapeCurveSamples.IsCreated) cavernShapeCurveSamples.Dispose();
+        if (octaveOffsetsContinentalness.IsCreated) octaveOffsetsContinentalness.Dispose();
+        if (octaveOffsetsErosion.IsCreated) octaveOffsetsErosion.Dispose();
+        if (octaveOffsetsPeaksAndValleys.IsCreated) octaveOffsetsPeaksAndValleys.Dispose();
+        if (octaveOffsets3D.IsCreated) octaveOffsets3D.Dispose();
+        if (octaveOffsetsWarp.IsCreated) octaveOffsetsWarp.Dispose();
+    }
 
     public class TerrainChunk
     {
         public Bounds Bounds { get; private set; }
-        private float2 noiseOffset;
         private GameObject meshObject;
         private MeshRenderer meshRenderer;
         private MeshFilter meshFilter;
@@ -168,11 +151,10 @@ public class EndlessTerrain : MonoBehaviour
         private int previousLODIndex = -1;
         private MapGenerator mapGenerator;
 
-        public TerrainChunk(MapGenerator mapGen, int2 coord, int3 dimensions, LODInfo[] lodInfoList, Transform parent, Material material, float2 noiseOffset)
+        public TerrainChunk(MapGenerator mapGen, int2 coord, int3 dimensions, LODInfo[] lodInfoList, Transform parent, Material material)
         {
             this.chunkCoord = coord;
             this.lodInfoList = lodInfoList;
-            this.noiseOffset = noiseOffset;
 
             Vector3 position = new Vector3(coord.x * dimensions.x, 0, coord.y * dimensions.z);
             this.Bounds = new Bounds(position, new Vector3(dimensions.x, dimensions.y, dimensions.z));
@@ -190,7 +172,7 @@ public class EndlessTerrain : MonoBehaviour
             lodMeshes = new LODMesh[lodInfoList.Length];
             for (int i = 0; i < lodMeshes.Length; i++)
             {
-                lodMeshes[i] = new LODMesh(lodInfoList[i].lod, this.noiseOffset);
+                lodMeshes[i] = new LODMesh(lodInfoList[i].lod);
             }
 
             UpdateTerrainChunk(); // Initial update to determine visibility and start generation
@@ -242,7 +224,6 @@ public class EndlessTerrain : MonoBehaviour
                         lodMesh.RequestMesh(mapGenerator, chunkCoord, Bounds.size);
                     }
                 }
-                // REMOVED: The faulty lastVisibleChunksList.Add(this) call is gone.
             }
 
             SetVisible(visible);
@@ -267,7 +248,6 @@ public class EndlessTerrain : MonoBehaviour
     class LODMesh
     {
         public Mesh mesh;
-        private float2 noiseOffset;
         public bool hasMesh;
         public bool isGenerating;
         public int lod;
@@ -280,10 +260,9 @@ public class EndlessTerrain : MonoBehaviour
         private NativeArray<float> cubeDensities;
         private NativeArray<float3> edgeVertices;
 
-        public LODMesh(int lod, float2 noiseOffset)
+        public LODMesh(int lod)
         {
             this.lod = lod;
-            this.noiseOffset = noiseOffset;
         }
 
         public void RequestMesh(MapGenerator mapGen, int2 chunkCoord, Vector3 chunkDimensions)
@@ -317,7 +296,6 @@ public class EndlessTerrain : MonoBehaviour
                 chunkSize = dimensions,
                 isoLevel = EndlessTerrain.isoLevel,
                 lod = this.lod,
-                noiseOffset = this.noiseOffset,
 
                 vertices = vertices,
                 triangles = triangles,
@@ -334,11 +312,15 @@ public class EndlessTerrain : MonoBehaviour
                 erosionNoise = staticActiveBiomeSO.erosionNoise,
                 peaksAndValleysNoise = staticActiveBiomeSO.peaksAndValleysNoise,
                 threeDNoiseSettings = staticActiveBiomeSO.threeDNoise,
+                cavernNoiseSettings = staticActiveBiomeSO.cavernNoise,
+                warpNoiseSettings = staticActiveBiomeSO.warpNoise,
                 verticalGradientCurveSamples = verticalGradientSamples,
+                cavernShapeCurveSamples = cavernShapeCurveSamples,
                 octaveOffsetsContinentalness = octaveOffsetsContinentalness,
                 octaveOffsetsErosion = octaveOffsetsErosion,
                 octaveOffsetsPeaksAndValleys = octaveOffsetsPeaksAndValleys,
                 octaveOffsets3D = octaveOffsets3D,
+                octaveOffsetsWarp = octaveOffsetsWarp
             };
 
             jobHandle = job.Schedule();
@@ -410,6 +392,7 @@ public class EndlessTerrain : MonoBehaviour
             // If not generating, there's no active job or allocated memory to worry about.
         }
 
+        // destroys arrays that only need to exist per job
         private void DisposeArrays()
         {
             if (vertices.IsCreated) vertices.Dispose();

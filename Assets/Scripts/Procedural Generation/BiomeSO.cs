@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.VFX;
 
@@ -29,7 +30,9 @@ public class BiomeSO : ScriptableObject
 
     [Tooltip("Controls the 3D noise influence based on world height (Y-axis, normalized 0-1). Allows making the ground solid at the bottom and removing noise high in the sky.")]
     public AnimationCurve verticalGradientCurve;
-
+    public NoiseSettings cavernNoise; // <-- Add this for Worley noise
+    public AnimationCurve cavernShapeCurve; // <-- Add this to shape the caves
+    public NoiseSettings warpNoise;
 
     [Header("Aesthetic & Spawning Settings")]
     [Tooltip("The main material for the terrain. Use a custom Shader Graph material for best results.")]
@@ -52,19 +55,25 @@ public class BiomeSO : ScriptableObject
 }
 
 // A reusable struct for noise settings to keep the Inspector clean.
-[System.Serializable]
+[Serializable]
 public struct NoiseSettings
 {
-    [Range(0,1)]
+    [Range(0, 1)]
     public float scale;
+    [Range(-1, 1)]
+    public float carveBias;
     public int octaves;
     public float lacunarity;
     public float persistence;
     public float frequency;
+    
+    [Tooltip("Should always be 1 except for WarpSettings")]
+    public float amplitude;
+    public float caveSharpness;
 }
 
 // A class for defining rules for spawning objects like trees, rocks, etc.
-[System.Serializable]
+[Serializable]
 public class SpawnableObject
 {
     public GameObject prefab;
