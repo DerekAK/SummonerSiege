@@ -7,13 +7,12 @@ public class PlayerNetworkSyncHandler : NetworkBehaviour
 {
     
     public event EventHandler NetworkSyncEvent;
-    private float syncInterval = 1f;
-    private float timeSinceLastSync;
+    private float syncInterval = 3f;
+    private float timeSinceLastSync = 0;
 
     public override void OnNetworkSpawn(){
         if(IsLocalPlayer){
             StartCoroutine(SyncingCoroutine());
-            timeSinceLastSync = syncInterval;
         }
     }
 

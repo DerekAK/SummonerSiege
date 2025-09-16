@@ -56,7 +56,7 @@ public static class SaveLoadSystem{
     public static PlayerSaveData LoadPlayerData(string playerId){
         string filePath = saveFolder + playerId + ".json";
 
-        // Debug.Log($"Loaded data for {playerId} from {filePath}");
+        Debug.Log($"Loaded data for {playerId} from {filePath}");
         // Debug.Log($"Loaded JSON content: {json}");
         // Debug.Log($"Loaded PlayerSaveData - Position: {data.PlayerPosition}, Health: {data.Health}");
 

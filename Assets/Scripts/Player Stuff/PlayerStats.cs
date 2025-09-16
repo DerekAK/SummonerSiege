@@ -2,10 +2,9 @@ using UnityEngine;
 using Unity.Netcode;
 using System.Collections;
 
-public class PlayerStats : NetworkStats{
+public class PlayerStats : NetworkStats
+{
     public PlayerStatsConfiguration playerStatsSO;
-
-    // Declare NetworkVariables directly in PlayerStats
     private NetworkVariable<float> healthStat = new NetworkVariable<float>();
     private NetworkVariable<float> maxHealthStat = new NetworkVariable<float>();
     private NetworkVariable<float> strengthStat = new NetworkVariable<float>();
@@ -21,7 +20,6 @@ public class PlayerStats : NetworkStats{
     private NetworkVariable<float> corruptionStat = new NetworkVariable<float>();
     private NetworkVariable<float> maxCorruptionStat = new NetworkVariable<float>();
 
-    // NetworkStat instances using the above NetworkVariables
     public NetworkStat StrengthStat;
     public NetworkStat SpeedStat;
     public NetworkStat EnduranceStat;
@@ -29,7 +27,8 @@ public class PlayerStats : NetworkStats{
     public NetworkStat BindingAffinityStat;
     public NetworkStat CorruptionStat;
 
-    private void Awake(){
+    private void Awake()
+    {
         HealthStat = new NetworkStat(healthStat, maxHealthStat);
         StrengthStat = new NetworkStat(strengthStat, maxStrengthStat);
         SpeedStat = new NetworkStat(speedStat, maxSpeedStat);
@@ -39,16 +38,89 @@ public class PlayerStats : NetworkStats{
         CorruptionStat = new NetworkStat(corruptionStat, maxCorruptionStat);
     }
 
-    public override void OnNetworkSpawn(){
-        base.OnNetworkSpawn();
+    private void Start()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+        {
+            LoadStatsForSinglePlayer();
+        }
+    }
 
-        if (IsServer && IsLocalPlayer){
+    public override void OnNetworkSpawn()
+    {
+        // ENTRY POINT 2: MULTIPLAYER
+        base.OnNetworkSpawn();
+        if (!IsOwner) return; // Only the owner should request/load their stats.
+
+        if (IsServer) // This also covers the Host case
+        {
             ApplyLoadedData(NetworkManager.Singleton.LocalClientId, 
                           SaveLoadSystem.LoadPlayerData(NetworkHandler.Instance.DeterminePlayerId(NetworkManager.Singleton.LocalClientId)));
         }
-        else if (IsLocalPlayer){
+        else // This is for clients
+        {
             RequestStatsServerRpc(NetworkManager.Singleton.LocalClientId);
         }
+    }
+
+    private void LoadStatsForSinglePlayer()
+    {
+        Debug.Log("Loading stats for single-player mode...");
+        
+        // For single-player, we need a default profile ID to load.
+        string singlePlayerProfileId = "singleplayer_profile"; // You can change this
+        SaveLoadSystem.PlayerSaveData playerSaveData = SaveLoadSystem.LoadPlayerData(singlePlayerProfileId);
+
+        if (!playerSaveData.Equals(default(SaveLoadSystem.PlayerSaveData)))
+        {
+            Debug.Log("Single-player stats loaded from save file.");
+            // Apply saved data directly
+            ApplyStatsFromSave(playerSaveData);
+            GetComponent<PlayerMovement>().PlayerPosition.Value = playerSaveData.PlayerPosition;
+        }
+        else
+        {
+            Debug.Log("Single-player stats loaded from configuration data (ScriptableObject).");
+            // Apply default SO data
+            ApplyStatsFromConfiguration(playerStatsSO);
+            GetComponent<PlayerMovement>().PlayerPosition.Value = transform.position; // Use current position
+        }
+    }
+
+    // Helper method to reduce code duplication
+    private void ApplyStatsFromSave(SaveLoadSystem.PlayerSaveData playerSaveData)
+    {
+        HealthStat.Stat.Value = playerSaveData.Health;
+        HealthStat.MaxStat.Value = playerSaveData.MaxHealth;
+        StrengthStat.Stat.Value = playerSaveData.Strength;
+        StrengthStat.MaxStat.Value = playerSaveData.MaxStrength;
+        SpeedStat.Stat.Value = playerSaveData.Speed;
+        SpeedStat.MaxStat.Value = playerSaveData.MaxSpeed;
+        EnduranceStat.Stat.Value = playerSaveData.Endurance;
+        EnduranceStat.MaxStat.Value = playerSaveData.MaxEndurance;
+        SummoningCapacityStat.Stat.Value = playerSaveData.SummoningCapacity;
+        SummoningCapacityStat.MaxStat.Value = playerSaveData.MaxSummoningCapacity;
+        BindingAffinityStat.Stat.Value = playerSaveData.BindingAffinity;
+        BindingAffinityStat.MaxStat.Value = playerSaveData.MaxBindingAffinity;
+        CorruptionStat.Stat.Value = playerSaveData.Corruption;
+        CorruptionStat.MaxStat.Value = playerSaveData.MaxCorruption;
+    }
+
+    private void ApplyStatsFromConfiguration(PlayerStatsConfiguration playerStatsSO) {
+        HealthStat.Stat.Value = playerStatsSO.Health;
+        HealthStat.MaxStat.Value = playerStatsSO.Health;
+        StrengthStat.Stat.Value = playerStatsSO.Strength;
+        StrengthStat.MaxStat.Value = playerStatsSO.Strength;
+        SpeedStat.Stat.Value = playerStatsSO.Speed;
+        SpeedStat.MaxStat.Value = playerStatsSO.Speed;
+        EnduranceStat.Stat.Value = playerStatsSO.Endurance;
+        EnduranceStat.MaxStat.Value = playerStatsSO.Endurance;
+        SummoningCapacityStat.Stat.Value = playerStatsSO.SummoningCapacity;
+        SummoningCapacityStat.MaxStat.Value = playerStatsSO.SummoningCapacity;
+        BindingAffinityStat.Stat.Value = playerStatsSO.BindingAffinity;
+        BindingAffinityStat.MaxStat.Value = playerStatsSO.BindingAffinity;
+        CorruptionStat.Stat.Value = playerStatsSO.Corruption;
+        CorruptionStat.MaxStat.Value = playerStatsSO.Corruption;
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -58,51 +130,23 @@ public class PlayerStats : NetworkStats{
         ApplyLoadedData(clientId, playerData);
     }
 
-    private void ApplyLoadedData(ulong clientId, SaveLoadSystem.PlayerSaveData playerSaveData){
+    private void ApplyLoadedData(ulong clientId, SaveLoadSystem.PlayerSaveData playerSaveData)
+    {
         if (!IsServer) { return; }
-
-        Debug.Log($"Applying data for client {clientId}. IsSpawned: {NetworkObject.IsSpawned}");
+        
         Vector3 position;
 
-        if (!playerSaveData.Equals(default(SaveLoadSystem.PlayerSaveData))){
-            Debug.Log($"Client {clientId} received stats from save file");
+        if (!playerSaveData.Equals(default(SaveLoadSystem.PlayerSaveData)))
+        {
+            Debug.Log("Applying stats from save!");
             position = playerSaveData.PlayerPosition;
-
-            HealthStat.Stat.Value = playerSaveData.Health;
-            StrengthStat.Stat.Value = playerSaveData.Strength;
-            SpeedStat.Stat.Value = playerSaveData.Speed;
-            EnduranceStat.Stat.Value = playerSaveData.Endurance;
-            SummoningCapacityStat.Stat.Value = playerSaveData.SummoningCapacity;
-            BindingAffinityStat.Stat.Value = playerSaveData.BindingAffinity;
-            CorruptionStat.Stat.Value = playerSaveData.Corruption;
-
-            HealthStat.MaxStat.Value = playerSaveData.MaxHealth;
-            StrengthStat.MaxStat.Value = playerSaveData.MaxStrength;
-            SpeedStat.MaxStat.Value = playerSaveData.MaxSpeed;
-            EnduranceStat.MaxStat.Value = playerSaveData.MaxEndurance;
-            SummoningCapacityStat.MaxStat.Value = playerSaveData.MaxSummoningCapacity;
-            BindingAffinityStat.MaxStat.Value = playerSaveData.MaxBindingAffinity;
-            CorruptionStat.MaxStat.Value = playerSaveData.MaxCorruption;
+            ApplyStatsFromSave(playerSaveData);
         }
-        else{
-            Debug.Log($"Client {clientId} received stats from configuration data");
+        else
+        {
+            Debug.Log("Applying stats from configuration!");
             position = default;
-
-            HealthStat.Stat.Value = playerStatsSO.Health;
-            StrengthStat.Stat.Value = playerStatsSO.Strength;
-            SpeedStat.Stat.Value = playerStatsSO.Speed;
-            EnduranceStat.Stat.Value = playerStatsSO.Endurance;
-            SummoningCapacityStat.Stat.Value = playerStatsSO.SummoningCapacity;
-            BindingAffinityStat.Stat.Value = playerStatsSO.BindingAffinity;
-            CorruptionStat.Stat.Value = playerStatsSO.Corruption;
-
-            HealthStat.MaxStat.Value = playerStatsSO.Health;
-            StrengthStat.MaxStat.Value = playerStatsSO.Strength;
-            SpeedStat.MaxStat.Value = playerStatsSO.Speed;
-            EnduranceStat.MaxStat.Value = playerStatsSO.Endurance;
-            SummoningCapacityStat.MaxStat.Value = playerStatsSO.SummoningCapacity;
-            BindingAffinityStat.MaxStat.Value = playerStatsSO.BindingAffinity;
-            CorruptionStat.MaxStat.Value = playerStatsSO.Corruption;
+            ApplyStatsFromConfiguration(playerStatsSO);
         }
 
         OwnerAuthoritativeData playerData = new OwnerAuthoritativeData { Position = position };
@@ -111,43 +155,40 @@ public class PlayerStats : NetworkStats{
     }
 
     [ClientRpc]
-    private void SendOwnerAuthoritativeDataClientRpc(OwnerAuthoritativeData data, ClientRpcParams rpcParams){
-        Debug.Log($"ClientRpc called for client {NetworkManager.Singleton.LocalClientId}. LocalClient null: {NetworkManager.Singleton.LocalClient == null}");
-
-        // Wait until the player object is available
-        NetworkObject playerObject = null;
-        if (NetworkManager.Singleton.LocalClient != null){
-            playerObject = NetworkManager.Singleton.LocalClient.PlayerObject;
-        }
-
-        if (playerObject != null){
-            Debug.Log($"Player object found for client {NetworkManager.Singleton.LocalClientId}. Setting position to {data.Position}");
-            playerObject.GetComponent<PlayerMovement>().PlayerPosition.Value = data.Position;
-        }
-        else{
-            Debug.LogWarning($"PlayerObject is null for client {NetworkManager.Singleton.LocalClientId}. Retrying in next frame...");
-            // Retry in the next frame if the player object isn’t ready yet
-            StartCoroutine(TrySetPlayerPosition(data, rpcParams));
-        }
+    private void SendOwnerAuthoritativeDataClientRpc(OwnerAuthoritativeData data, ClientRpcParams rpcParams)
+    {
+        StartCoroutine(TrySetPlayerPosition(data, rpcParams));
     }
 
-    private IEnumerator TrySetPlayerPosition(OwnerAuthoritativeData data, ClientRpcParams rpcParams){
-        yield return null; // Wait one frame
+    private IEnumerator TrySetPlayerPosition(OwnerAuthoritativeData data, ClientRpcParams rpcParams)
+    {
+        // Wait until the player object is available
+        NetworkObject playerObject = null;
+        while (playerObject == null)
+        {
+             if (NetworkManager.Singleton.LocalClient != null)
+             {
+                 playerObject = NetworkManager.Singleton.LocalClient.PlayerObject;
+             }
+             yield return null; // Wait one frame
+        }
 
-        NetworkObject playerObject = NetworkManager.Singleton.LocalClient?.PlayerObject;
-        if (playerObject != null){
-            Debug.Log($"Retry succeeded for client {NetworkManager.Singleton.LocalClientId}. Setting position to {data.Position}");
+        if (playerObject != null)
+        {
             playerObject.GetComponent<PlayerMovement>().PlayerPosition.Value = data.Position;
         }
-        else{
+        else
+        {
             Debug.LogError($"Failed to find PlayerObject for client {NetworkManager.Singleton.LocalClientId} after retry!");
         }
     }
 
-    public struct OwnerAuthoritativeData : INetworkSerializable{
+    public struct OwnerAuthoritativeData : INetworkSerializable
+    {
         public Vector3 Position;
 
-        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter{
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
             serializer.SerializeValue(ref Position);
         }
     }

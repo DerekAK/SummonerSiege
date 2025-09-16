@@ -6,6 +6,8 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using System;
 using System.Linq;
+using UnityEngine.AI;
+using Unity.AI.Navigation;
 
 public class EndlessTerrain : MonoBehaviour
 {
@@ -150,6 +152,8 @@ public class EndlessTerrain : MonoBehaviour
         private int2 chunkCoord;
         private int previousLODIndex = -1;
         private MapGenerator mapGenerator;
+        private NavMeshSurface navMeshSurface;
+        private bool hasNavMeshBeenBaked = false;
 
         public TerrainChunk(MapGenerator mapGen, int2 coord, int3 dimensions, LODInfo[] lodInfoList, Transform parent, Material material)
         {
@@ -167,6 +171,10 @@ public class EndlessTerrain : MonoBehaviour
             meshFilter = meshObject.AddComponent<MeshFilter>();
             meshRenderer.material = material;
 
+            navMeshSurface = meshObject.AddComponent<NavMeshSurface>();
+            navMeshSurface.collectObjects = CollectObjects.Children; // Only consider this chunk for baking
+            navMeshSurface.useGeometry = NavMeshCollectGeometry.RenderMeshes; // Use the visual mesh
+
             mapGenerator = mapGen;
 
             lodMeshes = new LODMesh[lodInfoList.Length];
@@ -174,6 +182,10 @@ public class EndlessTerrain : MonoBehaviour
             {
                 lodMeshes[i] = new LODMesh(lodInfoList[i].lod);
             }
+
+            int groundLayerIndex = LayerMask.NameToLayer("Obstacle");
+
+            meshObject.layer = groundLayerIndex;
 
             UpdateTerrainChunk(); // Initial update to determine visibility and start generation
         }
@@ -190,7 +202,7 @@ public class EndlessTerrain : MonoBehaviour
                 {
                     if (viewerDstFromNearestEdge > lodInfoList[i].visibleDistanceThreshold)
                     {
-                        lodIndex = i + 1;
+                        lodIndex += 1;
                     }
                     else
                     {
@@ -206,8 +218,6 @@ public class EndlessTerrain : MonoBehaviour
                         previousLODIndex = lodIndex;
                         meshFilter.mesh = lodMesh.mesh;
 
-                        // --- ADD THIS LOGIC ---
-                        // Add or get a MeshCollider component
                         MeshCollider meshCollider = meshObject.GetComponent<MeshCollider>();
                         if (meshCollider == null)
                         {
@@ -215,8 +225,11 @@ public class EndlessTerrain : MonoBehaviour
                         }
                         // Update the collider's mesh to match the visual mesh
                         meshCollider.sharedMesh = lodMesh.mesh;
-                        // --- END OF ADDED LOGIC ---
 
+                        if (!hasNavMeshBeenBaked && lodIndex == 0)
+                        {
+                            BakeNavMesh();
+                        }
 
                     }
                     else if (!lodMesh.isGenerating)
@@ -227,6 +240,15 @@ public class EndlessTerrain : MonoBehaviour
             }
 
             SetVisible(visible);
+        }
+
+        private void BakeNavMesh()
+        {
+            if (navMeshSurface != null && navMeshSurface.enabled)
+            {
+                navMeshSurface.BuildNavMesh();
+                hasNavMeshBeenBaked = true;
+            }
         }
 
         public void SetVisible(bool visible)
@@ -338,7 +360,7 @@ public class EndlessTerrain : MonoBehaviour
             {
                 jobHandle.Complete(); // This will re-throw any exception from the job.
 
-                if (!isGenerating){ yield break; }
+                if (!isGenerating) { yield break; }
 
                 CreateMesh();
             }

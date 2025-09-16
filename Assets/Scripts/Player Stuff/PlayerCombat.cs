@@ -3,17 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public class PlayerCombat : NetworkBehaviour
 {
-
-    /**
-        Errors so far: spawning a network weapon object won't be synced if client joins in after
-        it was spawned
-
-    */
-
-
     [SerializeField] private GameObject pfTmpSword;
     private Animator _anim;
     private PlayerState _playerState;
@@ -48,17 +41,117 @@ public class PlayerCombat : NetworkBehaviour
     [SerializeField] private List<ComboSystem.Combo> defaultCombos = new List<ComboSystem.Combo>();
     private List<ComboSystem.Combo> possibleCombos = new List<ComboSystem.Combo>();
 
+    private bool isInitialized = false;
+
     private void Awake(){
         _anim = GetComponent<Animator>();
         _playerState = GetComponent<PlayerState>();
         _playerClipsHandler = GetComponent<PlayerClipsHandler>();
     }
-
-    private void Update(){
-        if(!IsLocalPlayer) return;
-        if(Input.GetKeyDown(KeyCode.P)){
-            WeaponSpawnServerRpc();            
+    
+    private void Start()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
+        {
+            Initialize();
         }
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        if (IsOwner)
+        {
+            Initialize();
+        }
+    }
+    
+    private void Initialize()
+    {
+        GameInput.Instance.OnAttackButtonStarted += AttackButtonStart;
+        GameInput.Instance.OnAttackButtonCanceled += AttackButtonCanceled;
+
+        foreach (ComboSystem.Combo combo in defaultCombos){
+            possibleCombos.Add(combo);
+            combo.Initialize();
+        }
+        isInitialized = true;
+    }
+
+    private void Shutdown()
+    {
+        if (GameInput.Instance != null)
+        {
+            GameInput.Instance.OnAttackButtonStarted -= AttackButtonStart;
+            GameInput.Instance.OnAttackButtonCanceled -= AttackButtonCanceled;
+        }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (IsOwner)
+        {
+            Shutdown();
+        }
+    }
+
+    public override void OnDestroy()
+    {
+        base.OnDestroy();
+        if (NetworkManager.Singleton == null || (!NetworkManager.Singleton.IsServer && !NetworkManager.Singleton.IsClient))
+        {
+            Shutdown();
+        }
+    }
+    
+    private void Update(){
+        if(!isInitialized) return;
+        
+        if(Input.GetKeyDown(KeyCode.P))
+        {
+            // This is debug code, but now it's safe for single-player.
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            {
+                WeaponSpawnServerRpc();
+            }
+            else
+            {
+                if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer && !NetworkManager.Singleton.IsClient)
+                {
+                    NonNetworkedWeaponSpawn();
+                }
+            }
+        }
+    }
+
+    private void PerformAttack(){
+        isAttacking = true;
+        _playerState.currentAttack = currentAttackSO;
+        _playerState.ChangeAttackStatus(true);
+        
+        int attackIndex = GetIndexByAttackSO(currentAttackSO);
+        
+        // Safely update network variables and call RPCs
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient)
+        {
+            ChangeAttackSOIndexServerRpc(attackIndex);
+            _playerClipsHandler.ChangeOverriderClipsServerRpc(attackIndex);
+        }
+        else
+        {
+            // In single-player, we just update the local value and animator directly
+            nvAttackSOIndex.Value = attackIndex;
+            // The ClientRpc in PlayerClipsHandler needs to be called directly
+             _playerClipsHandler.ExecuteClipChange(attackIndex);
+        }
+
+        if (currAnimAttackState == 0) _anim.SetTrigger(attackParamA);
+        else _anim.SetTrigger(attackParamB);
+        currAnimAttackState = (currAnimAttackState + 1) % 2;
+    }
+
+    private void NonNetworkedWeaponSpawn()
+    {
+        
     }
 
     [ServerRpc]
@@ -85,24 +178,8 @@ public class PlayerCombat : NetworkBehaviour
         StartCoroutine(networkObjectWeapon.GetComponent<FollowTarget>().
             FollowTargetCoroutine(attachPoint));
     }
-
-    private void Start(){
-        GameInput.Instance.OnAttackButtonStarted += AttackButtonStart;
-        GameInput.Instance.OnAttackButtonCanceled += AttackButtonCanceled;
-
-        foreach (ComboSystem.Combo combo in defaultCombos){
-            possibleCombos.Add(combo);
-            combo.Initialize();
-        }
-    }
-
-    private void OnDisable(){
-        GameInput.Instance.OnAttackButtonStarted -= AttackButtonStart;
-        GameInput.Instance.OnAttackButtonCanceled -= AttackButtonCanceled;
-    }
-
+    
     private void AttackButtonStart(GameInput.AttackInput inputButton){        
-        if (!IsLocalPlayer) return;
         if (inHoldCombo) return;
 
         if (!isAttacking || inCombo){
@@ -144,7 +221,6 @@ public class PlayerCombat : NetworkBehaviour
         if (inputHoldCoroutine != null) StopCoroutine(inputHoldCoroutine);
 
         if (inHoldCombo){
-            // Advance to release attack if holdable
             if (currentAttackSO?.Holdable == true){
                 currentAttackSO = DecideCurrentAttackSO(GameInput.AttackInput.None, ComboSystem.AttackPressType.Hold);
                 if (currentAttackSO){
@@ -158,7 +234,7 @@ public class PlayerCombat : NetworkBehaviour
 
             }
             inHoldCombo = false;
-            currentCombo?.ResetComboStep(); // Reset after release
+            currentCombo?.ResetComboStep();
             return;
         }
 
@@ -170,15 +246,12 @@ public class PlayerCombat : NetworkBehaviour
             }
         }
     }
-
-
+    
     private BaseAttackSO DecideCurrentAttackSO(GameInput.AttackInput inputButton, ComboSystem.AttackPressType pressType){
         if (inCombo && currentCombo.currComboStep.userPressType == pressType && currentCombo.currComboStep.userInput == inputButton){
-            // Debug.Log("Registered combo input!");
             return currentCombo.currComboStep.attack;
         }
         else if (inCombo){
-            // Debug.Log("In combo but wrong input");
             return null;
         }
         else{
@@ -186,16 +259,13 @@ public class PlayerCombat : NetworkBehaviour
                 foreach (ComboSystem.Combo combo in possibleCombos){
                     ComboSystem.ComboStep firstComboStep = combo.comboSteps[0];
                     if (firstComboStep.userInput == inputButton && firstComboStep.userPressType == pressType){
-                        // Debug.Log("Found the correct normal attack!");
                         currentCombo = combo;
                         return firstComboStep.attack;
                     }
                 }
-                // Debug.Log("No Normal attack matching these inputs!");
                 return null;
             }
             else{
-                // Debug.Log("In attack but past combat window");
                 return null;
             }
         }
@@ -217,19 +287,6 @@ public class PlayerCombat : NetworkBehaviour
                 comboCoroutine = StartCoroutine(TrackComboWindow());
             }
         }
-    }
-
-    private void PerformAttack(){
-        if (!IsLocalPlayer) return;
-        isAttacking = true;
-        _playerState.currentAttack = currentAttackSO;
-        _playerState.ChangeAttackStatus(true);
-        ChangeAttackSOIndexServerRpc(GetIndexByAttackSO(currentAttackSO));
-        _playerClipsHandler.ChangeOverriderClipsServerRpc(GetIndexByAttackSO(currentAttackSO));
-
-        if (currAnimAttackState == 0) _anim.SetTrigger(attackParamA);
-        else _anim.SetTrigger(attackParamB);
-        currAnimAttackState = (currAnimAttackState + 1) % 2;
     }
 
     [ServerRpc]
@@ -279,12 +336,12 @@ public class PlayerCombat : NetworkBehaviour
     }
 
     private void EnableHitBoxes(){
-        if (!IsServer) return;
+        if (!IsServer && NetworkManager.Singleton != null) return;
         GetAttackSOByIndex(nvAttackSOIndex.Value).Enable(this, _anim);
     }
 
     private void DisableHitBoxes(){
-        if (!IsServer) return;
+        if (!IsServer && NetworkManager.Singleton != null) return;
         GetAttackSOByIndex(nvAttackSOIndex.Value).Disable(this, _anim);
     }
 

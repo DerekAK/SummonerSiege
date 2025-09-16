@@ -7,12 +7,12 @@ Responsible for handling all animation transitions of the player
 */
 public class PlayerClipsHandler : NetworkBehaviour{
 
-    private PlayerState _playerState;
     private Animator _anim;
     private PlayerCombat _playerCombat;
     private AnimatorOverrideController _templateOverrider;
     private AnimatorOverrideController _copyOverrider;
 
+    [Header("Movement Animations")]
     [Header("Movement Animations")]
     [SerializeField] private AnimationClip unarmedIdleClip;
     [SerializeField] private AnimationClip unarmedStrafeIdleClip;
@@ -40,6 +40,8 @@ public class PlayerClipsHandler : NetworkBehaviour{
     }
 
     private void Start(){
+        // Using Start for this is fine as it's not dependent on network state
+        // and needs to run on all clients regardless of ownership.
         HandleMovementClips();
     }
 
@@ -61,9 +63,17 @@ public class PlayerClipsHandler : NetworkBehaviour{
         _copyOverrider["Roll Right Placeholder"] = unarmedRollRightClip;
         _copyOverrider["Crouch Frame Placeholder"] = unarmedCrouchClip;
     }
+    
+    // This is the public method that should now be called from PlayerCombat
+    public void ExecuteClipChange(int newIndex)
+    {
+        // This is the actual logic that changes the animation clip
+        AnimationClip attackClip = GetComponent<PlayerCombat>().attackSOList[newIndex].AttackClip;
+        AnimatorOverrideController copyController = (AnimatorOverrideController)GetComponent<Animator>().runtimeAnimatorController;
+        copyController["Attack A Placeholder"] = attackClip;
+        copyController["Attack B Placeholder"] = attackClip;
+    }
 
-
-    // will only be called by the local player (using isLocalPlayer)
     [ServerRpc]
     public void ChangeOverriderClipsServerRpc(int newIndex){
         ChangeOverriderClipsClientRpc(newIndex);
@@ -71,9 +81,6 @@ public class PlayerClipsHandler : NetworkBehaviour{
 
     [ClientRpc]
     private void ChangeOverriderClipsClientRpc(int newIndex){
-        AnimationClip attackClip = GetComponent<PlayerCombat>().attackSOList[newIndex].AttackClip;
-        AnimatorOverrideController copyController = (AnimatorOverrideController)GetComponent<Animator>().runtimeAnimatorController;
-        copyController["Attack A Placeholder"] = attackClip;
-        copyController["Attack B Placeholder"] = attackClip;
+        ExecuteClipChange(newIndex);
     } 
 }

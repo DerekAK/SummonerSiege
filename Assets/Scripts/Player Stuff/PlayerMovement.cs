@@ -24,7 +24,7 @@ public class PlayerMovement : NetworkBehaviour
     [SerializeField, Tooltip("Useful for rough ground")]
     private float groundedOffset = -0.14f;
     [SerializeField, Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
-    private float groundedRadius = 0.5f;
+    private float groundedRadius;
     private float _verticalVelocity;
     private float gravity = Physics.gravity.y;
     [SerializeField] private float fastFallFactor = 100f;
@@ -50,7 +50,6 @@ public class PlayerMovement : NetworkBehaviour
     private NetworkVariable<Vector3> nvPhysicsVelocity = new NetworkVariable<Vector3>(Vector3.zero);
     private Vector3 physicsVelocity;
 
-    // Camera
     [Header("Mouse Cursor Settings")]
     public bool cursorLocked = true;
     public bool cursorInputForLook = true;
@@ -63,6 +62,8 @@ public class PlayerMovement : NetworkBehaviour
     public GameObject _mainCamera;
     [SerializeField] private GameObject _playerFollowCamera;
 
+    private bool isInitialized = false;
+
     private void Awake()
     {
         _characterController = GetComponent<CharacterController>();
@@ -71,22 +72,128 @@ public class PlayerMovement : NetworkBehaviour
         _playerState = GetComponent<PlayerState>();
     }
 
+    private void Start()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
+        {
+            Debug.Log(">>> START: Detected SINGLE-PLAYER mode. Initializing...", this);
+            Initialize();
+        }
+        else
+        {
+            Debug.Log(">>> START: Detected NETWORK mode. Waiting for OnNetworkSpawn...", this);
+        }
+    }
+
     public override void OnNetworkSpawn()
     {
-        if (!IsLocalPlayer){
-            Destroy(_mainCamera);
-            Destroy(_playerFollowCamera);
-            return;
+        Debug.Log($">>> OnNetworkSpawn: IsOwner = {IsOwner}", this);
+        if (IsOwner)
+        {
+            Debug.Log(">>> OnNetworkSpawn: This is the OWNER. Initializing...", this);
+            Initialize();
         }
+        else
+        {
+            if (_mainCamera != null) Destroy(_mainCamera);
+            if (_playerFollowCamera != null) Destroy(_playerFollowCamera);
+        }
+    }
+
+    private void Initialize()
+    {
+        if (isInitialized) return; // Prevent double-initialization
+        
+        Debug.Log("--- INITIALIZE Method Called! ---", this);
+        
+        _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
+        SetCursorState(cursorLocked);
+        GameInput.Instance.OnAttackButtonStarted += OnRightClickPerform;
+
         StartCoroutine(WaitForStatsLoaded());
         StartCoroutine(BillboardShit());
-        nvPhysicsVelocity.OnValueChanged += PhysicsVelocityChanged;
+        
+        if (NetworkManager.Singleton != null && (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer))
+        {
+            nvPhysicsVelocity.OnValueChanged += PhysicsVelocityChanged;
+            GetComponent<PlayerNetworkSyncHandler>().NetworkSyncEvent += SyncNetworkVariables;
+            Debug.Log("--- INITIALIZE: Subscribed to network events.", this);
+        }
+        isInitialized = true;
+    }
+
+    private void Update()
+    {
+        // This is the gate that is likely blocking execution.
+        if (!isInitialized || !statsConfigured)
+        {
+            // We will add a log here to see the status every frame
+            // To prevent spam, let's log it only for the owner object
+            if (IsOwner || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+            {
+                 Debug.LogWarning($"Update BLOCKED: isInitialized = {isInitialized}, statsConfigured = {statsConfigured}", this);
+            }
+            return;
+        }
+
+        // If we see the "Update RUNNING" message, then the problem is elsewhere.
+        Debug.Log("Update RUNNING", this);
+        GroundedCheck();
+        UpdateVerticalVelocity();
+        HandleMovement();
+        CursorStuffIDontUnderstand();
+    }
+
+    private IEnumerator WaitForStatsLoaded()
+    {
+        Debug.Log("--- Coroutine: Waiting for stats...", this);
+        yield return new WaitForSeconds(0.5f);
+        Debug.Log($"Before applying: {PlayerPosition.Value}");
+        transform.position = PlayerPosition.Value;
+        Debug.Log($"After applying: {transform.position}");
+        statsConfigured = true;
+        Debug.Log("--- Coroutine: Stats configured! Movement should now be enabled.", this);
+    }
+    
+    private void Shutdown()
+    {
+        if (GameInput.Instance != null)
+        {
+            GameInput.Instance.OnAttackButtonStarted -= OnRightClickPerform;
+        }
+
+        if (NetworkManager.Singleton != null)
+        {
+            nvPhysicsVelocity.OnValueChanged -= PhysicsVelocityChanged;
+            var syncHandler = GetComponent<PlayerNetworkSyncHandler>();
+            if (syncHandler != null)
+            {
+                syncHandler.NetworkSyncEvent -= SyncNetworkVariables;
+            }
+        }
+    }
+    
+    public override void OnNetworkDespawn()
+    {
+        if(IsOwner)
+        {
+            Shutdown();
+        }
+    }
+
+    public override void OnDestroy()
+    {
+        base.OnDestroy();
+        if (NetworkManager.Singleton == null || (!NetworkManager.Singleton.IsServer && !NetworkManager.Singleton.IsClient))
+        {
+             Shutdown();
+        }
     }
     
     private IEnumerator BillboardShit(){
         while (isActiveAndEnabled){
+            if (_mainCamera == null) yield break;
             GameObject[] healthBars = GameObject.FindGameObjectsWithTag(billBoardTag);
-            Debug.Log($"Length of healthbars is {healthBars.Length}");
             foreach (GameObject healthBar in healthBars){
                 healthBar.transform.LookAt(healthBar.transform.position + _mainCamera.transform.forward, _mainCamera.transform.up);
             }
@@ -94,39 +201,10 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
-    private void SyncNetworkVariables(object sender, EventArgs e){
-        if (!IsLocalPlayer)
-            return;
-        PlayerPosition.Value = transform.position;
-    }
-
-    private IEnumerator WaitForStatsLoaded(){
-        yield return new WaitForSeconds(0.5f);
-        transform.position = PlayerPosition.Value;
-        GetComponent<PlayerNetworkSyncHandler>().NetworkSyncEvent += SyncNetworkVariables;
-        statsConfigured = true;
-    }
-
-    private void Start(){
-        if (!IsLocalPlayer) return;
-        _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
-        SetCursorState(cursorLocked);
-        GameInput.Instance.OnAttackButtonStarted += OnRightClickPerform;
-    }
-
-    public override void OnNetworkDespawn(){
-        GameInput.Instance.OnAttackButtonStarted -= OnRightClickPerform;
-        GetComponent<PlayerNetworkSyncHandler>().NetworkSyncEvent -= SyncNetworkVariables;
-    }
-
-    private void Update()
+    private void SyncNetworkVariables(object sender, EventArgs e)
     {
-        if (!IsLocalPlayer || !statsConfigured)
-            return;
-        GroundedCheck();
-        UpdateVerticalVelocity();
-        HandleMovement();
-        CursorStuffIDontUnderstand();
+        PlayerPosition.Value = transform.position;
+        Debug.Log($"PlayerPosition updated to {PlayerPosition.Value}!");
     }
 
     private void UpdateVerticalVelocity(){
@@ -143,7 +221,6 @@ public class PlayerMovement : NetworkBehaviour
 
     private void HandleMovement(){
         Vector2 moveDir = GameInput.Instance.GetPlayerMovementVectorNormalized();
-
         bool isMoving = moveDir.sqrMagnitude > _threshold;
         bool isSprinting = GameInput.Instance.SprintingPressed();
         bool isLockedOn = GameInput.Instance.IsAttackButtonPressed(GameInput.AttackInput.RightMouse);
@@ -237,7 +314,6 @@ public class PlayerMovement : NetworkBehaviour
             moveSpeed *= _playerState.currentAttack.MovementSpeedFactor;
         }
 
-        // Combine input movement, vertical velocity, and physics velocity
         Vector3 moveVector = targetDirection.normalized * moveSpeed + new Vector3(0.0f, _verticalVelocity, 0.0f);
         moveVector += physicsVelocity;
         if (moveVector.sqrMagnitude > _threshold){
@@ -245,38 +321,38 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
-    public void ApplyForce(Vector3 force){
+    public void ApplyForce(Vector3 force) {
         if (!IsServer) return;
         nvPhysicsVelocity.Value = force;
         Debug.Log($"Server applied force: {force}, Velocity: {nvPhysicsVelocity.Value}, ID: {OwnerClientId}");
     }
 
-    private void PhysicsVelocityChanged(Vector3 oldValue, Vector3 newValue){
-        if(!IsLocalPlayer){return;}
+    private void PhysicsVelocityChanged(Vector3 oldValue, Vector3 newValue) {
+        if (!IsOwner) { return; }
         StartCoroutine(UpdateLocalPhysicsVelocity(newValue));
     }
 
-    private IEnumerator UpdateLocalPhysicsVelocity(Vector3 newValue){
+    private IEnumerator UpdateLocalPhysicsVelocity(Vector3 newValue) {
         physicsVelocity = newValue;
-        while(physicsVelocity != Vector3.zero){
+        while (physicsVelocity != Vector3.zero) {
             physicsVelocity.x = Mathf.Lerp(physicsVelocity.x, 0, forceDecay * Time.deltaTime);
             physicsVelocity.z = Mathf.Lerp(physicsVelocity.z, 0, forceDecay * Time.deltaTime);
-            physicsVelocity.y = Math.Abs(physicsVelocity.y) < 3f? 0 : 
+            physicsVelocity.y = Math.Abs(physicsVelocity.y) < 3f ? 0 :
                 Mathf.Lerp(physicsVelocity.y, 0, forceDecay * Time.deltaTime);
             yield return null;
         }
     }
 
-    private Vector3 HandlePlayerAndCameraRotation(bool isLockedOn, Vector2 moveDir, bool isMoving){
+    private Vector3 HandlePlayerAndCameraRotation(bool isLockedOn, Vector2 moveDir, bool isMoving) {
         Vector3 playerTargetDirection = Vector3.zero;
         bool scrolledUp = GameInput.Instance.ScrolledUp();
         bool scrolledDown = GameInput.Instance.ScrolledDown();
         float targetRotation;
         float rotationSpeedFactor = _playerState.Attacking ? _playerState.currentAttack.RotationSpeedFactor : 1f;
 
-        if (isLockedOn){
+        if (isLockedOn) {
             bool hasLockOnTarget = _playerState.lockOnTargets.Count > 0;
-            if (hasLockOnTarget){
+            if (hasLockOnTarget) {
                 if (scrolledUp) playerTargetIndex = (playerTargetIndex + 1) % _playerState.lockOnTargets.Count;
                 if (scrolledDown) playerTargetIndex = (playerTargetIndex - 1 + _playerState.lockOnTargets.Count) % _playerState.lockOnTargets.Count;
 
@@ -284,20 +360,20 @@ public class PlayerMovement : NetworkBehaviour
                 Vector3 directionToTarget = (lockOnTarget.position - transform.position).normalized;
                 targetRotation = Mathf.Atan2(directionToTarget.x, directionToTarget.z) * Mathf.Rad2Deg;
             }
-            else{
+            else {
                 targetRotation = _mainCamera.transform.eulerAngles.y;
             }
 
             Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y);
-            if (inputDirection.sqrMagnitude > _threshold){
+            if (inputDirection.sqrMagnitude > _threshold) {
                 playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * inputDirection.normalized;
             }
 
             Quaternion targetRot = Quaternion.Euler(0.0f, targetRotation, 0.0f);
             transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotationSpeed * rotationSpeedFactor * Time.deltaTime);
         }
-        else{
-            if (isMoving){
+        else {
+            if (isMoving) {
                 Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y).normalized;
                 targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + _mainCamera.transform.eulerAngles.y;
                 playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * Vector3.forward;
@@ -309,7 +385,7 @@ public class PlayerMovement : NetworkBehaviour
         return playerTargetDirection;
     }
 
-    private IEnumerator WaitEndRoll(){
+    private IEnumerator WaitEndRoll() {
         _playerState.Rolling = true;
         if (rollCoroutine != null) { StopCoroutine(rollCoroutine); }
         _anim.applyRootMotion = true;
@@ -318,23 +394,23 @@ public class PlayerMovement : NetworkBehaviour
         _playerState.Rolling = false;
     }
 
-    private void OnRightClickPerform(GameInput.AttackInput input){
-        if (input == GameInput.AttackInput.RightMouse){
+    private void OnRightClickPerform(GameInput.AttackInput input) {
+        if (input == GameInput.AttackInput.RightMouse) {
             _playerState.lockOnTargets.Sort((a, b) => Vector3.Distance(a.position, transform.position).CompareTo(Vector3.Distance(b.position, transform.position)));
             playerTargetIndex = 0;
         }
     }
-        
-    private void LateUpdate(){
+
+    private void LateUpdate() {
         if (cursorInputForLook && cursorLocked) { CameraRotation(); }
     }
 
-    private void GroundedCheck(){
+    private void GroundedCheck() {
         Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - groundedOffset, transform.position.z);
         isGrounded = Physics.CheckSphere(spherePosition, groundedRadius, groundLayers, QueryTriggerInteraction.Ignore);
     }
 
-    private void CameraRotation(){
+    private void CameraRotation() {
         if (GameInput.Instance.GetPlayerLookVectorNormalized().sqrMagnitude >= _threshold)
         {
             _cinemachineTargetYaw += GameInput.Instance.GetPlayerLookVectorNormalized().x * 1.2f;
@@ -347,34 +423,34 @@ public class PlayerMovement : NetworkBehaviour
         cinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch, _cinemachineTargetYaw, 0.0f);
     }
 
-    private static float ClampAngle(float lfAngle, float lfMin, float lfMax){
+    private static float ClampAngle(float lfAngle, float lfMin, float lfMax) {
         if (lfAngle < -360f) lfAngle += 360f;
         if (lfAngle > 360f) lfAngle -= 360f;
         return Mathf.Clamp(lfAngle, lfMin, lfMax);
     }
 
-    private void OnApplicationFocus(bool hasFocus){
+    private void OnApplicationFocus(bool hasFocus) {
         if (hasFocus) { SetCursorState(cursorLocked); }
     }
 
-    private void SetCursorState(bool newState){
+    private void SetCursorState(bool newState) {
         Cursor.lockState = newState ? CursorLockMode.Locked : CursorLockMode.None;
         Cursor.visible = !newState;
     }
 
-    private void CursorStuffIDontUnderstand(){
-        if (Input.GetKeyDown(KeyCode.Escape)){
+    private void CursorStuffIDontUnderstand() {
+        if (Input.GetKeyDown(KeyCode.Escape)) {
             cursorLocked = false;
             SetCursorState(cursorLocked);
         }
 
-        if (!cursorLocked && Input.GetMouseButtonDown(0)){
+        if (!cursorLocked && Input.GetMouseButtonDown(0)) {
             cursorLocked = true;
             SetCursorState(cursorLocked);
         }
     }
 
-    public Transform GetEyesTransform(){
+    public Transform GetEyesTransform() {
         return eyesTransform;
     }
 }

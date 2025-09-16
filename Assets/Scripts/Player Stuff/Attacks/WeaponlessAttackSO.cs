@@ -5,7 +5,7 @@ using Unity.Netcode;
 public class WeaponlessAttackSO : BaseAttackSO{
 
     public override void Enable(PlayerCombat combat, Animator anim){
-        if (!NetworkManager.Singleton.IsServer) return;
+        if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsServer) return;
         foreach (Hitbox hitbox in MatrixHitboxes[currHitboxIndex].Hitboxes){
             // Debug.Log($"Index: {currHitboxIndex} and bone: {hitbox.AttachBone}");
 

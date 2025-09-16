@@ -26,8 +26,8 @@ MonoBehaviour:
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
-      time: 0.3435799
-      value: 0.18980992
+      time: 0.4290291
+      value: 0.121420026
       inSlope: 0.785958
       outSlope: 0.785958
       tangentMode: 0
@@ -35,8 +35,8 @@ MonoBehaviour:
       inWeight: 0.33333334
       outWeight: 0.33333334
     - serializedVersion: 3
-      time: 0.5914553
-      value: 0.9469274
+      time: 0.6341799
+      value: 0.8455137
       inSlope: 0.5604323
       outSlope: 0.5604323
       tangentMode: 0
@@ -68,19 +68,19 @@ MonoBehaviour:
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
-      time: 0.35224786
-      value: 0.64566827
-      inSlope: 1.0222256
-      outSlope: 1.0222256
+      time: 0.6785008
+      value: 0.052983135
+      inSlope: 0.14555897
+      outSlope: 0.14555897
       tangentMode: 0
       weightedMode: 0
       inWeight: 0.33333334
       outWeight: 0.33333334
     - serializedVersion: 3
-      time: 0.677158
-      value: 0.22278294
-      inSlope: 0.14555897
-      outSlope: 0.14555897
+      time: 0.79951346
+      value: 0.6739733
+      inSlope: 1.0222256
+      outSlope: 1.0222256
       tangentMode: 0
       weightedMode: 0
       inWeight: 0.33333334
@@ -103,15 +103,24 @@ MonoBehaviour:
     - serializedVersion: 3
       time: 0
       value: 0
-      inSlope: 2
-      outSlope: 2
+      inSlope: 0.14914182
+      outSlope: 0.14914182
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
-      outWeight: 0
+      outWeight: 0.59717673
     - serializedVersion: 3
-      time: 0.40084916
-      value: 0.4543209
+      time: 0.19114855
+      value: 0.0059168786
+      inSlope: -0.086120814
+      outSlope: -0.086120814
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.5677266
+      value: 0.1284982
       inSlope: 1.1575942
       outSlope: 1.1575942
       tangentMode: 0
@@ -217,11 +226,11 @@ MonoBehaviour:
     octaves: 3
     lacunarity: 2
     persistence: 0.5
-    frequency: 0.001
+    frequency: 0.0005
     amplitude: 1
     caveSharpness: 0
   erosionNoise:
-    scale: 0.05
+    scale: 0
     carveBias: 0
     octaves: 3
     lacunarity: 2
@@ -235,12 +244,12 @@ MonoBehaviour:
     octaves: 3
     lacunarity: 2
     persistence: 0.5
-    frequency: 0.002
+    frequency: 0.001
     amplitude: 1
     caveSharpness: 0
   threeDNoise:
-    scale: 1
-    carveBias: 0.25
+    scale: 0
+    carveBias: 0.061
     octaves: 3
     lacunarity: 2
     persistence: 0.5
@@ -281,7 +290,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   cavernNoise:
-    scale: 1
+    scale: 0
     carveBias: 0
     octaves: 3
     lacunarity: 2

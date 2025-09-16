@@ -5,7 +5,8 @@ public class PlayerState: MonoBehaviour
 {
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     [SerializeField] private string lockOnTargetTag;
-    public List<Transform> lockOnTargets {get; private set;} = new List<Transform>();
+    [Tooltip("Mark as false if just want debugging for single person world")]
+    public List<Transform> lockOnTargets { get; private set; } = new List<Transform>();
     public bool InAir = false;
     public bool Attacking{get; private set;} = false;
     public bool Rolling = false;

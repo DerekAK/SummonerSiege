@@ -14,38 +14,85 @@ public class HealthComponent: NetworkBehaviour
         _stats = GetComponent<NetworkStats>();
     }
 
-    public override void OnNetworkSpawn(){
-        base.OnNetworkSpawn();
-        healthNetworkStat = _stats.HealthStat;
-        healthNetworkStat.Stat.OnValueChanged += OnNetworkHealthChanged;
-        healthNetworkStat.OnEqualsZero += Die;
-
-        StartCoroutine(WaitForStatsLoaded());
+    private void Start()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
+        {
+            Initialize();
+        }
     }
 
+    public override void OnNetworkSpawn(){
+        Initialize();
+    }
+    
+    private void Initialize()
+    {
+        healthNetworkStat = _stats.HealthStat;
+        if (healthNetworkStat != null)
+        {
+            healthNetworkStat.Stat.OnValueChanged += OnNetworkHealthChanged;
+            healthNetworkStat.OnEqualsZero += Die;
+            StartCoroutine(WaitForStatsLoaded());
+        }
+    }
+
+    private void Shutdown()
+    {
+        if (healthNetworkStat != null)
+        {
+            healthNetworkStat.Stat.OnValueChanged -= OnNetworkHealthChanged;
+            healthNetworkStat.OnEqualsZero -= Die;
+        }
+    }
+    
+    public override void OnNetworkDespawn(){
+        Shutdown();
+    }
+
+    public override void OnDestroy()
+    {
+        base.OnDestroy();
+        if (NetworkManager.Singleton == null || (!NetworkManager.Singleton.IsServer && !NetworkManager.Singleton.IsClient))
+        {
+            Shutdown();
+        }
+    }
+    
     private IEnumerator WaitForStatsLoaded(){
         yield return new WaitForSeconds(0.5f); //wait one second, enough time for stats to be loaded joining clients
         OnNetworkHealthChanged(healthNetworkStat.Stat.Value, healthNetworkStat.Stat.Value);
     }
+    
+    private void OnNetworkHealthChanged(float previousValue, float newValue)
+    {
+        float fillAmount = 0f; // Default the fill amount to 0.
 
-    public override void OnNetworkDespawn(){
-        base.OnNetworkDespawn();
-        healthNetworkStat.Stat.OnValueChanged -= OnNetworkHealthChanged;
-    }
-
-    private void OnNetworkHealthChanged(float previousValue, float newValue){
-        float fillAmount = newValue/healthNetworkStat.MaxStat.Value;
-        //Debug.Log($"Client {OwnerClientId} fill amount of {fillAmount}, previousVal is {previousValue}, newValue is {newValue}");
-        if(IsOwner){
-            Vector3 currHealthBarVector3 = localHealthBar.localScale;
-            currHealthBarVector3.x = fillAmount;
-            localHealthBar.localScale = currHealthBarVector3;
+        // FIX: Check if max health is not zero to prevent a division error.
+        if (healthNetworkStat.MaxStat.Value > 0)
+        {
+            fillAmount = newValue / healthNetworkStat.MaxStat.Value;
         }
-        else{
-            // intuition is that when one player changes health, every other client calls this but is referencing that player's worldspacehealthbar
-            Vector3 currHealthBarVector3 = worldSpaceHealthBar.localScale;
-            currHealthBarVector3.x = fillAmount;
-            worldSpaceHealthBar.localScale = currHealthBarVector3;
+        
+        bool isOwnerOrSinglePlayer = IsOwner || (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsClient);
+
+        if (isOwnerOrSinglePlayer)
+        {
+            if (localHealthBar != null)
+            {
+                Vector3 currHealthBarVector3 = localHealthBar.localScale;
+                currHealthBarVector3.x = fillAmount;
+                localHealthBar.localScale = currHealthBarVector3;
+            }
+        }
+        else
+        {
+            if (worldSpaceHealthBar != null)
+            {
+                Vector3 currHealthBarVector3 = worldSpaceHealthBar.localScale;
+                currHealthBarVector3.x = fillAmount;
+                worldSpaceHealthBar.localScale = currHealthBarVector3;
+            }
         }
     }
 
@@ -60,5 +107,5 @@ public class HealthComponent: NetworkBehaviour
 
     private void Die(object sender, EventArgs e){
         Debug.Log("Player " + OwnerClientId + " Died!");
-    }    
+    }   
 }
