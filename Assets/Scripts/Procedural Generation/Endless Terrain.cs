@@ -8,6 +8,8 @@ using System;
 using System.Linq;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
+// --- CHANGE: No longer need System.Threading.Tasks
+// using System.Threading.Tasks;
 
 public class EndlessTerrain : MonoBehaviour
 {
@@ -120,7 +122,6 @@ public class EndlessTerrain : MonoBehaviour
         var samples = new NativeArray<float>(resolution, Allocator.Persistent);
         for (int i = 0; i < resolution; i++)
         {
-            // Evaluate the curve at normalized time [0, 1]
             float time = (float)i / (resolution - 1);
             samples[i] = curve.Evaluate(time);
         }
@@ -154,6 +155,7 @@ public class EndlessTerrain : MonoBehaviour
         private MapGenerator mapGenerator;
         private NavMeshSurface navMeshSurface;
         private bool hasNavMeshBeenBaked = false;
+        private bool isBakingNavMesh = false;
 
         public TerrainChunk(MapGenerator mapGen, int2 coord, int3 dimensions, LODInfo[] lodInfoList, Transform parent, Material material)
         {
@@ -172,8 +174,15 @@ public class EndlessTerrain : MonoBehaviour
             meshRenderer.material = material;
 
             navMeshSurface = meshObject.AddComponent<NavMeshSurface>();
-            navMeshSurface.collectObjects = CollectObjects.Children; // Only consider this chunk for baking
-            navMeshSurface.useGeometry = NavMeshCollectGeometry.RenderMeshes; // Use the visual mesh
+            navMeshSurface.collectObjects = CollectObjects.All;
+            navMeshSurface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
+            
+            // --- FIX: Instantiate an empty NavMeshData object on the main thread here.
+            // This prevents the null reference exception when updating asynchronously.
+            navMeshSurface.navMeshData = new NavMeshData();
+            
+            // --- Add the (currently empty) data to the NavMesh system.
+            navMeshSurface.AddData();
 
             mapGenerator = mapGen;
 
@@ -187,7 +196,7 @@ public class EndlessTerrain : MonoBehaviour
 
             meshObject.layer = groundLayerIndex;
 
-            UpdateTerrainChunk(); // Initial update to determine visibility and start generation
+            UpdateTerrainChunk();
         }
 
         public void UpdateTerrainChunk()
@@ -223,14 +232,12 @@ public class EndlessTerrain : MonoBehaviour
                         {
                             meshCollider = meshObject.AddComponent<MeshCollider>();
                         }
-                        // Update the collider's mesh to match the visual mesh
                         meshCollider.sharedMesh = lodMesh.mesh;
 
-                        if (!hasNavMeshBeenBaked && lodIndex == 0)
+                        if (!hasNavMeshBeenBaked && lodIndex == 0 && !isBakingNavMesh)
                         {
-                            BakeNavMesh();
+                            mapGenerator.StartCoroutine(BakeNavMeshAsync());
                         }
-
                     }
                     else if (!lodMesh.isGenerating)
                     {
@@ -242,14 +249,27 @@ public class EndlessTerrain : MonoBehaviour
             SetVisible(visible);
         }
 
-        private void BakeNavMesh()
+        // --- CHANGE: Reverted to the simpler, safer coroutine.
+        private IEnumerator BakeNavMeshAsync()
         {
-            if (navMeshSurface != null && navMeshSurface.enabled)
+            if (navMeshSurface == null || !navMeshSurface.enabled)
             {
-                navMeshSurface.BuildNavMesh();
-                hasNavMeshBeenBaked = true;
+                yield break;
             }
+
+            isBakingNavMesh = true;
+
+            // This is the intended high-level async API for NavMeshSurface.
+            // It runs in the background and will not throw an error because navMeshData now exists.
+            AsyncOperation operation = navMeshSurface.UpdateNavMesh(navMeshSurface.navMeshData);
+            
+            // Wait for the operation to complete without blocking the main thread.
+            yield return operation;
+
+            hasNavMeshBeenBaked = true;
+            isBakingNavMesh = false;
         }
+
 
         public void SetVisible(bool visible)
         {
@@ -258,9 +278,15 @@ public class EndlessTerrain : MonoBehaviour
 
         public void DestroyChunk()
         {
+            if (meshObject == null) return;
+            
             foreach (var lodMesh in lodMeshes)
             {
                 lodMesh.CancelJob();
+            }
+            if (navMeshSurface != null && navMeshSurface.navMeshData != null)
+            {
+                navMeshSurface.RemoveData();
             }
             Destroy(meshObject);
         }
@@ -275,7 +301,6 @@ public class EndlessTerrain : MonoBehaviour
         public int lod;
         private JobHandle jobHandle;
 
-        // Native Arrays for 3D generation
         private NativeList<float3> vertices;
         private NativeList<int> triangles;
         private NativeArray<float> densityField;
@@ -300,17 +325,12 @@ public class EndlessTerrain : MonoBehaviour
 
             int3 dimensions = new int3((int)chunkDimensions.x, (int)chunkDimensions.y, (int)chunkDimensions.z);
 
-            // --- THIS IS THE FIX ---
-            // Calculate the step and required grid size here, BEFORE allocating memory.
             int step = 1 << this.lod;
             int3 numPointsPerAxis = dimensions / step + 1;
 
-            // Allocate the densityField with the CORRECT size for the current LOD.
             densityField = new NativeArray<float>(numPointsPerAxis.x * numPointsPerAxis.y * numPointsPerAxis.z, Allocator.Persistent);
-
             cubeDensities = new NativeArray<float>(8, Allocator.Persistent);
             edgeVertices = new NativeArray<float3>(12, Allocator.Persistent);
-
 
             var job = new ThreeDJob
             {
@@ -318,14 +338,11 @@ public class EndlessTerrain : MonoBehaviour
                 chunkSize = dimensions,
                 isoLevel = EndlessTerrain.isoLevel,
                 lod = this.lod,
-
                 vertices = vertices,
                 triangles = triangles,
                 densityField = densityField,
                 cubeDensities = cubeDensities,
                 edgeVertices = edgeVertices,
-
-                // biome settings
                 terrainAmplitude = staticActiveBiomeSO.terrainAmplitude,
                 continentalnessCurveSamples = continentalnessSamples,
                 erosionCurveSamples = erosionSamples,
@@ -358,7 +375,7 @@ public class EndlessTerrain : MonoBehaviour
 
             try
             {
-                jobHandle.Complete(); // This will re-throw any exception from the job.
+                jobHandle.Complete();
 
                 if (!isGenerating) { yield break; }
 
@@ -366,7 +383,6 @@ public class EndlessTerrain : MonoBehaviour
             }
             finally
             {
-                // This block is GUARANTEED to execute, regardless of exceptions.
                 DisposeArrays();
                 isGenerating = false;
             }
@@ -396,25 +412,20 @@ public class EndlessTerrain : MonoBehaviour
 
         public void CancelJob()
         {
-            // Check if there's a job we need to handle.
             if (isGenerating)
             {
                 try
                 {
-                    // We must wait for the job to finish before we can dispose its data.
                     jobHandle.Complete();
                 }
                 finally
                 {
-                    // This guarantees cleanup even if the job had an error.
                     isGenerating = false;
                     DisposeArrays();
                 }
             }
-            // If not generating, there's no active job or allocated memory to worry about.
         }
 
-        // destroys arrays that only need to exist per job
         private void DisposeArrays()
         {
             if (vertices.IsCreated) vertices.Dispose();
