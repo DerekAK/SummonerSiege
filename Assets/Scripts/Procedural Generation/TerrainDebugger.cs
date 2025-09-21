@@ -38,7 +38,7 @@ public class TerrainDebugger : MonoBehaviour
         {
             // Draw a bright green wireframe cube around the selected chunk's bounds
             Gizmos.color = Color.green;
-            Gizmos.DrawWireCube(new Vector3(selectedChunk.Bounds.center.x, 64, selectedChunk.Bounds.center.z), selectedChunk.Bounds.size);
+            Gizmos.DrawWireCube(new Vector3(selectedChunk.Bounds.center.x, MapGenerator.ChunkHeight/2, selectedChunk.Bounds.center.z), selectedChunk.Bounds.size);
         }
     }
 }

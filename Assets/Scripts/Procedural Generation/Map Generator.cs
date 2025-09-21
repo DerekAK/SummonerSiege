@@ -3,8 +3,8 @@ using UnityEngine;
 public class MapGenerator : MonoBehaviour
 {
     // Constants for chunk dimensions
-    public const int ChunkSideLength = 64;
-    public const int ChunkHeight = 128;
+    public const int ChunkSideLength = 128;
+    public const int ChunkHeight = 512;
     public LayerMask groundLayers;
     
     [Header("Noise Settings")]

@@ -23,7 +23,7 @@ public struct ThreeDJob : IJob
     public NativeList<int> triangles;
 
     // --- Biome Data ---  
-    public float terrainAmplitude;
+    public float terrainAmplitudeFactor;
     [ReadOnly] public NativeArray<float> continentalnessCurveSamples;
     [ReadOnly] public NativeArray<float> erosionCurveSamples;
     [ReadOnly] public NativeArray<float> peaksAndValleysCurveSamples;
@@ -65,7 +65,7 @@ public struct ThreeDJob : IJob
                     densityField[index] = CalculateDensity(
                         worldPos,
                         chunkSize.y,
-                        terrainAmplitude,
+                        terrainAmplitudeFactor,
                         continentalnessCurveSamples,
                         erosionCurveSamples,
                         peaksAndValleysCurveSamples,
@@ -126,7 +126,7 @@ public struct ThreeDJob : IJob
         float chunkHeight, // Needed for normalizing Y for the vertical gradient
 
         // --- Biome Parameters Passed from the BiomeSO ---
-        float terrainAmplitude,
+        float terrainAmplitudeFactor,
         NativeArray<float> continentalnessCurveSamples,
         NativeArray<float> erosionCurveSamples,
         NativeArray<float> peaksAndValleysCurveSamples,
@@ -139,11 +139,20 @@ public struct ThreeDJob : IJob
         NativeArray<float> verticalGradientCurveSamples,
         NativeArray<float> cavernShapeCurveSamples)
     {
-        // 1: Calculate the 2D Base Shape, these will be normalized from [0,1]
+        // --- CONTINENTALNESS ---
+        float continentalnessRaw = FBM2D(worldPos, continentalnessNoise, octaveOffsetsContinentalness);
+        float continentalnessModified = ApplyNoiseFunction(continentalnessRaw, continentalnessNoise); // Apply function
+        float continentalness = EvaluateUsingCurveArray(continentalnessModified, continentalnessCurveSamples) * continentalnessNoise.scale;
 
-        float continentalness = EvaluateUsingCurveArray(FBM2D(worldPos, continentalnessNoise, octaveOffsetsContinentalness), continentalnessCurveSamples) * continentalnessNoise.scale;
-        float erosion = EvaluateUsingCurveArray(FBM2D(worldPos, erosionNoise, octaveOffsetsErosion), erosionCurveSamples) * erosionNoise.scale;
-        float peaksAndValleys = EvaluateUsingCurveArray(FBM2D(worldPos, peaksAndValleysNoise, octaveOffsetsPeaksAndValleys), peaksAndValleysCurveSamples) * peaksAndValleysNoise.scale;
+        // --- EROSION ---
+        float erosionRaw = FBM2D(worldPos, erosionNoise, octaveOffsetsErosion);
+        float erosionModified = ApplyNoiseFunction(erosionRaw, erosionNoise); // Apply function
+        float erosion = EvaluateUsingCurveArray(erosionModified, erosionCurveSamples) * erosionNoise.scale;
+
+        // --- PEAKS & VALLEYS ---
+        float peaksAndValleysRaw = FBM2D(worldPos, peaksAndValleysNoise, octaveOffsetsPeaksAndValleys);
+        float peaksAndValleysModified = ApplyNoiseFunction(peaksAndValleysRaw, peaksAndValleysNoise); // Apply function
+        float peaksAndValleys = EvaluateUsingCurveArray(peaksAndValleysModified, peaksAndValleysCurveSamples) * peaksAndValleysNoise.scale;
 
         // Combine the remapped values to get the final terrain shape.
         // A simple addition is a good start. You can get creative here (e.g., multiplication).
@@ -151,7 +160,7 @@ public struct ThreeDJob : IJob
         float normalizedNoise = (continentalness + erosion + peaksAndValleys) / divideFactor;
 
         // Calculate the final height of the 2D surface.
-        float surfaceHeight = normalizedNoise * (terrainAmplitude - 1);
+        float surfaceHeight = normalizedNoise * terrainAmplitudeFactor * (chunkHeight - 1);
         float clampedSurfaceHeight = Mathf.Clamp(surfaceHeight, 0, chunkHeight - 1);
         float baseDensity = clampedSurfaceHeight - worldPos.y; // in range of [-terrain amplitude, terrain amplitude], which should just be [-chunkheight, chunkheight] (assuming terrain amplitude is set to chunk height)
 
@@ -160,15 +169,15 @@ public struct ThreeDJob : IJob
         float normalizedY = worldPos.y / chunkHeight; // Assumes chunk starts at y=0
         float gradient = EvaluateUsingCurveArray(normalizedY, verticalGradientCurveSamples);
         float clampedGradient = math.saturate(gradient);
-        float threeDModifier = centered3DNoise * threeDNoiseSettings.scale * clampedGradient * terrainAmplitude;
+        float threeDModifier = centered3DNoise * threeDNoiseSettings.scale * clampedGradient * terrainAmplitudeFactor * (chunkHeight - 1);
 
 
-        float3 warpOffset = FBM3D(worldPos, warpNoiseSettings, octaveOffsetsWarp) * warpNoiseSettings.amplitude;
+        float3 warpOffset = FBM3D(worldPos, warpNoiseSettings, octaveOffsetsWarp) * warpNoiseSettings.amplitude * warpNoiseSettings.scale;
         float3 warpPos = worldPos + warpOffset;
         float2 worleyValues = GetWorleyF1F2(warpPos * cavernNoiseSettings.frequency);
         float f1 = worleyValues.x;
         float f2 = worleyValues.y;
-    
+
         // This value is low on the ridges and high in the cell centers
         float ridgeValue = f2 - f1;
 
@@ -177,7 +186,7 @@ public struct ThreeDJob : IJob
 
         float cavernGradient = EvaluateUsingCurveArray(normalizedY, cavernShapeCurveSamples);
         float sharpenedWorley = math.pow(invertedRidgeValue, cavernNoiseSettings.caveSharpness);
-        float cavernCarvingValue = sharpenedWorley * terrainAmplitude * cavernGradient * cavernNoiseSettings.scale;
+        float cavernCarvingValue = sharpenedWorley * terrainAmplitudeFactor * (chunkHeight-1) * cavernGradient * cavernNoiseSettings.scale;
 
         float final3DModifier = threeDModifier + cavernCarvingValue;
 
@@ -291,7 +300,7 @@ public struct ThreeDJob : IJob
                 {
                     int3 neighborCell = cell + new int3(x, y, z);
                     float3 featurePoint = neighborCell + Hash(neighborCell);
-                    
+
                     float dist = math.distance(pos, featurePoint);
 
                     // Check if this distance is a new F1 or F2
@@ -308,6 +317,33 @@ public struct ThreeDJob : IJob
             }
         }
         return minDistance;
+    }
+    
+    private float ApplyNoiseFunction(float normalizedNoise, NoiseSettings settings)
+    {
+        switch (settings.function)
+        {
+            case NoiseFunction.Standard:
+                return normalizedNoise;
+
+            case NoiseFunction.Power:
+                return math.pow(normalizedNoise, settings.power);
+
+            case NoiseFunction.Billow:
+                // Billow creates puffy, cloud-like shapes. It's the absolute value of noise remapped from [-1, 1].
+                float remappedBillow = normalizedNoise * 2f - 1f; // Remap [0, 1] to [-1, 1]
+                return math.abs(remappedBillow);
+
+            case NoiseFunction.Ridged:
+                // Ridged is the inverse of Billow, creating sharp ridges.
+                float remappedRidged = normalizedNoise * 2f - 1f; // Remap [0, 1] to [-1, 1]
+                return 1f - math.abs(remappedRidged);
+
+            case NoiseFunction.Terraced:
+                // Creates distinct steps or terraces in the terrain.
+                return math.floor(normalizedNoise * settings.terraceSteps) / settings.terraceSteps;
+        }
+        return normalizedNoise; // Default case
     }
     
     

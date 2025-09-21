@@ -8,15 +8,15 @@ using UnityEngine.VFX;
 public class BiomeSO : ScriptableObject
 {
 
-    [Tooltip("The maximum height variation. Higher values create taller mountains and deeper valleys.")]
-    public float terrainAmplitude;
+    [Tooltip("Multiplied by chunkheight, so 1 will get a value of chunkheight")]
+    public float terrainAmplitudeFactor;
 
     [Tooltip("Maps the low-frequency Continentalness noise to a height factor. Controls the largest landmass shapes.")]
     public AnimationCurve continentalnessCurve;
 
     [Tooltip("Maps the Erosion noise to a height factor. Controls the general roughness and smoothness of terrain.")]
     public AnimationCurve erosionCurve;
-    
+
     [Tooltip("Maps the Peaks & Valleys noise to a height factor. Controls the fine details of hills, mountains, and valleys.")]
     public AnimationCurve peaksAndValleysCurve;
 
@@ -40,7 +40,7 @@ public class BiomeSO : ScriptableObject
 
     [Tooltip("The skybox to use for this biome.")]
     public Material skyboxMaterial;
-    
+
     [Tooltip("Ambient particle effects like dust, leaves, or snow.")]
     public VisualEffectAsset vfxGraphAsset;
 
@@ -54,14 +54,29 @@ public class BiomeSO : ScriptableObject
     public float fogDensity = 0.01f;
 }
 
-// A reusable struct for noise settings to keep the Inspector clean.
+public enum NoiseFunction { Standard, Power, Billow, Ridged, Terraced }
+
+
 [Serializable]
 public struct NoiseSettings
 {
+    [Header("2D Function Modifiers")]
+    public NoiseFunction function; 
+    [Tooltip("For 'Power': a value of 1 is normal. > 1 creates sharper peaks, < 1 creates flatter plateaus.")]
+    [Range(0.1f, 5f)]
+    public float power;
+    [Tooltip("For 'Terraced': the number of distinct steps or layers.")]
+    [Range(2, 20)]
+    public int terraceSteps;
+    [Range(-1, 1)]
+    [Tooltip("Only used for 3d noise")]
+    public float carveBias;
+    [Tooltip("Only used for cavern shape")]
+    public float caveSharpness;
+
+    [Header("Base Noise Shape")]
     [Range(0, 1)]
     public float scale;
-    [Range(-1, 1)]
-    public float carveBias;
     public int octaves;
     public float lacunarity;
     public float persistence;
@@ -69,7 +84,7 @@ public struct NoiseSettings
     
     [Tooltip("Should always be 1 except for WarpSettings")]
     public float amplitude;
-    public float caveSharpness;
+
 }
 
 // A class for defining rules for spawning objects like trees, rocks, etc.
