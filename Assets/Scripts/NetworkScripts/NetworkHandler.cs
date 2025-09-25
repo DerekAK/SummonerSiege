@@ -27,7 +27,7 @@ public class NetworkHandler : NetworkBehaviour
     }
 
     public void StartHostHandler(){
-        var netMan = NetworkManager.Singleton;
+        NetworkManager netMan = NetworkManager.Singleton;
 
         //subscribe to all callbacks before starting the server
         netMan.OnClientConnectedCallback += OnClientConnected;
@@ -52,7 +52,7 @@ public class NetworkHandler : NetworkBehaviour
             NetworkObject playerObject = connectedPlayers[clientId];
 
             string playerId = DeterminePlayerId(clientId);
-            SaveLoadSystem.PlayerSaveData playerData = ExtractPlayerData(clientId, playerObject);
+            SaveLoadSystem.PlayerSaveData playerData = ExtractPlayerData(playerObject);
             SaveLoadSystem.SavePlayerData(playerId, playerData);
             connectedPlayers.Remove(clientId);
         }
@@ -64,14 +64,14 @@ public class NetworkHandler : NetworkBehaviour
         NetworkManager.Singleton.OnServerStopped -= OnServerStopped;
         foreach ((ulong clientId, NetworkObject playerObject) in connectedPlayers){
             string playerId = DeterminePlayerId(clientId);
-            SaveLoadSystem.PlayerSaveData playerData = ExtractPlayerData(clientId, playerObject);
+            SaveLoadSystem.PlayerSaveData playerData = ExtractPlayerData(playerObject);
             SaveLoadSystem.SavePlayerData(playerId, playerData);
         }
         Debug.Log("Clearing all players from dictionaries");
         connectedPlayers.Clear();
     }
 
-    private SaveLoadSystem.PlayerSaveData ExtractPlayerData(ulong clientId, NetworkObject playerObject){
+    private SaveLoadSystem.PlayerSaveData ExtractPlayerData(NetworkObject playerObject){
         PlayerStats localPlayerStats = playerObject.GetComponent<PlayerStats>();
 
         SaveLoadSystem.PlayerSaveData playerSaveData = new SaveLoadSystem.PlayerSaveData{ 

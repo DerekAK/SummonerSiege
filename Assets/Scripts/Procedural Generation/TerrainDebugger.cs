@@ -14,8 +14,8 @@ public class TerrainDebugger : MonoBehaviour
     public void FindChunkFromWorldPos(Vector3 worldPos)
     {
         // This is the same logic you use to find the viewer's current chunk
-        int coordX = Mathf.RoundToInt(worldPos.x / MapGenerator.ChunkSideLength);
-        int coordZ = Mathf.RoundToInt(worldPos.z / MapGenerator.ChunkSideLength);
+        int coordX = Mathf.RoundToInt(worldPos.x / endlessTerrain.ChunkDimensions.x);
+        int coordZ = Mathf.RoundToInt(worldPos.z / endlessTerrain.ChunkDimensions.x);
         selectedChunkCoord = new int2(coordX, coordZ);
 
         // Try to get the chunk from the dictionary in EndlessTerrain
@@ -38,7 +38,7 @@ public class TerrainDebugger : MonoBehaviour
         {
             // Draw a bright green wireframe cube around the selected chunk's bounds
             Gizmos.color = Color.green;
-            Gizmos.DrawWireCube(new Vector3(selectedChunk.Bounds.center.x, MapGenerator.ChunkHeight/2, selectedChunk.Bounds.center.z), selectedChunk.Bounds.size);
+            Gizmos.DrawWireCube(new Vector3(selectedChunk.Bounds.center.x, endlessTerrain.ChunkDimensions.y/2, selectedChunk.Bounds.center.z), selectedChunk.Bounds.size);
         }
     }
 }

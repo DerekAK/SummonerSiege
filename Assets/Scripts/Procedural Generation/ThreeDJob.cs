@@ -11,6 +11,7 @@ public struct ThreeDJob : IJob
     public int2 chunkCoord;
     public int3 chunkSize;
     public float isoLevel;
+    public float caveStrength;
     public int lod;
 
     // --- Reusable Input/Output Arrays ---
@@ -33,13 +34,18 @@ public struct ThreeDJob : IJob
     public NoiseSettings threeDNoiseSettings;
     public NoiseSettings cavernNoiseSettings;
     public NoiseSettings warpNoiseSettings;
+    public float heightBiasForCaves;
     [ReadOnly] public NativeArray<float> verticalGradientCurveSamples;
-    [ReadOnly] public NativeArray<float> cavernShapeCurveSamples;
+    [ReadOnly] public NativeArray<float> worleyVerticalGradientSamples;
     [ReadOnly] public NativeArray<float2> octaveOffsetsContinentalness;
     [ReadOnly] public NativeArray<float2> octaveOffsetsErosion;
     [ReadOnly] public NativeArray<float2> octaveOffsetsPeaksAndValleys;
     [ReadOnly] public NativeArray<float3> octaveOffsets3D;
     [ReadOnly] public NativeArray<float3> octaveOffsetsWarp;
+
+    [ReadOnly] public NativeArray<NoiseFunction> continentalnessNoiseFunctions;
+    [ReadOnly] public NativeArray<NoiseFunction> erosionNoiseFunctions;
+    [ReadOnly] public NativeArray<NoiseFunction> peaksAndValleysNoiseFunctions;
 
     public void Execute()
     {
@@ -66,6 +72,7 @@ public struct ThreeDJob : IJob
                         worldPos,
                         chunkSize.y,
                         terrainAmplitudeFactor,
+                        caveStrength,
                         continentalnessCurveSamples,
                         erosionCurveSamples,
                         peaksAndValleysCurveSamples,
@@ -76,7 +83,10 @@ public struct ThreeDJob : IJob
                         cavernNoiseSettings,
                         warpNoiseSettings,
                         verticalGradientCurveSamples,
-                        cavernShapeCurveSamples
+                        worleyVerticalGradientSamples,
+                        continentalnessNoiseFunctions,
+                        erosionNoiseFunctions,
+                        peaksAndValleysNoiseFunctions
                     );
                 }
             }
@@ -127,6 +137,7 @@ public struct ThreeDJob : IJob
 
         // --- Biome Parameters Passed from the BiomeSO ---
         float terrainAmplitudeFactor,
+        float caveStrength,
         NativeArray<float> continentalnessCurveSamples,
         NativeArray<float> erosionCurveSamples,
         NativeArray<float> peaksAndValleysCurveSamples,
@@ -137,27 +148,33 @@ public struct ThreeDJob : IJob
         NoiseSettings cavernNoiseSettings,
         NoiseSettings warpNoiseSettings,
         NativeArray<float> verticalGradientCurveSamples,
-        NativeArray<float> cavernShapeCurveSamples)
+        NativeArray<float> worleyVerticalGradientSamples,
+        NativeArray<NoiseFunction> continentalnessNoiseFunctions,
+        NativeArray<NoiseFunction> erosionNoiseFunctions,
+        NativeArray<NoiseFunction> peaksAndValleysNoiseFunctions
+        )
     {
         // --- CONTINENTALNESS ---
         float continentalnessRaw = FBM2D(worldPos, continentalnessNoise, octaveOffsetsContinentalness);
-        float continentalnessModified = ApplyNoiseFunction(continentalnessRaw, continentalnessNoise); // Apply function
+        float continentalnessModified = ApplyNoiseFunctions(continentalnessRaw, continentalnessNoise, continentalnessNoiseFunctions); // Apply function
         float continentalness = EvaluateUsingCurveArray(continentalnessModified, continentalnessCurveSamples) * continentalnessNoise.scale;
 
         // --- EROSION ---
         float erosionRaw = FBM2D(worldPos, erosionNoise, octaveOffsetsErosion);
-        float erosionModified = ApplyNoiseFunction(erosionRaw, erosionNoise); // Apply function
+        float erosionModified = ApplyNoiseFunctions(erosionRaw, erosionNoise, erosionNoiseFunctions); // Apply function
         float erosion = EvaluateUsingCurveArray(erosionModified, erosionCurveSamples) * erosionNoise.scale;
 
         // --- PEAKS & VALLEYS ---
         float peaksAndValleysRaw = FBM2D(worldPos, peaksAndValleysNoise, octaveOffsetsPeaksAndValleys);
-        float peaksAndValleysModified = ApplyNoiseFunction(peaksAndValleysRaw, peaksAndValleysNoise); // Apply function
+        float peaksAndValleysModified = ApplyNoiseFunctions(peaksAndValleysRaw, peaksAndValleysNoise, peaksAndValleysNoiseFunctions); // Apply function
         float peaksAndValleys = EvaluateUsingCurveArray(peaksAndValleysModified, peaksAndValleysCurveSamples) * peaksAndValleysNoise.scale;
 
         // Combine the remapped values to get the final terrain shape.
         // A simple addition is a good start. You can get creative here (e.g., multiplication).
         float divideFactor = continentalnessNoise.scale + erosionNoise.scale + peaksAndValleysNoise.scale;
         float normalizedNoise = (continentalness + erosion + peaksAndValleys) / divideFactor;
+
+        float caveHeightMask = math.pow(normalizedNoise, heightBiasForCaves) * caveStrength;
 
         // Calculate the final height of the 2D surface.
         float surfaceHeight = normalizedNoise * terrainAmplitudeFactor * (chunkHeight - 1);
@@ -184,11 +201,11 @@ public struct ThreeDJob : IJob
         // We invert it so the ridges have a high value (close to 1)
         float invertedRidgeValue = 1.0f - ridgeValue;
 
-        float cavernGradient = EvaluateUsingCurveArray(normalizedY, cavernShapeCurveSamples);
+        float cavernGradient = EvaluateUsingCurveArray(normalizedY, worleyVerticalGradientSamples);
         float sharpenedWorley = math.pow(invertedRidgeValue, cavernNoiseSettings.caveSharpness);
         float cavernCarvingValue = sharpenedWorley * terrainAmplitudeFactor * (chunkHeight-1) * cavernGradient * cavernNoiseSettings.scale;
 
-        float final3DModifier = threeDModifier + cavernCarvingValue;
+        float final3DModifier = (threeDModifier + cavernCarvingValue) * caveHeightMask;
 
         // --- Step 3: Combine 2D and 3D ---
         // Add the 3D modifier to the base density. This will push the surface inwards
@@ -319,31 +336,57 @@ public struct ThreeDJob : IJob
         return minDistance;
     }
     
-    private float ApplyNoiseFunction(float normalizedNoise, NoiseSettings settings)
+    private float ApplyNoiseFunctions(float normalizedNoise, NoiseSettings settings, NativeArray<NoiseFunction> functions)
     {
-        switch (settings.function)
+        // If there are no functions, just return the base noise.
+        if (functions.Length == 0)
         {
-            case NoiseFunction.Standard:
-                return normalizedNoise;
-
-            case NoiseFunction.Power:
-                return math.pow(normalizedNoise, settings.power);
-
-            case NoiseFunction.Billow:
-                // Billow creates puffy, cloud-like shapes. It's the absolute value of noise remapped from [-1, 1].
-                float remappedBillow = normalizedNoise * 2f - 1f; // Remap [0, 1] to [-1, 1]
-                return math.abs(remappedBillow);
-
-            case NoiseFunction.Ridged:
-                // Ridged is the inverse of Billow, creating sharp ridges.
-                float remappedRidged = normalizedNoise * 2f - 1f; // Remap [0, 1] to [-1, 1]
-                return 1f - math.abs(remappedRidged);
-
-            case NoiseFunction.Terraced:
-                // Creates distinct steps or terraces in the terrain.
-                return math.floor(normalizedNoise * settings.terraceSteps) / settings.terraceSteps;
+            return normalizedNoise;
         }
-        return normalizedNoise; // Default case
+
+        float calculatedNoise = 0f;
+        float maxPossibleValue = 0f;
+
+        // Loop through each function and accumulate its result.
+        foreach (NoiseFunction function in functions)
+        {
+            float functionResult = 0f;
+            switch (function)
+            {
+                case NoiseFunction.Standard:
+                    functionResult = normalizedNoise;
+                    break; // Use break to prevent falling through to the next case.
+
+                case NoiseFunction.Power:
+                    functionResult = math.pow(normalizedNoise, settings.power);
+                    break;
+
+                case NoiseFunction.Billow:
+                    float remappedBillow = normalizedNoise * 2f - 1f; // Remap [0, 1] to [-1, 1]
+                    functionResult = math.abs(remappedBillow); // Result is [0, 1]
+                    break;
+
+                case NoiseFunction.Ridged:
+                    float remappedRidged = normalizedNoise * 2f - 1f; // Remap [0, 1] to [-1, 1]
+                    functionResult = 1f - math.abs(remappedRidged); // Result is [0, 1]
+                    break;
+
+                case NoiseFunction.Terraced:
+                    functionResult = math.floor(normalizedNoise * settings.terraceSteps) / settings.terraceSteps;
+                    break;
+            }
+
+            // Add the result of the current function to our total.
+            calculatedNoise += functionResult;
+
+            // Keep track of the max possible total to normalize it later.
+            // Since all our functions output in the [0, 1] range, we just add 1.
+            maxPossibleValue += 1f;
+        }
+
+        // After the loop, normalize the combined value and return it.
+        // This ensures the final output is still in the [0, 1] range.
+        return calculatedNoise / maxPossibleValue;
     }
     
     

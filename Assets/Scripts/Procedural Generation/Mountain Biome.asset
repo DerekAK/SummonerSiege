@@ -10,9 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0784216404b6340a6a598978579ef4f7, type: 3}
-  m_Name: Better Biome
+  m_Name: Mountain Biome
   m_EditorClassIdentifier: 
-  terrainAmplitudeFactor: 1.2
+  terrainAmplitudeFactor: 3.66
+  heightBiasForCaves: 3
+  caveStrength: 30
+  sameOctaveOffsets: 1
   continentalnessCurve:
     serializedVersion: 2
     m_Curve:
@@ -26,49 +29,13 @@ MonoBehaviour:
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
-      time: 0.3804691
-      value: 0.03866314
-      inSlope: 0.2684327
-      outSlope: 0.2684327
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 0.5107669
-      value: 0.40017134
-      inSlope: 0.45627522
-      outSlope: 0.45627522
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.14982028
-    - serializedVersion: 3
-      time: 0.73992026
-      value: 0.45493367
-      inSlope: 0.66968864
-      outSlope: 0.66968864
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.7265782
-    - serializedVersion: 3
-      time: 0.81569844
-      value: 0.8636106
-      inSlope: 1.0935357
-      outSlope: 1.0935357
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.10769607
-      outWeight: 0.3431371
-    - serializedVersion: 3
       time: 1
       value: 1
-      inSlope: 0.08411956
-      outSlope: 0.08411956
+      inSlope: 2
+      outSlope: 2
       tangentMode: 0
       weightedMode: 0
-      inWeight: 0.13725513
+      inWeight: 0
       outWeight: 0
     m_PreInfinity: 2
     m_PostInfinity: 2
@@ -166,53 +133,26 @@ MonoBehaviour:
     - serializedVersion: 3
       time: 0
       value: 0
-      inSlope: 0.28009713
-      outSlope: 0.28009713
+      inSlope: 0
+      outSlope: 0
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
-      outWeight: 0.2995016
+      outWeight: 0
     - serializedVersion: 3
-      time: 0.20541973
-      value: 0.023536801
-      inSlope: 0.49407077
-      outSlope: 0.49407077
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 0.4870923
-      value: 0.17416708
-      inSlope: 3.0442128
-      outSlope: 3.0442128
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.1547104
-      outWeight: 0.3902482
-    - serializedVersion: 3
-      time: 0.66212416
-      value: 0.8357312
-      inSlope: 2.0949476
-      outSlope: 2.0949476
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 0.77067417
-      value: 0.9098886
-      inSlope: 0.26136485
-      outSlope: 0.26136485
+      time: 0.69013685
+      value: 0.3091799
+      inSlope: 1.1550419
+      outSlope: 1.1550419
       tangentMode: 0
       weightedMode: 0
       inWeight: 0.33333334
       outWeight: 0.33333334
     - serializedVersion: 3
       time: 1
-      value: 0.85211563
-      inSlope: 0
-      outSlope: 0
+      value: 1
+      inSlope: 2
+      outSlope: 2
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
@@ -220,69 +160,30 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  continentalnessNoise:
-    function: 0
-    power: 0.1
-    terraceSteps: 2
-    carveBias: 0
-    caveSharpness: 0
-    scale: 1
-    octaves: 3
-    lacunarity: 2
-    persistence: 0.5
-    frequency: 0.0006
-    amplitude: 1
-  erosionNoise:
-    function: 0
-    power: 1
-    terraceSteps: 2
-    carveBias: 0
-    caveSharpness: 0
-    scale: 0.105
-    octaves: 3
-    lacunarity: 2
-    persistence: 0.5
-    frequency: 0.001
-    amplitude: 1
-  peaksAndValleysNoise:
-    function: 0
-    power: 3
-    terraceSteps: 2
-    carveBias: 0
-    caveSharpness: 0
-    scale: 1
-    octaves: 3
-    lacunarity: 2
-    persistence: 0.5
-    frequency: 0.0003
-    amplitude: 1
-  threeDNoise:
-    function: 0
-    power: 3
-    terraceSteps: 2
-    carveBias: 0.12
-    caveSharpness: 0
-    scale: 0.187
-    octaves: 3
-    lacunarity: 2
-    persistence: 0.5
-    frequency: 0.005
-    amplitude: 1
   verticalGradientCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
       time: 0
       value: 0
-      inSlope: 19.79412
-      outSlope: 19.79412
+      inSlope: 4.0472836
+      outSlope: 4.0472836
       tangentMode: 34
       weightedMode: 0
       inWeight: 0
       outWeight: 0.33333334
     - serializedVersion: 3
-      time: 0.023494177
-      value: 0.46504658
+      time: 0.056427866
+      value: 0.22837958
+      inSlope: 1.8878675
+      outSlope: 1.8878675
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.1095919
+      value: 0.56380147
       inSlope: 7.5415783
       outSlope: 7.5415783
       tangentMode: 0
@@ -290,8 +191,8 @@ MonoBehaviour:
       inWeight: 0.33333334
       outWeight: 0.33333334
     - serializedVersion: 3
-      time: 0.17570333
-      value: 0.98561233
+      time: 0.26914817
+      value: 0.9808058
       inSlope: 0.31685326
       outSlope: 0.31685326
       tangentMode: 0
@@ -299,8 +200,17 @@ MonoBehaviour:
       inWeight: 0.33333334
       outWeight: 0.07434884
     - serializedVersion: 3
-      time: 0.47352624
-      value: 0.3107479
+      time: 0.44602233
+      value: 0.75495166
+      inSlope: -3.757314
+      outSlope: -3.757314
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.56263757
+      value: 0.29640463
       inSlope: -1.8224512
       outSlope: -1.8224512
       tangentMode: 0
@@ -310,8 +220,8 @@ MonoBehaviour:
     - serializedVersion: 3
       time: 1
       value: 0.0010566711
-      inSlope: -0.58823675
-      outSlope: -0.58823675
+      inSlope: -0.6752934
+      outSlope: -0.6752934
       tangentMode: 34
       weightedMode: 0
       inWeight: 0.33333334
@@ -319,75 +229,114 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  cavernNoise:
-    function: 0
-    power: 0.1
-    terraceSteps: 2
-    carveBias: 0
-    caveSharpness: 5
-    scale: 0
-    octaves: 3
-    lacunarity: 2
-    persistence: 0.5
-    frequency: 0.005
-    amplitude: 1
-  cavernShapeCurve:
+  worleyVerticalGradientCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
-      time: 0
-      value: -0.0000076293945
-      inSlope: 7.045572
-      outSlope: 7.045572
+      time: -0.0000008563511
+      value: 0.0016140938
+      inSlope: 7.2815356
+      outSlope: 7.2815356
       tangentMode: 34
       weightedMode: 0
       inWeight: 0
       outWeight: 0.33333334
     - serializedVersion: 3
-      time: 0.1368818
-      value: 0.9644029
-      inSlope: -0.047188275
-      outSlope: -0.047188275
+      time: 0.13484845
+      value: 0.983524
+      inSlope: 0.23903273
+      outSlope: 0.23903273
       tangentMode: 0
       weightedMode: 0
       inWeight: 0.33333334
-      outWeight: 0.17214093
+      outWeight: 0.29146463
     - serializedVersion: 3
-      time: 0.25072291
-      value: 0.31966764
-      inSlope: -1.2093006
-      outSlope: -1.2093006
+      time: 0.26854196
+      value: 0.1329861
+      inSlope: -0.70543844
+      outSlope: -0.70543844
       tangentMode: 0
       weightedMode: 0
-      inWeight: 0.20761354
-      outWeight: 0.33333334
+      inWeight: 0.19565721
+      outWeight: 0.052643206
     - serializedVersion: 3
       time: 1
       value: 0
-      inSlope: -0.14558224
-      outSlope: -0.14558224
-      tangentMode: 0
+      inSlope: -0.1818096
+      outSlope: -0.1818096
+      tangentMode: 34
       weightedMode: 0
-      inWeight: 0.10767724
+      inWeight: 0.33333334
       outWeight: 0
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  continentalnessNoiseFunctions: 0300000001000000
+  continentalnessNoise:
+    scale: 1
+    power: 7.17
+    terraceSteps: 5
+    carveBias: 0
+    caveSharpness: 0
+    octaves: 5
+    lacunarity: 2
+    persistence: 0.5
+    frequency: 0.0002
+    amplitude: 1
+  erosionNoiseFunctions: 
+  erosionNoise:
+    scale: 0
+    power: 1
+    terraceSteps: 2
+    carveBias: 0
+    caveSharpness: 0
+    octaves: 3
+    lacunarity: 2
+    persistence: 0.5
+    frequency: 0.001
+    amplitude: 1
+  peaksAndValleysNoiseFunctions: 0000000001000000
+  peaksAndValleysNoise:
+    scale: 0.08
+    power: 2.1
+    terraceSteps: 2
+    carveBias: 0
+    caveSharpness: 0
+    octaves: 5
+    lacunarity: 2
+    persistence: 0.5
+    frequency: 0.002
+    amplitude: 1
+  threeDNoise:
+    scale: 1
+    power: 3
+    terraceSteps: 2
+    carveBias: 0.568
+    caveSharpness: 0
+    octaves: 3
+    lacunarity: 2
+    persistence: 0.5
+    frequency: 0.001
+    amplitude: 1
+  cavernNoise:
+    scale: 0.789
+    power: 0.1
+    terraceSteps: 2
+    carveBias: 0
+    caveSharpness: 4
+    octaves: 3
+    lacunarity: 2
+    persistence: 0.5
+    frequency: 0.002
+    amplitude: 1
   warpNoise:
-    function: 0
+    scale: 1
     power: 0.1
     terraceSteps: 2
     carveBias: 0
     caveSharpness: 0
-    scale: 1
     octaves: 3
     lacunarity: 2
     persistence: 0.5
-    frequency: 0.005
+    frequency: 0.007
     amplitude: 100
-  terrainMaterial: {fileID: 0}
-  skyboxMaterial: {fileID: 0}
-  vfxGraphAsset: {fileID: 0}
-  spawnableObjects: []
-  fogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-  fogDensity: 0.01

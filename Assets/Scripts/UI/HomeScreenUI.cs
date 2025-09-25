@@ -5,6 +5,7 @@ using UnityEngine.UI;
 
 public class HomeScreenUI : MonoBehaviour
 {
+    [SerializeField] private string loadSceneString = "World Building";
     [SerializeField] private Button singleplayerButton;
     [SerializeField] private Button multiplayerButton;
     [SerializeField] private GameObject multiplayerPanel;
@@ -19,17 +20,18 @@ public class HomeScreenUI : MonoBehaviour
         gameObject.SetActive(false);
         canvasBackground.gameObject.SetActive(false);
         SceneManager.sceneLoaded += SceneLoaded;
-        SceneManager.LoadScene("WorldBuilding");   
+        SceneManager.LoadScene(loadSceneString);   
     }
 
     private void SceneLoaded(Scene scene, LoadSceneMode mode){
         SceneManager.sceneLoaded -= SceneLoaded;
-        NetworkHandler.Instance.StartHostHandler();
     }
 
 
-    private void ShowMultiplayerCanvas(){
+    private void ShowMultiplayerCanvas()
+    {
         gameObject.SetActive(false);
         multiplayerPanel.SetActive(true);
+        multiplayerPanel.GetComponent<MultiplayerUI>().SetSceneString(loadSceneString);
     }
 }
