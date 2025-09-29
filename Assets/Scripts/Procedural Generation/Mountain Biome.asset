@@ -13,8 +13,6 @@ MonoBehaviour:
   m_Name: Mountain Biome
   m_EditorClassIdentifier: 
   terrainAmplitudeFactor: 3.66
-  heightBiasForCaves: 3
-  caveStrength: 30
   sameOctaveOffsets: 1
   continentalnessCurve:
     serializedVersion: 2
@@ -278,7 +276,7 @@ MonoBehaviour:
     terraceSteps: 5
     carveBias: 0
     caveSharpness: 0
-    octaves: 5
+    octaves: 3
     lacunarity: 2
     persistence: 0.5
     frequency: 0.0002
@@ -302,11 +300,13 @@ MonoBehaviour:
     terraceSteps: 2
     carveBias: 0
     caveSharpness: 0
-    octaves: 5
+    octaves: 3
     lacunarity: 2
     persistence: 0.5
     frequency: 0.002
     amplitude: 1
+  heightBiasForCaves: 3
+  caveStrength: 30
   threeDNoise:
     scale: 1
     power: 3
@@ -338,5 +338,24 @@ MonoBehaviour:
     octaves: 3
     lacunarity: 2
     persistence: 0.5
-    frequency: 0.007
+    frequency: 0.002
     amplitude: 100
+  placeableObjects:
+  - prefab: {fileID: 4928616408704863665, guid: 1caa73a6296593c46bb83d678ff6609b,
+      type: 3}
+    density: 0.203
+    placementNoise:
+      scale: 1
+      power: 0
+      terraceSteps: 0
+      carveBias: 0
+      caveSharpness: 0
+      octaves: 3
+      lacunarity: 2
+      persistence: 0.5
+      frequency: 0.05
+      amplitude: 1
+    heightRange: {x: 0, y: 1}
+    slopeRange: {x: 0, y: 180}
+    scaleRange: {x: 1, y: 1}
+    randomYRotation: 0

@@ -155,12 +155,15 @@ public class PlayerCombat : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void WeaponSpawnServerRpc(){
+    private void WeaponSpawnServerRpc()
+    {
         //Debug.Log(NetworkManager.Singleton.NetworkConfig.Prefabs.Contains(pfTmpSword));
-        NetworkObject weaponObj = NetworkObjectPool.Singleton.GetNetworkObject(pfTmpSword, transform.position, transform.rotation);            
-        weaponObj.Spawn();
-        EquippedWeapons.Add(weaponObj.GetComponent<BaseWeapon>());
-        FollowTargetClientRpc(weaponObj);
+        NetworkObject netWeaponObj = ObjectPoolManager.Singleton.GetObject(pfTmpSword, transform.position, transform.rotation).GetComponent<NetworkObject>();
+        netWeaponObj.Spawn(true);
+        EquippedWeapons.Add(netWeaponObj.GetComponent<BaseWeapon>());
+        FollowTargetClientRpc(netWeaponObj);
+        netWeaponObj.Despawn();
+        
     }
 
     [ClientRpc]

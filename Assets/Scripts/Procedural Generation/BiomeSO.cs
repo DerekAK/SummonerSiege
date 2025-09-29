@@ -10,11 +10,6 @@ public class BiomeSO : ScriptableObject
     [Tooltip("Multiplied by chunkheight, so 1 will get a value of chunkheight")]
     public float terrainAmplitudeFactor;
 
-    [Tooltip("1 means no change, >1 means that higher 2d terrain heights will have higher 3d noise values hopefully for higher cave percentage")]
-    public float heightBiasForCaves;
-
-    public float caveStrength;
-
     [Tooltip("True to use same octave offsets for all 3 2d noise settings")]
     public bool sameOctaveOffsets;
 
@@ -35,6 +30,7 @@ public class BiomeSO : ScriptableObject
     public AnimationCurve worleyVerticalGradientCurve; // <-- Add this to shape the caves
 
     // --- Noise map settings ---
+    [Header("2D Detail Settings")]
     public NoiseFunction[] continentalnessNoiseFunctions;
     public NoiseSettings continentalnessNoise;
     public NoiseFunction[] erosionNoiseFunctions;
@@ -43,9 +39,16 @@ public class BiomeSO : ScriptableObject
     public NoiseSettings peaksAndValleysNoise;
 
     [Header("3D Detail Settings")]
+    [Tooltip("1 means no change, >1 means that higher 2d terrain heights will have higher 3d noise values hopefully for higher cave percentage")]
+    public float heightBiasForCaves;
+    [Tooltip("Increases overall 3d noise strength, including both 3d (perlin) and cavern (worley) noise")]
+    public float caveStrength;
     public NoiseSettings threeDNoise;
     public NoiseSettings cavernNoise; // <-- Add this for Worley noise
     public NoiseSettings warpNoise;
+
+    [Header("Object Placement Settings")]
+    public PlaceableObject[] placeableObjects;
 
 }
 
@@ -81,5 +84,33 @@ public struct NoiseSettings
     [Tooltip("Should always be 1 except for WarpSettings")]
     public float amplitude;
 
+}
+
+// Add this new class/struct inside or outside your BiomeSO.cs file
+[Serializable]
+public class PlaceableObject
+{
+    public GameObject prefab; // The prefab to spawn (e.g., a tree model)
+    
+    [Header("Placement Density")]
+    [Tooltip("Normalized, 0 is smallest, 1 highest. In combination with noise placement settings")]
+    [Range(0, 1)]
+    public float density; // Controls how many objects appear
+    public NoiseSettings placementNoise; // Use noise to create natural-looking clusters
+
+    [Header("Placement Rules")]
+
+    [Tooltip("Normalized height (0 = world bottom, 1 = world top)")]
+    [Range(0,1)]
+    public Vector2 heightRange; // Normalized height (0 = world bottom, 1 = world top)
+
+    [Tooltip("Allowable slope in degrees, from 0 to 180?")]
+    public Vector2 slopeRange; // Allowable slope in degrees
+
+    [Header("Transform Variations")]
+
+    [Tooltip("1 would be normal size, 0 would be invisible, 2 would be double")]
+    public Vector2 scaleRange;
+    public bool randomYRotation = true;
 }
 
