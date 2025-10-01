@@ -3,7 +3,14 @@ using Unity.Mathematics;
 
 public static class MarchingCubes
 {
-    public static void March(float3 position, float isoLevel, int step, NativeArray<float> cubeDensities, NativeList<float3> vertices, NativeList<int> triangles, NativeArray<float3> edgeVertices)
+    public static void March(
+        float3 position,
+        float isoLevel,
+        int step,
+        NativeArray<float> cubeDensities,
+        NativeList<float3> vertices,
+        NativeList<int> triangles,
+        NativeArray<float3> edgeVertices)
     {
         int cubeIndex = 0;
         if (cubeDensities[0] < isoLevel) cubeIndex |= 1;

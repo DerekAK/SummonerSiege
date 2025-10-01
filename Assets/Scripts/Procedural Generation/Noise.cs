@@ -110,4 +110,30 @@ public static class Noise
         p3 += math.dot(p3, p3.yzx + 33.33f);
         return math.frac((p3.xxy + p3.yzz) * p3.zyx);
     }
+    public static NativeArray<float2> Get2DOctaveOffsets(int seed, int octaves)
+    {
+        System.Random prng = new(seed);
+        NativeArray<float2> octaveOffsets = new NativeArray<float2>(octaves, Allocator.Persistent);
+        for (int i = 0; i < octaves; i++)
+        {
+            float xOffset = prng.Next(-100000, 100000);
+            float yOffset = prng.Next(-100000, 100000);
+            octaveOffsets[i] = new float2(xOffset, yOffset);
+        }
+        return octaveOffsets;
+    }
+
+    public static NativeArray<float3> Get3DOctaveOffsets(int seed, int octaves)
+    {
+        System.Random prng = new(seed);
+        NativeArray<float3> octaveOffsets = new NativeArray<float3>(octaves, Allocator.Persistent);
+        for (int i = 0; i < octaves; i++)
+        {
+            float xOffset = prng.Next(-100000, 100000);
+            float yOffset = prng.Next(-100000, 100000);
+            float zOffset = prng.Next(-100000, 100000);
+            octaveOffsets[i] = new float3(xOffset, yOffset, zOffset);
+        }
+        return octaveOffsets;
+    }
 }

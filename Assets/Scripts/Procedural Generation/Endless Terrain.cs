@@ -8,6 +8,7 @@ using System;
 using System.Linq;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
+using Unity.Entities;
 
 
 public class EndlessTerrain : MonoBehaviour
@@ -26,6 +27,7 @@ public class EndlessTerrain : MonoBehaviour
     [SerializeField] private Material terrainMaterial;
     [SerializeField] private BiomeSO activeBiomeSO;
     public static BiomeSO StaticActiveBiomeSO;
+    [SerializeField] GameObject pfTerrainChunk;
 
     [Header("NavMesh Management")]
     [Tooltip("The single NavMeshSurface component for the entire terrain. Set CollectObjects to 'Children'.")]
@@ -35,8 +37,6 @@ public class EndlessTerrain : MonoBehaviour
     private float lastNavMeshUpdateTime;
     public Dictionary<int2, TerrainChunk> TerrainChunkDict = new Dictionary<int2, TerrainChunk>();
     private Queue<Bounds> dirtyNavMeshBoundsQueue = new Queue<Bounds>();
-    private Queue<int2> chunkCoordsMemoryQueue = new Queue<int2>();
-    [SerializeField] private int chunkMemoryLimit;
 
     // Native Arrays for noise curves
     private static NativeArray<float> continentalnessSamples;
@@ -52,7 +52,7 @@ public class EndlessTerrain : MonoBehaviour
     private static NativeArray<NoiseFunction> continentalnessNoiseFunctions;
     private static NativeArray<NoiseFunction> erosionNoiseFunctions;
     private static NativeArray<NoiseFunction> peaksAndValleysNoiseFunctions;
-    private static Dictionary<int, NativeArray<float2>> octaveOffsetsPlaceableObjectsDict = new();
+    private static Dictionary<int, NativeArray<float3>> octaveOffsetsPlaceableObjectsDict = new();
 
     private Dictionary<AsyncOperation, Bounds> activeBakeOperations = new Dictionary<AsyncOperation, Bounds>();
 
@@ -64,15 +64,39 @@ public class EndlessTerrain : MonoBehaviour
     }
     private void Start()
     {
-        GenerateNewBiomeArrays();
+        int numChunks = InitializeChunkPool();
+        InitializePlacementPools(numChunks);
         globalNavMeshSurface = GetComponent<NavMeshSurface>();
         globalNavMeshSurface.navMeshData = new NavMeshData();
-
         currViewerPosition = viewer.position;
+        GenerateNewBiomeArrays();
         UpdateVisibleChunks();
-        StartCoroutine(CheckChunksInRAMCoroutine());
         highestLOD = lodInfoList[0].lod;
     }
+
+    private int InitializeChunkPool()
+    {
+        int chunkBuffer = 0;
+        float maxDistancePerSide = lodInfoList[lodInfoList.Length - 1].visibleDistanceThreshold;
+        int maxChunksX = (int)Mathf.Ceil(maxDistancePerSide / ChunkDimensions.x) * 2 + 1;
+        int maxChunksZ = (int)Mathf.Ceil(maxDistancePerSide / ChunkDimensions.x) * 2 + 1;
+
+        int numChunks = maxChunksX * maxChunksZ + chunkBuffer;
+
+        ObjectPoolManager.Singleton.RegisterPrefab(pfTerrainChunk, numChunks);
+
+        return numChunks;
+    }
+
+    private void InitializePlacementPools(int numChunks)
+    {
+        int initialAmountPerPf = 1000;
+        foreach (PlaceableObject placeable in activeBiomeSO.placeableObjects)
+        {
+            ObjectPoolManager.Singleton.RegisterPrefab(placeable.prefab, initialAmountPerPf);
+        }
+    }
+
 
     public TerrainChunk GetChunk(int2 coords)
     {
@@ -99,18 +123,18 @@ public class EndlessTerrain : MonoBehaviour
                 StaticActiveBiomeSO.erosionNoise.octaves,
                 StaticActiveBiomeSO.peaksAndValleysNoise.octaves
             );
-            octaveOffsetsContinentalness = Get2DOctaveOffsets(seed, maxOctaves);
-            octaveOffsetsErosion = Get2DOctaveOffsets(seed, maxOctaves);
-            octaveOffsetsPeaksAndValleys = Get2DOctaveOffsets(seed, maxOctaves);
+            octaveOffsetsContinentalness = Noise.Get2DOctaveOffsets(seed, maxOctaves);
+            octaveOffsetsErosion = Noise.Get2DOctaveOffsets(seed, maxOctaves);
+            octaveOffsetsPeaksAndValleys = Noise.Get2DOctaveOffsets(seed, maxOctaves);
         }
         else
         {
-            octaveOffsetsContinentalness = Get2DOctaveOffsets(seed, StaticActiveBiomeSO.continentalnessNoise.octaves);
-            octaveOffsetsErosion = Get2DOctaveOffsets(seed + 10, StaticActiveBiomeSO.erosionNoise.octaves);
-            octaveOffsetsPeaksAndValleys = Get2DOctaveOffsets(seed + 20, StaticActiveBiomeSO.peaksAndValleysNoise.octaves);
+            octaveOffsetsContinentalness = Noise.Get2DOctaveOffsets(seed, StaticActiveBiomeSO.continentalnessNoise.octaves);
+            octaveOffsetsErosion = Noise.Get2DOctaveOffsets(seed + 10, StaticActiveBiomeSO.erosionNoise.octaves);
+            octaveOffsetsPeaksAndValleys = Noise.Get2DOctaveOffsets(seed + 20, StaticActiveBiomeSO.peaksAndValleysNoise.octaves);
         }
-        octaveOffsets3D = Get3DOctaveOffsets(seed + 30, StaticActiveBiomeSO.threeDNoise.octaves);
-        octaveOffsetsWarp = Get3DOctaveOffsets(seed + 40, StaticActiveBiomeSO.warpNoise.octaves);
+        octaveOffsets3D = Noise.Get3DOctaveOffsets(seed + 30, StaticActiveBiomeSO.threeDNoise.octaves);
+        octaveOffsetsWarp = Noise.Get3DOctaveOffsets(seed + 40, StaticActiveBiomeSO.warpNoise.octaves);
 
         // create native arrays for noise functions
         continentalnessNoiseFunctions = new NativeArray<NoiseFunction>(StaticActiveBiomeSO.continentalnessNoiseFunctions, Allocator.Persistent);
@@ -120,7 +144,7 @@ public class EndlessTerrain : MonoBehaviour
         int i = 50;
         foreach (PlaceableObject placeableObject in StaticActiveBiomeSO.placeableObjects)
         {
-            octaveOffsetsPlaceableObjectsDict[placeableObject.prefab.GetHashCode()] = Get2DOctaveOffsets(i, placeableObject.placementNoise.octaves);
+            octaveOffsetsPlaceableObjectsDict[placeableObject.prefab.GetHashCode()] = Noise.Get3DOctaveOffsets(i, placeableObject.placementNoise.octaves);
             i += 10;
         }
 
@@ -146,41 +170,20 @@ public class EndlessTerrain : MonoBehaviour
         }
     }
 
-    // private void OnDrawGizmos()
-    // {
-    //     // Draw chunks that are currently being baked in red
-    //     Gizmos.color = Color.red;
-    //     foreach (var bounds in activeBakeOperations.Values)
-    //     {
-    //         Gizmos.DrawWireCube(bounds.center, bounds.size);
-    //     }
-
-    //     // Draw chunks that are waiting in the queue in yellow
-    //     Gizmos.color = Color.yellow;
-    //     foreach (var bounds in dirtyNavMeshBoundsQueue)
-    //     {
-    //         Gizmos.DrawWireCube(bounds.center, bounds.size);
-    //     }
-    // }
-
-    public void EnqueueChunkCoordsRAM(int2 coords)
+    private void OnDrawGizmos()
     {
-        chunkCoordsMemoryQueue.Enqueue(coords);
-    }
-
-    private IEnumerator CheckChunksInRAMCoroutine()
-    {
-        WaitForSeconds wait = new WaitForSeconds(1);
-        while (true)
+        // Draw chunks that are currently being baked in red
+        Gizmos.color = Color.red;
+        foreach (var bounds in activeBakeOperations.Values)
         {
-            if (chunkCoordsMemoryQueue.Count > chunkMemoryLimit)
-            {
-                int2 coordsToRemove = chunkCoordsMemoryQueue.Dequeue();
-                TerrainChunk chunkToRemove = TerrainChunkDict[coordsToRemove];
-                chunkToRemove.DestroyChunk();
-                TerrainChunkDict.Remove(coordsToRemove);
-            }
-            yield return wait;
+            Gizmos.DrawWireCube(bounds.center, bounds.size);
+        }
+
+        // Draw chunks that are waiting in the queue in yellow
+        Gizmos.color = Color.yellow;
+        foreach (var bounds in dirtyNavMeshBoundsQueue)
+        {
+            Gizmos.DrawWireCube(bounds.center, bounds.size);
         }
     }
 
@@ -222,17 +225,20 @@ public class EndlessTerrain : MonoBehaviour
             boundsToBake
         );
 
-        activeBakeOperations.Add(operation, boundsToBake); // ✅ ADD THIS LINE
+        activeBakeOperations.Add(operation, boundsToBake); 
     }
 
     private void CleanupFinishedBakeOperations()
     {
         if (activeBakeOperations.Count == 0) return;
-
-        // Find all operations that are done
-        var finishedOperations = activeBakeOperations.Keys.Where(op => op.isDone).ToList();
-
-        // Remove them from the dictionary
+        var finishedOperations = new List<AsyncOperation>(); 
+        foreach (var kvp in activeBakeOperations)
+        {
+            if (kvp.Key.isDone)
+            {
+                finishedOperations.Add(kvp.Key);
+            }
+        }
         foreach (var op in finishedOperations)
         {
             activeBakeOperations.Remove(op);
@@ -253,17 +259,31 @@ public class EndlessTerrain : MonoBehaviour
             {
                 int2 chunkCoord = new int2(viewerCoordX + xOffset, viewerCoordZ + zOffset);
 
-                if (TerrainChunkDict.ContainsKey(chunkCoord)) // cached in memory but not necessarily visible or correct LOD
+                if (TerrainChunkDict.ContainsKey(chunkCoord)) // was visible last rendering and should be visible this rendering, but might be different lod
                 {
                     TerrainChunkDict[chunkCoord].UpdateTerrainChunk();
                 }
-                else
+                else // was not visible last rendering but should be, so create a new chunk (not new gameobject, get one from object pool)
                 {
-                    var newChunk = new TerrainChunk(this, chunkCoord);
-                    TerrainChunkDict.Add(chunkCoord, newChunk);
+                    // this extra check is necessary because this for loop forms a giant square around the viewer, but its should be a circle based
+                    // on the radius
+                    Vector3 position = new(chunkCoord.x * ChunkDimensions.x, 0, chunkCoord.y * ChunkDimensions.z);
+                    Bounds tempBounds = new Bounds(position, new Vector3(ChunkDimensions.x, ChunkDimensions.y, ChunkDimensions.z));
+                    float viewerDstFromChunk = Mathf.Sqrt(tempBounds.SqrDistance(currViewerPosition));
+                    if (viewerDstFromChunk <= maxViewDist)
+                    {
+                        var newChunk = new TerrainChunk(this, chunkCoord);
+                        TerrainChunkDict.Add(chunkCoord, newChunk);
+                    }
                 }
             }
         }
+
+        HandleChunksToUnrender(maxViewDist);
+    }
+
+    private void HandleChunksToUnrender(int maxViewDist)
+    {
         List<int2> chunksToUnrender = new List<int2>();
         // Check for chunks to remove
         foreach (var chunkPair in TerrainChunkDict)
@@ -278,9 +298,9 @@ public class EndlessTerrain : MonoBehaviour
         // Unrender the chunks that are out of range and put them in recency RAMqueue to be removed later 
         foreach (var coord in chunksToUnrender)
         {
-            EnqueueChunkCoordsRAM(coord);
             TerrainChunk chunkToUnrender = TerrainChunkDict[coord];
-            chunkToUnrender.SetVisible(false);
+            chunkToUnrender.HandleChunkRemoval();
+            TerrainChunkDict.Remove(coord);
         }
     }
 
@@ -327,9 +347,9 @@ public class EndlessTerrain : MonoBehaviour
     public class TerrainChunk
     {
         public Bounds Bounds { get; private set; }
-        public GameObject meshObject;
+        public GameObject MeshObject;
+        public MeshFilter MeshFilter;
         private MeshRenderer meshRenderer;
-        public MeshFilter meshFilter;
         private LODInfo[] lodInfoList;
         private LODMesh[] lodMeshes;
         private int2 chunkCoord;
@@ -337,8 +357,10 @@ public class EndlessTerrain : MonoBehaviour
         private EndlessTerrain endlessTerrain; // Reference to the parent manager
         private bool hasNotifiedForNavMesh = false; // Flag to prevent spamming updates
         public Dictionary<int, List<float4x4>> ObjectData = new Dictionary<int, List<float4x4>>();
+        private List<(GameObject, GameObject)> activeGameObjects = new();
+        private Dictionary<int, Transform> objectParents = new();
         private Coroutine placementCoroutine; // NEW: Store coroutine handle for object placement
-        private List<(JobHandle, NativeList<float4x4>, int)> placementJobs; // NEW: Store jobs for cleanup
+        private List<(JobHandle, NativeList<PlacementData>, int, GameObject)> placementJobs;
         private bool isDestroyed; // NEW: Flag to track chunk destruction
 
 
@@ -355,12 +377,11 @@ public class EndlessTerrain : MonoBehaviour
             Vector3 position = new(coord.x * dimensions.x, 0, coord.y * dimensions.z);
             Bounds = new Bounds(position, new Vector3(dimensions.x, dimensions.y, dimensions.z));
 
-            meshObject = new GameObject($"Chunk {coord.x},{coord.y}");
-            meshObject.transform.SetParent(endlessTerrain.transform);
-            meshObject.transform.position = position;
+            MeshObject = ObjectPoolManager.Singleton.GetObject(endlessTerrain.pfTerrainChunk, position, Quaternion.identity);
+            MeshObject.transform.SetParent(endlessTerrain.transform);
 
-            meshRenderer = meshObject.AddComponent<MeshRenderer>();
-            meshFilter = meshObject.AddComponent<MeshFilter>();
+            MeshFilter = MeshObject.GetComponent<MeshFilter>();
+            meshRenderer = MeshObject.GetComponent<MeshRenderer>();
             meshRenderer.material = endlessTerrain.terrainMaterial;
 
             lodMeshes = new LODMesh[lodInfoList.Length];
@@ -371,7 +392,7 @@ public class EndlessTerrain : MonoBehaviour
 
             // Set layer for physics, raycasting, etc.
             int groundLayerIndex = LayerMask.NameToLayer("Obstacle");
-            meshObject.layer = groundLayerIndex;
+            MeshObject.layer = groundLayerIndex;
 
             UpdateTerrainChunk();
         }
@@ -383,8 +404,6 @@ public class EndlessTerrain : MonoBehaviour
 
             if (shouldBeVisible)
             {
-                SetVisible(true);
-
                 int lodIndex = 0;
                 for (int i = 0; i < lodInfoList.Length - 1; i++)
                 {
@@ -405,10 +424,10 @@ public class EndlessTerrain : MonoBehaviour
                     {
                         previousLODIndex = lodIndex;
 
-                        meshFilter.mesh = lodMesh.mesh;
+                        MeshFilter.mesh = lodMesh.mesh;
 
                         // If this is the highest detail LOD, queue its bounds for a NavMesh bake
-                        if (lodIndex == highestLOD && !hasNotifiedForNavMesh)
+                        if (lodMesh.lod == highestLOD && !hasNotifiedForNavMesh)
                         {
                             endlessTerrain.MarkNavMeshAsDirty(this.Bounds);
                             hasNotifiedForNavMesh = true; // Only notify once
@@ -428,8 +447,8 @@ public class EndlessTerrain : MonoBehaviour
 
             foreach (PlaceableObject placeable in StaticActiveBiomeSO.placeableObjects)
             {
-                NativeArray<float2> octaveOffsets = octaveOffsetsPlaceableObjectsDict[placeable.prefab.GetHashCode()];
-                NativeList<float4x4> matrices = new(Allocator.TempJob);
+                NativeArray<float3> octaveOffsets = octaveOffsetsPlaceableObjectsDict[placeable.prefab.GetHashCode()];
+                NativeList<PlacementData> placementData = new(Allocator.Persistent);
 
                 // Here is the fully populated job struct
                 ObjectPlacementJob placementJob = new ObjectPlacementJob
@@ -437,7 +456,7 @@ public class EndlessTerrain : MonoBehaviour
                     densityField = densityField,
                     chunkSize = endlessTerrain.ChunkDimensions,
                     chunkCoord = this.chunkCoord,
-                    seed = (uint)(endlessTerrain.seed + chunkCoord.x * 100 + chunkCoord.y + placeable.prefab.GetHashCode()), // More robust seed
+                    seed = (uint)(endlessTerrain.seed + this.chunkCoord.x * 100 + this.chunkCoord.y + placeable.prefab.GetHashCode()),
                     isoLevel = isoLevel,
                     lod = lod,
 
@@ -448,60 +467,82 @@ public class EndlessTerrain : MonoBehaviour
                     slopeRange = placeable.slopeRange,   // Implicit Vector2 -> float2 conversion
                     scaleRange = placeable.scaleRange,   // Implicit Vector2 -> float2 conversion
 
-                    octaveOffsets = octaveOffsets,
-                    objectMatrices = matrices,
+                    randomYRotation = placeable.randomYRotation,
+                    placeVertical = placeable.placeVertical,
+
+                    octaveOffsets3D = octaveOffsets,
+                    objectDataList = placementData
                 };
 
                 JobHandle handle = placementJob.Schedule();
-                placementJobs.Add((handle, matrices, placeable.prefab.GetHashCode()));
+                placementJobs.Add((handle, placementData, placeable.prefab.GetHashCode(), placeable.prefab));
             }
             placementCoroutine = endlessTerrain.StartCoroutine(WaitForPlacementJobs(placementJobs, densityField));
         }
 
-        private IEnumerator WaitForPlacementJobs(List<(JobHandle, NativeList<float4x4>, int)> jobs, NativeArray<float> densityField)
+        private IEnumerator WaitForPlacementJobs(List<(JobHandle, NativeList<PlacementData>, int, GameObject)> jobs, NativeArray<float> densityField)
         {
             foreach (var job in jobs)
             {
-                yield return new WaitUntil(() => job.Item1.IsCompleted);
+
+                JobHandle jobHandle = job.Item1;
+                NativeList<PlacementData> placementData = job.Item2;
+                int prefabHash = job.Item3;
+                GameObject prefab = job.Item4;
+
+                yield return new WaitUntil(() => jobHandle.IsCompleted);
 
                 if (isDestroyed)
                 {
-                    job.Item1.Complete();
-                    if (job.Item2.IsCreated) job.Item2.Dispose();
+                    jobHandle.Complete();
+                    if (placementData.IsCreated) placementData.Dispose();
                     continue;
                 }
 
-                job.Item1.Complete();
+                jobHandle.Complete();
 
-                if (!ObjectData.ContainsKey(job.Item3))
+                //Debug.Log(prefab.GetComponent<MeshFilter>());
+                if (!objectParents.TryGetValue(prefabHash, out Transform parentTransform))
                 {
-                    ObjectData[job.Item3] = new List<float4x4>();
+                    GameObject parentObject = new GameObject(prefab.name + "s"); // e.g., "OakTrees"
+                    parentTransform = parentObject.transform;
+                    parentTransform.SetParent(MeshObject.transform, false); // Parent it to the chunk
+                    objectParents[prefabHash] = parentTransform; // Add it to the dictionary for next time
                 }
 
-                // Manually copy NativeList<float4x4> to List<float4x4>
-                var nativeMatrices = job.Item2;
-                for (int i = 0; i < nativeMatrices.Length; i++)
+                Debug.Log(prefab.GetComponent<MeshFilter>());
+
+                int maxObjectsPerFrame = 50;
+                int objectsPlacedThisFrame = 0;
+                for (int i = 0; i < placementData.Length; i++)
                 {
-                    ObjectData[job.Item3].Add(nativeMatrices[i]);
+                    PlacementData data = placementData[i];
+                    GameObject newObject = ObjectPoolManager.Singleton.GetObject(prefab, Vector3.zero, data.rotation); // Assuming your pooler can take a prefab reference
+                    newObject.transform.SetParent(parentTransform, false);
+                    newObject.transform.localPosition = data.position;
+                    newObject.transform.localScale = Vector3.one * data.scale;
+                    activeGameObjects.Add((newObject, prefab)); // Keep track of it
+
+                    objectsPlacedThisFrame++;
+                    if (objectsPlacedThisFrame >= maxObjectsPerFrame)
+                    {
+                        objectsPlacedThisFrame = 0;
+                        yield return null; 
+                    }
                 }
 
-                if (job.Item2.IsCreated) job.Item2.Dispose(); // Clean up native list
+                if (placementData.IsCreated) placementData.Dispose();
             }
             if (densityField.IsCreated && !isDestroyed) densityField.Dispose();
-            placementJobs.Clear(); // Clear jobs list after completion
-            placementCoroutine = null; // Clear coroutine reference
+            placementJobs.Clear();
+            placementCoroutine = null;
         }
 
-        public void SetVisible(bool visible)
+        public void HandleChunkRemoval()
         {
-            meshObject.SetActive(visible);
-        }
+            if (isDestroyed) return;
 
-        public void DestroyChunk()
-        {
-            if (isDestroyed) return; 
-
-            isDestroyed = true; 
+            isDestroyed = true;
 
             // Stop placement coroutine if running
             if (placementCoroutine != null)
@@ -527,10 +568,20 @@ public class EndlessTerrain : MonoBehaviour
             // Queue bounds for NavMesh update
             endlessTerrain.MarkNavMeshAsDirty(Bounds);
 
-            if (meshObject != null)
+            if (MeshObject != null)
             {
-                Destroy(meshObject);
+                ObjectPoolManager.Singleton.ReturnObject(MeshObject, endlessTerrain.pfTerrainChunk);
             }
+            foreach ((GameObject obj, GameObject pf) in activeGameObjects)
+            {
+                ObjectPoolManager.Singleton.ReturnObject(obj, pf);
+            }
+            foreach (var parentTransform in objectParents.Values)
+            {
+                Destroy(parentTransform.gameObject);
+            }
+            objectParents.Clear();
+            activeGameObjects.Clear();
         }
     }
 
@@ -563,15 +614,15 @@ public class EndlessTerrain : MonoBehaviour
 
         private void Request3DMesh(EndlessTerrain endlessTerrain, int2 chunkCoord, int3 chunkDimensions)
         {
-            vertices = new NativeList<float3>(Allocator.TempJob);
-            triangles = new NativeList<int>(Allocator.TempJob);
+            vertices = new NativeList<float3>(Allocator.Persistent);
+            triangles = new NativeList<int>(Allocator.Persistent);
 
             int step = 1 << lod;
             int3 numPointsPerAxis = chunkDimensions / step + 1;
 
-            densityField = new NativeArray<float>(numPointsPerAxis.x * numPointsPerAxis.y * numPointsPerAxis.z, Allocator.TempJob);
-            cubeDensities = new NativeArray<float>(8, Allocator.TempJob);
-            edgeVertices = new NativeArray<float3>(12, Allocator.TempJob);
+            densityField = new NativeArray<float>(numPointsPerAxis.x * numPointsPerAxis.y * numPointsPerAxis.z, Allocator.Persistent);
+            cubeDensities = new NativeArray<float>(8, Allocator.Persistent);
+            edgeVertices = new NativeArray<float3>(12, Allocator.Persistent);
 
             var job = new ThreeDJob
             {
@@ -630,7 +681,7 @@ public class EndlessTerrain : MonoBehaviour
                 }
                 CreateMesh();
 
-                if (lod == highestLOD && hasMesh)
+                if (hasMesh)
                 {
                     parentChunk.SchedulePlacementJobs(densityField, lod);
                 }
@@ -651,25 +702,65 @@ public class EndlessTerrain : MonoBehaviour
 
         private void CreateMesh()
         {
-            if (vertices.Length == 0) return;
-
-            mesh = new Mesh();
-
-            if (vertices.Length > 65535)
+            if (vertices.Length == 0)
             {
-                mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                // If the job produced no vertices, create a blank mesh.
+                // This prevents the chunk from trying to generate it again.
+                mesh = new Mesh(); 
+                hasMesh = true;
+                parentChunk.UpdateTerrainChunk();
+                return;
             }
 
-            mesh.SetVertices(vertices.AsArray());
-            mesh.SetTriangles(triangles.AsArray().ToArray(), 0);
+            if (mesh == null)
+            {
+                mesh = new Mesh();
+            }
 
+            var meshDataArray = Mesh.AllocateWritableMeshData(1);
+            var meshData = meshDataArray[0];
+
+            meshData.SetVertexBufferParams(vertices.Length, 
+                new UnityEngine.Rendering.VertexAttributeDescriptor(UnityEngine.Rendering.VertexAttribute.Position, stream: 0));
+
+            UnityEngine.Rendering.IndexFormat indexFormat = vertices.Length > 65535 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16;
+            meshData.SetIndexBufferParams(triangles.Length, indexFormat);
+
+            var vertexData = meshData.GetVertexData<float3>(stream: 0);
+            vertices.AsArray().CopyTo(vertexData);
+
+            if (indexFormat == UnityEngine.Rendering.IndexFormat.UInt16)
+            {
+                var triangleData = meshData.GetIndexData<ushort>();
+                for (int i = 0; i < triangles.Length; i++)
+                {
+                    triangleData[i] = (ushort)triangles[i];
+                }
+            }
+            else
+            {
+                var triangleData = meshData.GetIndexData<int>();
+                triangles.AsArray().CopyTo(triangleData);
+            }
+
+            meshData.subMeshCount = 1;
+            meshData.SetSubMesh(0, new UnityEngine.Rendering.SubMeshDescriptor(0, triangles.Length));
+
+            // We pass a flag to tell the engine not to worry about the bounds yet.
+            Mesh.ApplyAndDisposeWritableMeshData(meshDataArray, mesh, UnityEngine.Rendering.MeshUpdateFlags.DontRecalculateBounds);
+            
+            // ✅ ADD THIS BACK: This is the critical fix.
+            // It calculates the bounding box so the rendering engine knows how big the mesh is.
+            mesh.RecalculateBounds(); 
+            
             mesh.RecalculateNormals();
+            
             hasMesh = true;
 
-            MeshCollider meshCollider = parentChunk.meshObject.GetComponent<MeshCollider>();
+            MeshCollider meshCollider = parentChunk.MeshObject.GetComponent<MeshCollider>();
             if (meshCollider == null)
             {
-                meshCollider = parentChunk.meshObject.AddComponent<MeshCollider>();
+                meshCollider = parentChunk.MeshObject.AddComponent<MeshCollider>();
             }
             meshCollider.sharedMesh = mesh;
             parentChunk.UpdateTerrainChunk();
@@ -689,33 +780,6 @@ public class EndlessTerrain : MonoBehaviour
 
             }
         }
-    }
-
-    private static NativeArray<float2> Get2DOctaveOffsets(int seed, int octaves)
-    {
-        System.Random prng = new(seed);
-        NativeArray<float2> octaveOffsets = new NativeArray<float2>(octaves, Allocator.Persistent);
-        for (int i = 0; i < octaves; i++)
-        {
-            float xOffset = prng.Next(-100000, 100000);
-            float yOffset = prng.Next(-100000, 100000);
-            octaveOffsets[i] = new float2(xOffset, yOffset);
-        }
-        return octaveOffsets;
-    }
-
-    private static NativeArray<float3> Get3DOctaveOffsets(int seed, int octaves)
-    {
-        System.Random prng = new(seed);
-        NativeArray<float3> octaveOffsets = new NativeArray<float3>(octaves, Allocator.Persistent);
-        for (int i = 0; i < octaves; i++)
-        {
-            float xOffset = prng.Next(-100000, 100000);
-            float yOffset = prng.Next(-100000, 100000);
-            float zOffset = prng.Next(-100000, 100000);
-            octaveOffsets[i] = new float3(xOffset, yOffset, zOffset);
-        }
-        return octaveOffsets;
     }
 
     [Serializable]

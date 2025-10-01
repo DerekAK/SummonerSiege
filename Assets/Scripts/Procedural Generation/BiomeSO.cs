@@ -91,7 +91,7 @@ public struct NoiseSettings
 public class PlaceableObject
 {
     public GameObject prefab; // The prefab to spawn (e.g., a tree model)
-    
+
     [Header("Placement Density")]
     [Tooltip("Normalized, 0 is smallest, 1 highest. In combination with noise placement settings")]
     [Range(0, 1)]
@@ -101,7 +101,7 @@ public class PlaceableObject
     [Header("Placement Rules")]
 
     [Tooltip("Normalized height (0 = world bottom, 1 = world top)")]
-    [Range(0,1)]
+    [Range(0, 1)]
     public Vector2 heightRange; // Normalized height (0 = world bottom, 1 = world top)
 
     [Tooltip("Allowable slope in degrees, from 0 to 180?")]
@@ -111,6 +111,7 @@ public class PlaceableObject
 
     [Tooltip("1 would be normal size, 0 would be invisible, 2 would be double")]
     public Vector2 scaleRange;
-    public bool randomYRotation = true;
+    public bool randomYRotation;
+    public bool placeVertical;
 }
 

@@ -131,13 +131,10 @@ public class PlayerMovement : NetworkBehaviour
             // To prevent spam, let's log it only for the owner object
             if (IsOwner || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
             {
-                 Debug.LogWarning($"Update BLOCKED: isInitialized = {isInitialized}, statsConfigured = {statsConfigured}", this);
+                Debug.LogWarning($"Update BLOCKED: isInitialized = {isInitialized}, statsConfigured = {statsConfigured}", this);
             }
             return;
         }
-
-        // If we see the "Update RUNNING" message, then the problem is elsewhere.
-        Debug.Log("Update RUNNING", this);
         GroundedCheck();
         UpdateVerticalVelocity();
         HandleMovement();

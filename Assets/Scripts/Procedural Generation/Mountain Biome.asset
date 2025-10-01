@@ -341,13 +341,13 @@ MonoBehaviour:
     frequency: 0.002
     amplitude: 100
   placeableObjects:
-  - prefab: {fileID: 4928616408704863665, guid: 1caa73a6296593c46bb83d678ff6609b,
+  - prefab: {fileID: 6117071349010126079, guid: d250af4848f51154f9a2bf6a85b60ac2,
       type: 3}
-    density: 0.203
+    density: 0.449
     placementNoise:
       scale: 1
-      power: 0
-      terraceSteps: 0
+      power: 0.1
+      terraceSteps: 2
       carveBias: 0
       caveSharpness: 0
       octaves: 3
@@ -356,6 +356,7 @@ MonoBehaviour:
       frequency: 0.05
       amplitude: 1
     heightRange: {x: 0, y: 1}
-    slopeRange: {x: 0, y: 180}
-    scaleRange: {x: 1, y: 1}
-    randomYRotation: 0
+    slopeRange: {x: 0, y: 50}
+    scaleRange: {x: 0.5, y: 1.5}
+    randomYRotation: 1
+    placeVertical: 1

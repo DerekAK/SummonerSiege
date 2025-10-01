@@ -113,7 +113,7 @@ public struct ThreeDJob : IJob
                     MarchingCubes.March(
                         new float3(x * step, y * step, z * step),
                         isoLevel,
-                        step, // Pass the step value here
+                        step,
                         cubeDensities,
                         vertices,
                         triangles,

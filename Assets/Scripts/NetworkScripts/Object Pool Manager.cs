@@ -3,14 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Pool;
 
-// This struct can be moved to its own file if you prefer
-[Serializable]
-public struct PoolConfigObject
-{
-    public GameObject Prefab;
-    public int PrewarmCount;
-}
-
 public class ObjectPoolManager : MonoBehaviour
 {
     public static ObjectPoolManager Singleton { get; private set; }
@@ -18,7 +10,8 @@ public class ObjectPoolManager : MonoBehaviour
     // This list is now on the generic manager
     public List<PoolConfigObject> PooledPrefabsList;
 
-    private Dictionary<GameObject, ObjectPool<GameObject>> m_PooledObjects = new Dictionary<GameObject, ObjectPool<GameObject>>();
+    private Dictionary<GameObject, (ObjectPool<GameObject> pool, Transform parent)> m_PooledObjects = new();
+
 
     private void Awake()
     {
@@ -48,14 +41,17 @@ public class ObjectPoolManager : MonoBehaviour
     /// <summary>
     /// Registers a prefab with the pool, creating a new object pool for it.
     /// </summary>
-    private void RegisterPrefab(GameObject prefab, int prewarmCount)
+    public void RegisterPrefab(GameObject prefab, int prewarmCount)
     {
+        // Create scene hierarchy
+        GameObject category = new GameObject(prefab.name);
+        category.transform.SetParent(transform);
+
         // Generic create function for GameObjects
         GameObject CreateFunc()
         {
             return Instantiate(prefab);
         }
-
         // Generic actions for GameObjects
         void ActionOnGet(GameObject obj)
         {
@@ -72,18 +68,22 @@ public class ObjectPoolManager : MonoBehaviour
             Destroy(obj);
         }
 
+
         // Create a new pool for this prefab
-        m_PooledObjects[prefab] = new UnityEngine.Pool.ObjectPool<GameObject>(CreateFunc, ActionOnGet, ActionOnRelease, ActionOnDestroy, defaultCapacity: prewarmCount);
+        ObjectPool<GameObject> newPool = new(CreateFunc, ActionOnGet, ActionOnRelease, ActionOnDestroy, defaultCapacity: prewarmCount);
+        m_PooledObjects[prefab] = (newPool, category.transform);
 
         // Pre-warm the pool by getting and immediately releasing the objects
         var prewarmList = new List<GameObject>();
         for (var i = 0; i < prewarmCount; i++)
         {
-            prewarmList.Add(m_PooledObjects[prefab].Get());
+            GameObject pooledObject = newPool.Get();
+            prewarmList.Add(pooledObject);
+            pooledObject.transform.SetParent(category.transform);
         }
         foreach (var obj in prewarmList)
         {
-            m_PooledObjects[prefab].Release(obj);
+            newPool.Release(obj);
         }
     }
 
@@ -92,13 +92,13 @@ public class ObjectPoolManager : MonoBehaviour
     /// </summary>
     public GameObject GetObject(GameObject prefab, Vector3 position, Quaternion rotation)
     {
-        if (!m_PooledObjects.ContainsKey(prefab))
+        if (!m_PooledObjects.TryGetValue(prefab, out var poolInfo))
         {
-            Debug.LogError($"Pool for prefab '{prefab.name}' does not exist. Please add it to the PooledPrefabsList.");
+            Debug.LogError($"Pool for prefab '{prefab.name}' does not exist.");
             return null;
         }
 
-        GameObject obj = m_PooledObjects[prefab].Get();
+        GameObject obj = poolInfo.pool.Get();
         obj.transform.SetPositionAndRotation(position, rotation);
         return obj;
     }
@@ -108,13 +108,21 @@ public class ObjectPoolManager : MonoBehaviour
     /// </summary>
     public void ReturnObject(GameObject obj, GameObject prefab)
     {
-        if (!m_PooledObjects.ContainsKey(prefab))
+        if (!m_PooledObjects.TryGetValue(prefab, out var poolInfo))
         {
-            Debug.LogWarning($"Trying to return an object for prefab '{prefab.name}' but no pool exists for it. Destroying instead.");
+            Debug.LogWarning($"Trying to return object for prefab '{prefab.name}' but no pool exists. Destroying instead.");
             Destroy(obj);
             return;
         }
+
+        obj.transform.SetParent(poolInfo.parent);
         
-        m_PooledObjects[prefab].Release(obj);
+        poolInfo.pool.Release(obj);
     }
+}
+[Serializable]
+public struct PoolConfigObject
+{
+    public GameObject Prefab;
+    public int PrewarmCount;
 }
