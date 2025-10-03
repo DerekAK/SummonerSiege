@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0784216404b6340a6a598978579ef4f7, type: 3}
-  m_Name: Mountain Biome
+  m_Name: Mountain Biome 1
   m_EditorClassIdentifier: 
-  terrainAmplitudeFactor: 3.66
+  terrainAmplitudeFactor: 1
   sameOctaveOffsets: 1
   continentalnessCurve:
     serializedVersion: 2
@@ -20,18 +20,18 @@ MonoBehaviour:
     - serializedVersion: 3
       time: 0
       value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
+      inSlope: 1
+      outSlope: 1
+      tangentMode: 34
       weightedMode: 0
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
       time: 1
       value: 1
-      inSlope: 2
-      outSlope: 2
-      tangentMode: 0
+      inSlope: 1
+      outSlope: 1
+      tangentMode: 34
       weightedMode: 0
       inWeight: 0
       outWeight: 0
@@ -269,17 +269,17 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  continentalnessNoiseFunctions: 0300000001000000
+  continentalnessNoiseFunctions: 0100000003000000
   continentalnessNoise:
     scale: 1
-    power: 7.17
-    terraceSteps: 5
+    power: 5
+    terraceSteps: 2
     carveBias: 0
     caveSharpness: 0
     octaves: 3
     lacunarity: 2
     persistence: 0.5
-    frequency: 0.0002
+    frequency: 0.0005
     amplitude: 1
   erosionNoiseFunctions: 
   erosionNoise:
@@ -292,10 +292,10 @@ MonoBehaviour:
     lacunarity: 2
     persistence: 0.5
     frequency: 0.001
-    amplitude: 1
+    amplitude: 0
   peaksAndValleysNoiseFunctions: 0000000001000000
   peaksAndValleysNoise:
-    scale: 0.08
+    scale: 0
     power: 2.1
     terraceSteps: 2
     carveBias: 0
@@ -304,11 +304,11 @@ MonoBehaviour:
     lacunarity: 2
     persistence: 0.5
     frequency: 0.002
-    amplitude: 1
+    amplitude: 0
   heightBiasForCaves: 3
   caveStrength: 30
   threeDNoise:
-    scale: 1
+    scale: 0
     power: 3
     terraceSteps: 2
     carveBias: 0.568
@@ -317,46 +317,46 @@ MonoBehaviour:
     lacunarity: 2
     persistence: 0.5
     frequency: 0.001
-    amplitude: 1
+    amplitude: 0
   cavernNoise:
-    scale: 0.789
-    power: 0.1
-    terraceSteps: 2
-    carveBias: 0
-    caveSharpness: 4
-    octaves: 3
-    lacunarity: 2
-    persistence: 0.5
-    frequency: 0.002
-    amplitude: 1
-  warpNoise:
-    scale: 1
+    scale: 0
     power: 0.1
     terraceSteps: 2
     carveBias: 0
     caveSharpness: 0
-    octaves: 3
-    lacunarity: 2
-    persistence: 0.5
-    frequency: 0.002
-    amplitude: 100
+    octaves: 0
+    lacunarity: 0
+    persistence: 0
+    frequency: 0
+    amplitude: 0
+  warpNoise:
+    scale: 0
+    power: 0.1
+    terraceSteps: 2
+    carveBias: 0
+    caveSharpness: 0
+    octaves: 0
+    lacunarity: 0
+    persistence: 0
+    frequency: 0
+    amplitude: 0
   placeableObjects:
-  - prefab: {fileID: 6117071349010126079, guid: d250af4848f51154f9a2bf6a85b60ac2,
+  - prefab: {fileID: 5677254746301284002, guid: 105377fe3a78c402c95c376a962f3ae5,
       type: 3}
-    density: 0.449
+    density: 0.75
     placementNoise:
       scale: 1
-      power: 0.1
-      terraceSteps: 2
+      power: 0
+      terraceSteps: 0
       carveBias: 0
       caveSharpness: 0
       octaves: 3
       lacunarity: 2
       persistence: 0.5
-      frequency: 0.04
+      frequency: 0.05
       amplitude: 1
-    heightRange: {x: 0, y: 1}
-    slopeRange: {x: 0, y: 50}
+    heightRange: {x: 0, y: 0.36}
+    slopeRange: {x: 0, y: 90}
     scaleRange: {x: 0.5, y: 1.5}
     randomYRotation: 1
     placeVertical: 1

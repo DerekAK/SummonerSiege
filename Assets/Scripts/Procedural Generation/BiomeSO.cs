@@ -101,7 +101,6 @@ public class PlaceableObject
     [Header("Placement Rules")]
 
     [Tooltip("Normalized height (0 = world bottom, 1 = world top)")]
-    [Range(0, 1)]
     public Vector2 heightRange; // Normalized height (0 = world bottom, 1 = world top)
 
     [Tooltip("Allowable slope in degrees, from 0 to 180?")]

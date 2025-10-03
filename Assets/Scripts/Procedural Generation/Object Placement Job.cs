@@ -37,15 +37,15 @@ public struct ObjectPlacementJob : IJob
     {
         var random = new Random(seed);
         int step = 1 << lod;
-        int3 numPointsPerAxis = chunkSize / step + 1;
+        int3 numPointsPerAxis = chunkSize / step + 2; // Changed from +1 to +2
 
-        // Iterate through the entire 3D volume, leaving a 1-unit border to prevent errors
-        for (int x = 1; x < numPointsPerAxis.x - 1; x++)
+        // Iterate through the interior volume only (skip the border overlap layer)
+        // Start at 2 and end at numPointsPerAxis - 2 to stay within the original chunk bounds
+        for (int x = 2; x < numPointsPerAxis.x - 2; x++)
         {
-            for (int z = 1; z < numPointsPerAxis.z - 1; z++)
+            for (int z = 2; z < numPointsPerAxis.z - 2; z++)
             {
-                // We loop from the bottom-up to find all possible surfaces in this column
-                for (int y = 1; y < numPointsPerAxis.y - 1; y++)
+                for (int y = 2; y < numPointsPerAxis.y - 2; y++)
                 {
                     // --- STEP 1: Identify a "floor" surface ---
                     float currentDensity = densityField[GetIndex(x, y, z, numPointsPerAxis)];
@@ -55,11 +55,11 @@ public struct ObjectPlacementJob : IJob
                     if (currentDensity >= isoLevel && aboveDensity < isoLevel)
                     {
                         // --- STEP 2: Use 3D Noise for Clustering ---
-                        // We use the world position of the found surface for the noise check
+                        // Adjust for the border offset: (x-1) because we added a 1-voxel border
                         float3 worldPos = new float3(
-                            chunkCoord.x * chunkSize.x + (x * step),
-                            y * step,
-                            chunkCoord.y * chunkSize.z + (z * step)
+                            chunkCoord.x * chunkSize.x + ((x - 1) * step),
+                            (y - 1) * step,
+                            chunkCoord.y * chunkSize.z + ((z - 1) * step)
                         );
 
                         // Use 3D noise to create clusters that wrap around 3D surfaces
@@ -71,7 +71,7 @@ public struct ObjectPlacementJob : IJob
 
                         // --- STEP 3: Perform Final Rule Checks ---
                         // Interpolate for a more precise Y position on the isosurface
-                        float surfaceY = y + (isoLevel - currentDensity) / (aboveDensity - currentDensity);
+                        float surfaceY = (y - 1) + (isoLevel - currentDensity) / (aboveDensity - currentDensity);
                         
                         // Check height range (normalized against full chunk height)
                         float normalizedHeight = (surfaceY * step) / chunkSize.y;
@@ -89,7 +89,7 @@ public struct ObjectPlacementJob : IJob
 
                         // Sanity Check: Ensure this isn't a thin, floating island
                         int checkDepth = 2;
-                        if (y > checkDepth)
+                        if (y > checkDepth + 1) // +1 to account for border
                         {
                             float densityBelow = densityField[GetIndex(x, y - checkDepth, z, numPointsPerAxis)];
                             if (densityBelow < isoLevel)
@@ -114,7 +114,8 @@ public struct ObjectPlacementJob : IJob
                             baseRotation = math.mul(baseRotation, quaternion.RotateY(random.NextFloat(0, 2 * math.PI)));
                         }
 
-                        float3 position = new float3(x * step, (surfaceY * step) + yOffset, z * step);
+                        // Adjust position to account for border offset
+                        float3 position = new float3((x - 1) * step, (surfaceY * step) + yOffset, (z - 1) * step);
                         float scale = random.NextFloat(scaleRange.x, scaleRange.y);
 
                         objectDataList.Add(new PlacementData

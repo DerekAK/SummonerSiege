@@ -29,7 +29,7 @@ public static class Noise
 
         // 1. Normalize the noiseHeight.
         // We shift the [-max, +max] range to [0, 2*max] and then divide to get [0, 1].
-        float normalizedNoise = (noiseHeight + maxPossibleAmplitude) / (2 * maxPossibleAmplitude);
+        float normalizedNoise = math.saturate((noiseHeight + maxPossibleAmplitude) / (2 * maxPossibleAmplitude));
 
         return normalizedNoise;
     }
@@ -62,8 +62,9 @@ public static class Noise
         float carveScale = 1f - 0.5f * math.abs(carveBias);
 
         // Remap the noise from [-max, +max] to [0, 1]
-        float normalizedNoise = (noiseValue + maxPossibleAmplitude) / (2 * maxPossibleAmplitude);
+        float normalizedNoise = math.saturate((noiseValue + maxPossibleAmplitude) / (2 * maxPossibleAmplitude));
 
+        // Rmap from [0, 1] to [-1, 1]
         float initialNoise = (normalizedNoise - 0.5f) * 2f;
         return initialNoise * carveScale + center;
     }

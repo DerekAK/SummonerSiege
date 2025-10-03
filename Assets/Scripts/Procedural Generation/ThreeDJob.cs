@@ -13,6 +13,7 @@ public struct ThreeDJob : IJob
     public float isoLevel;
     public float caveStrength;
     public int lod;
+    [ReadOnly] public NativeArray<int> neighborLODs;
 
     // --- Reusable Input/Output Arrays ---
     public NativeArray<float> cubeDensities;
@@ -49,22 +50,23 @@ public struct ThreeDJob : IJob
 
     public void Execute()
     {
-        // NEW: Calculate step size based on LOD. 0=1, 1=2, 2=4, etc.
         int step = 1 << lod;
+        
+        // Add 1 extra point on each border that will overlap with neighbors
+        int3 numPointsPerAxis = chunkSize / step + 2; // Changed from +1 to +2
 
-        int3 numPointsPerAxis = chunkSize / step + 1;
-
-        // Step 1: Calculate the density field at the correct LOD
+        // Step 1: Calculate the density field with extra border
         for (int x = 0; x < numPointsPerAxis.x; x++)
         {
             for (int y = 0; y < numPointsPerAxis.y; y++)
             {
                 for (int z = 0; z < numPointsPerAxis.z; z++)
                 {
+                    // Offset by -1 step to create overlap
                     float3 worldPos = new float3(
-                        chunkCoord.x * chunkSize.x + (x * step),
-                        y * step, // Use absolute world Y
-                        chunkCoord.y * chunkSize.z + (z * step)
+                        chunkCoord.x * chunkSize.x + ((x - 1) * step),
+                        (y - 1) * step,
+                        chunkCoord.y * chunkSize.z + ((z - 1) * step)
                     );
 
                     int index = GetIndex(x, y, z, numPointsPerAxis);
@@ -92,7 +94,7 @@ public struct ThreeDJob : IJob
             }
         }
 
-        // Step 2: Generate the mesh
+        // Step 2: Generate the mesh with the extended grid
         int3 numCubes = numPointsPerAxis - 1;
         for (int x = 0; x < numCubes.x; x++)
         {
@@ -109,9 +111,9 @@ public struct ThreeDJob : IJob
                     cubeDensities[6] = densityField[GetIndex(x + 1, y + 1, z + 1, numPointsPerAxis)];
                     cubeDensities[7] = densityField[GetIndex(x, y + 1, z + 1, numPointsPerAxis)];
 
-                    // Pass the step size to Marching Cubes so the mesh is scaled correctly
+                    // Offset back to local coordinates
                     MarchingCubes.March(
-                        new float3(x * step, y * step, z * step),
+                        new float3((x - 1) * step, (y - 1) * step, (z - 1) * step),
                         isoLevel,
                         step,
                         cubeDensities,
@@ -181,12 +183,14 @@ public struct ThreeDJob : IJob
         float clampedSurfaceHeight = Mathf.Clamp(surfaceHeight, 0, chunkHeight - 1);
         float baseDensity = clampedSurfaceHeight - worldPos.y; // in range of [-terrain amplitude, terrain amplitude], which should just be [-chunkheight, chunkheight] (assuming terrain amplitude is set to chunk height)
 
+        // ----- Start of 3D Noise -------
+
         // returns [-1, 1]
         float centered3DNoise = Noise.FBM3D(worldPos, threeDNoiseSettings, octaveOffsets3D); // Using the full 3D position
+        //float centered3DNoise = 0;
         float normalizedY = worldPos.y / chunkHeight; // Assumes chunk starts at y=0
-        float gradient = EvaluateUsingCurveArray(normalizedY, verticalGradientCurveSamples);
-        float clampedGradient = math.saturate(gradient);
-        float threeDModifier = centered3DNoise * threeDNoiseSettings.scale * clampedGradient * terrainAmplitudeFactor * (chunkHeight - 1);
+        float gradient = math.saturate(EvaluateUsingCurveArray(normalizedY, verticalGradientCurveSamples));
+        float threeDModifier = centered3DNoise * threeDNoiseSettings.scale * gradient * terrainAmplitudeFactor * (chunkHeight - 1);
 
 
         float3 warpOffset = Noise.FBM3D(worldPos, warpNoiseSettings, octaveOffsetsWarp) * warpNoiseSettings.amplitude * warpNoiseSettings.scale;
@@ -211,7 +215,7 @@ public struct ThreeDJob : IJob
         // Add the 3D modifier to the base density. This will push the surface inwards
         // (carving caves) or outwards (creating overhangs) from its original 2D position.
         float finalDensity = baseDensity - final3DModifier;
-
+        
         return finalDensity;
     }
 
