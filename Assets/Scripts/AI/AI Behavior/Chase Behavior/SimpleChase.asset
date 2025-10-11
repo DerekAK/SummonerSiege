@@ -1,0 +1,16 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3669e467b650c49c7905a71cc4b3dc38, type: 3}
+  m_Name: SimpleChase
+  m_EditorClassIdentifier: Assembly-CSharp::SimpleChase
+  _agent: {fileID: 0}
+  _anim: {fileID: 0}

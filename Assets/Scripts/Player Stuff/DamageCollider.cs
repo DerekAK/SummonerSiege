@@ -40,7 +40,7 @@ public class DamageCollider : NetworkBehaviour
             float totalDamage = ComputeDamage(baseDamage, damageMultiplier, elementType);
             Debug.Log($"Total damage: {totalDamage}");
             if (damageType == BaseAttackSO.eDamageType.Single){
-                healthComponent.TakeDamage(totalDamage);
+                healthComponent.Damage(totalDamage);
                 ApplyKnockback(other);
             }
             else{
@@ -65,7 +65,7 @@ public class DamageCollider : NetworkBehaviour
         healthComponentsToDamage.Add(health);
         while (healthComponentsToDamage.Contains(health)){
             if (timeSinceLastTick > tickRate){
-                health.TakeDamage(damage);
+                health.Damage(damage);
                 ApplyKnockback(other);
                 timeSinceLastTick = 0;
             }

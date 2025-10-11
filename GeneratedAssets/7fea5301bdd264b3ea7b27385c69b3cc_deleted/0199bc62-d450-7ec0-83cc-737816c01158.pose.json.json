@@ -1,0 +1,11 @@
+{
+    "asset": "7fea5301bdd264b3ea7b27385c69b3cc",
+    "fileName": "0199bc62-d450-7ec0-83cc-737816c01158.pose.json",
+    "prompt": "prolonged fast sprint",
+    "negativePrompt": "",
+    "model": "a9c27ca4-3ec9-43e8-96cd-ee891aba64c5",
+    "modelName": "Text to Motion",
+    "customSeed": 1163640134,
+    "w3CTraceId": "6e1542eb9647832fa9d8b40ffca036ee",
+    "isTrimmed": false
+}

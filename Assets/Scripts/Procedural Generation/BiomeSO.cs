@@ -3,7 +3,7 @@ using UnityEngine;
 
 // This attribute allows you to create instances of this object in the Unity Editor.
 // Right-click in the Project window -> Create -> Procedural -> Biome
-[CreateAssetMenu(fileName = "NewBiome", menuName = "Procedural/Biome")]
+[CreateAssetMenu(fileName = "NewBiome", menuName = "Scriptable Objects/Procedural/Biome")]
 public class BiomeSO : ScriptableObject
 {
 
@@ -12,7 +12,6 @@ public class BiomeSO : ScriptableObject
 
     [Tooltip("True to use same octave offsets for all 3 2d noise settings")]
     public bool sameOctaveOffsets;
-
 
     [Tooltip("Maps the low-frequency Continentalness noise to a height factor. Controls the largest landmass shapes.")]
     public AnimationCurve continentalnessCurve;
@@ -50,10 +49,13 @@ public class BiomeSO : ScriptableObject
     [Header("Object Placement Settings")]
     public PlaceableObject[] placeableObjects;
 
+    [Header("Navigation Link Settings")]
+    [Tooltip("Rules for automatically generating NavMesh Links for things like cliff drops.")]
+    public NavMeshLinkRule[] navMeshLinkRules;
+
 }
 
 public enum NoiseFunction { Standard, Power, Billow, Ridged, Terraced }
-
 
 [Serializable]
 public struct NoiseSettings
@@ -98,6 +100,14 @@ public class PlaceableObject
     public float density; // Controls how many objects appear
     public NoiseSettings placementNoise; // Use noise to create natural-looking clusters
 
+
+    [Header("Navigation Settings")]
+    [Tooltip("If true, this object will have a NavMesh Obstacle component added to it at runtime.")]
+    public bool isNavMeshObstacle;
+    [Tooltip("If this is a NavMesh Obstacle, should it carve a hole in the NavMesh? Best for static objects. If false, it will be a dynamic avoidance obstacle.")]
+    public bool carveNavMesh;
+
+
     [Header("Placement Rules")]
 
     [Tooltip("Normalized height (0 = world bottom, 1 = world top)")]
@@ -114,3 +124,17 @@ public class PlaceableObject
     public bool placeVertical;
 }
 
+[Serializable]
+public struct NavMeshLinkRule
+{
+    [Tooltip("The minimum vertical drop distance to be considered for this link type.")]
+    public float minVerticalDistance;
+    [Tooltip("The maximum vertical drop distance to be considered for this link type.")]
+    public float maxVerticalDistance;
+    [Tooltip("The Agent Type ID this link is created for. 0 is the default 'Humanoid'.")]
+    public int agentTypeID;
+    [Tooltip("Can agents travel both up and down this link?")]
+    public bool bidirectional;
+    [Tooltip("A cost multiplier for pathfinding. Higher values make this link less desirable for agents. -1 to not override.")]
+    public float costOverride;
+}

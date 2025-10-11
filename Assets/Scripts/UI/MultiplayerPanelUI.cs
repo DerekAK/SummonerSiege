@@ -36,7 +36,7 @@ public class MultiplayerUI : MonoBehaviour
     private void SceneLoadedHost(Scene scene, LoadSceneMode mode)
     {
         SceneManager.sceneLoaded -= SceneLoadedHost;
-        NetworkHandler.Instance.StartHostHandler();
+        NetworkManager.Singleton.StartHost();
     }
 
     private void SceneLoadedClient(Scene scene, LoadSceneMode mode)

@@ -1,0 +1,11 @@
+{
+    "asset": "b81651591ce524215b47eb08989ce106",
+    "fileName": "0199bc1f-34d0-77d6-9db4-efc9b45fdef7.pose.json",
+    "prompt": "running in place on a treadmill",
+    "negativePrompt": "",
+    "model": "a9c27ca4-3ec9-43e8-96cd-ee891aba64c5",
+    "modelName": "Text to Motion",
+    "customSeed": 1217635742,
+    "w3CTraceId": "b24409bbf0b126f81cff179376f26895",
+    "isTrimmed": false
+}

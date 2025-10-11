@@ -4,44 +4,69 @@ using System.Collections.Generic;
 
 public class PushZone : NetworkBehaviour
 {
-    [SerializeField] private float tickRate;
+    [SerializeField] private float tickRate = 0.2f;
     private float pushForce = 200;
 
     private float timeSinceLastTick;
-    private List<PlayerMovement> playersInZone = new List<PlayerMovement>();
+    private List<GameObject> objectsInZone = new();
 
-    private void Awake(){timeSinceLastTick = tickRate;}
+    private void Awake() { timeSinceLastTick = tickRate; }
 
     private void Update(){
         if (!IsServer) return;
         timeSinceLastTick += Time.deltaTime;
         if (timeSinceLastTick >= tickRate){
-            ApplyPushToAllPlayers();
+            ApplyPushToAll();
             timeSinceLastTick = 0f;
         }
     }
 
-    private void OnTriggerEnter(Collider other){
+    private void OnTriggerEnter(Collider other) {
         if (!IsServer) return;
-        if (other.gameObject.TryGetComponent(out PlayerMovement movementComponent)){
-            playersInZone.Add(movementComponent);
+        if (other.gameObject.TryGetComponent(out PlayerMovement _))
+        {
+            objectsInZone.Add(other.gameObject);
+        }
+
+        else if (other.gameObject.TryGetComponent(out Rigidbody _)){
+            objectsInZone.Add(other.gameObject);
         }
     }
 
-    private void OnTriggerExit(Collider other){
+    private void OnTriggerExit(Collider other) {
         if (!IsServer) return;
-        if (other.gameObject.TryGetComponent(out PlayerMovement movementComponent)){
-            playersInZone.Remove(movementComponent);
+        if (other.gameObject.TryGetComponent(out PlayerMovement _))
+        {
+            objectsInZone.Remove(other.gameObject);
         }
+
+        else if (other.gameObject.TryGetComponent(out Rigidbody _))
+        {
+            objectsInZone.Remove(other.gameObject);
+        }
+
     }
 
-    private void ApplyPushToAllPlayers(){
-        if(!IsServer) return;
-        foreach (PlayerMovement movementComponent in playersInZone){
-            Vector3 force = (movementComponent.transform.position - transform.position).normalized;
+    private void ApplyPushToAll()
+    {
+        if (!IsServer) return;
+        foreach (GameObject obj in objectsInZone)
+        {
+            Vector3 force = (obj.transform.position - transform.position).normalized;
             force.y = 0.5f;
             force *= pushForce;
-            movementComponent.ApplyForce(force);
+
+            if (obj.TryGetComponent(out PlayerMovement movementComponent))
+            {
+                movementComponent.ApplyForce(force);
+            }
+            else if (obj.TryGetComponent(out Rigidbody rb))
+            {
+                Debug.Log($"Applying force to {rb.gameObject.name}");
+                rb.AddForce(force);
+            }
         }
+
+        
     }
 }

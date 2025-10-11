@@ -39,10 +39,9 @@ public class PlayerMovement : NetworkBehaviour
     public MovementState currentMovementState { get; private set; }
     private CharacterController _characterController;
     private Animator _anim;
-    private PlayerStats _playerStats;
+    private EntityStats _playerStats;
     private PlayerState _playerState;
     private int playerTargetIndex = 0;
-    private bool statsConfigured = false;
     
     [Header("Physics Settings")]
     [SerializeField, Tooltip("Rate to dampen external forces (1/s).")]
@@ -62,97 +61,58 @@ public class PlayerMovement : NetworkBehaviour
     public GameObject _mainCamera;
     [SerializeField] private GameObject _playerFollowCamera;
 
-    private bool isInitialized = false;
+    private bool statsConfigured = false;
 
     private void Awake()
     {
         _characterController = GetComponent<CharacterController>();
         _anim = GetComponent<Animator>();
-        _playerStats = GetComponent<PlayerStats>();
+        _playerStats = GetComponent<EntityStats>();
         _playerState = GetComponent<PlayerState>();
+
+        _playerStats.OnStatsConfigured += StatsConfigured;
     }
 
-    private void Start()
+    private void StatsConfigured()
     {
-        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
-        {
-            Debug.Log(">>> START: Detected SINGLE-PLAYER mode. Initializing...", this);
-            Initialize();
-        }
-        else
-        {
-            Debug.Log(">>> START: Detected NETWORK mode. Waiting for OnNetworkSpawn...", this);
-        }
+        Debug.Log("Stats for player are configured!");
+        statsConfigured = true;
     }
 
     public override void OnNetworkSpawn()
     {
-        Debug.Log($">>> OnNetworkSpawn: IsOwner = {IsOwner}", this);
         if (IsOwner)
         {
-            Debug.Log(">>> OnNetworkSpawn: This is the OWNER. Initializing...", this);
             Initialize();
         }
         else
         {
-            if (_mainCamera != null) Destroy(_mainCamera);
-            if (_playerFollowCamera != null) Destroy(_playerFollowCamera);
+            if (_mainCamera != null) _mainCamera.SetActive(false);
+            if (_playerFollowCamera != null) _playerFollowCamera.SetActive(false);
         }
     }
 
     private void Initialize()
     {
-        if (isInitialized) return; // Prevent double-initialization
-        
-        Debug.Log("--- INITIALIZE Method Called! ---", this);
-        
         _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
         SetCursorState(cursorLocked);
         GameInput.Instance.OnAttackButtonStarted += OnRightClickPerform;
-
-        StartCoroutine(WaitForStatsLoaded());
         StartCoroutine(BillboardShit());
-        
-        if (NetworkManager.Singleton != null && (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer))
-        {
-            nvPhysicsVelocity.OnValueChanged += PhysicsVelocityChanged;
-            GetComponent<PlayerNetworkSyncHandler>().NetworkSyncEvent += SyncNetworkVariables;
-            Debug.Log("--- INITIALIZE: Subscribed to network events.", this);
-        }
-        isInitialized = true;
+        nvPhysicsVelocity.OnValueChanged += PhysicsVelocityChanged;
     }
 
     private void Update()
     {
         // This is the gate that is likely blocking execution.
-        if (!isInitialized || !statsConfigured)
-        {
-            // We will add a log here to see the status every frame
-            // To prevent spam, let's log it only for the owner object
-            if (IsOwner || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
-            {
-                Debug.LogWarning($"Update BLOCKED: isInitialized = {isInitialized}, statsConfigured = {statsConfigured}", this);
-            }
-            return;
-        }
+        if (!statsConfigured) return; 
+
         GroundedCheck();
         UpdateVerticalVelocity();
         HandleMovement();
         CursorStuffIDontUnderstand();
     }
 
-    private IEnumerator WaitForStatsLoaded()
-    {
-        Debug.Log("--- Coroutine: Waiting for stats...", this);
-        yield return new WaitForSeconds(0.5f);
-        Debug.Log($"Before applying: {PlayerPosition.Value}");
-        transform.position = PlayerPosition.Value;
-        Debug.Log($"After applying: {transform.position}");
-        statsConfigured = true;
-        Debug.Log("--- Coroutine: Stats configured! Movement should now be enabled.", this);
-    }
-    
-    private void Shutdown()
+    public override void OnNetworkDespawn()
     {
         if (GameInput.Instance != null)
         {
@@ -162,29 +122,9 @@ public class PlayerMovement : NetworkBehaviour
         if (NetworkManager.Singleton != null)
         {
             nvPhysicsVelocity.OnValueChanged -= PhysicsVelocityChanged;
-            var syncHandler = GetComponent<PlayerNetworkSyncHandler>();
-            if (syncHandler != null)
-            {
-                syncHandler.NetworkSyncEvent -= SyncNetworkVariables;
-            }
         }
-    }
-    
-    public override void OnNetworkDespawn()
-    {
-        if(IsOwner)
-        {
-            Shutdown();
-        }
-    }
 
-    public override void OnDestroy()
-    {
-        base.OnDestroy();
-        if (NetworkManager.Singleton == null || (!NetworkManager.Singleton.IsServer && !NetworkManager.Singleton.IsClient))
-        {
-             Shutdown();
-        }
+        _playerStats.OnStatsConfigured -= StatsConfigured;
     }
     
     private IEnumerator BillboardShit(){
@@ -196,12 +136,6 @@ public class PlayerMovement : NetworkBehaviour
             }
             yield return null;
         }
-    }
-
-    private void SyncNetworkVariables(object sender, EventArgs e)
-    {
-        PlayerPosition.Value = transform.position;
-        Debug.Log($"PlayerPosition updated to {PlayerPosition.Value}!");
     }
 
     private void UpdateVerticalVelocity(){
@@ -226,26 +160,40 @@ public class PlayerMovement : NetworkBehaviour
 
         float targetMoveSpeed, targetX, targetY, targetCrouchWeight, targetStrafeWeight;
 
-        if (isMoving){
-            if (isSprinting && !isLockedOn){
-                targetMoveSpeed = _playerStats.SpeedStat.Stat.Value * sprintFactor;
+        float speed;
+        if (_playerStats.TryGetStat(StatType.Speed, out NetStat speedStat))
+        {
+            speed = speedStat.CurrentValue;
+        }
+        else
+        {
+            return;
+        }
+
+        if (isMoving)
+        {
+            if (isSprinting && !isLockedOn)
+            {
+                targetMoveSpeed = speed * sprintFactor;
                 targetX = 0;
                 targetY = 2;
             }
-            else{
-                targetMoveSpeed = _playerStats.SpeedStat.Stat.Value;
+            else
+            {
+                targetMoveSpeed = speed;
                 targetX = 0;
                 targetY = 1;
             }
         }
-        else{
+        else
+        {
             targetMoveSpeed = 0;
             targetX = 0;
             targetY = 0;
         }
 
         if (isLockedOn){
-            targetMoveSpeed = _playerStats.SpeedStat.Stat.Value * lockOnFactor;
+            targetMoveSpeed = speed * lockOnFactor;
             targetX = moveDir.x;
             targetY = moveDir.y;
             targetStrafeWeight = 1;

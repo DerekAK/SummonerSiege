@@ -29,14 +29,7 @@ public class EndlessTerrain : MonoBehaviour
     [SerializeField] GameObject pfTerrainChunk;
     private List<int2> previouslyVisibleChunks = new();
 
-    [Header("NavMesh Management")]
-    [Tooltip("The single NavMeshSurface component for the entire terrain. Set CollectObjects to 'Children'.")]
-    private NavMeshSurface globalNavMeshSurface;
-    [Tooltip("How often (in seconds) the NavMesh can be rebuilt.")]
-    [SerializeField] private float navMeshUpdateTime = 0.1f; // Reduced time as bakes are much smaller
-    private float lastNavMeshUpdateTime;
     public Dictionary<int2, TerrainChunk> TerrainChunkDict = new Dictionary<int2, TerrainChunk>();
-    private Queue<Bounds> dirtyNavMeshBoundsQueue = new Queue<Bounds>();
 
     // Native Arrays for noise curves
     private NativeArray<float> continentalnessSamples;
@@ -59,12 +52,82 @@ public class EndlessTerrain : MonoBehaviour
     {
         int numChunks = InitializeChunkPool();
         InitializePlacementPools(numChunks);
-        globalNavMeshSurface = GetComponent<NavMeshSurface>();
-        globalNavMeshSurface.navMeshData = new NavMeshData();
         viewerPosition = viewer.position;
         GenerateNewBiomeArrays();
         UpdateVisibleChunks();
         highestLOD = lodInfoList[0].lod;
+    }
+
+    private void Update()
+    {
+        if (Vector3.Distance(viewerPosition, viewer.position) > 0.01f)
+        {
+            UpdateVisibleChunks();
+        }
+        viewerPosition = viewer.position;
+    }
+
+    private void UpdateVisibleChunks()
+    {
+
+        previouslyVisibleChunks.Clear();
+        foreach (int2 coord in TerrainChunkDict.Keys)
+        {
+            previouslyVisibleChunks.Add(coord);
+        }
+
+        int maxViewDist = lodInfoList.Last().visibleDistanceThreshold;
+        int viewerCoordX = Mathf.RoundToInt(viewerPosition.x / ChunkDimensions.x);
+        int viewerCoordZ = Mathf.RoundToInt(viewerPosition.z / ChunkDimensions.z);
+        int maxChunksFromViewer = Mathf.RoundToInt((float)maxViewDist / ChunkDimensions.x);
+
+        // Create new chunks or update existing ones
+        for (int xOffset = -maxChunksFromViewer; xOffset <= maxChunksFromViewer; xOffset++)
+        {
+            for (int zOffset = -maxChunksFromViewer; zOffset <= maxChunksFromViewer; zOffset++)
+            {
+                int2 chunkCoord = new int2(viewerCoordX + xOffset, viewerCoordZ + zOffset);
+                Vector3 position = new(chunkCoord.x * ChunkDimensions.x, 0, chunkCoord.y * ChunkDimensions.z);
+                Vector3 boundsPosition = new(
+                    position.x + ChunkDimensions.x / 2f,
+                    ChunkDimensions.y / 2f,
+                    position.z + ChunkDimensions.z / 2f
+                );
+                Bounds tempBounds = new(boundsPosition, new Vector3(ChunkDimensions.x, ChunkDimensions.y, ChunkDimensions.z));
+                float viewerDstFromChunk = Mathf.Sqrt(tempBounds.SqrDistance(viewerPosition));
+
+                if (viewerDstFromChunk <= maxViewDist)
+                {
+                    previouslyVisibleChunks.Remove(chunkCoord);
+                    if (TerrainChunkDict.ContainsKey(chunkCoord)) // was visible last rendering and should be visible this rendering, but might be different lod
+                    {
+                        TerrainChunkDict[chunkCoord].UpdateTerrainChunk();
+                    }
+                    else // was not visible last rendering but should be, so create a new chunk (not new gameobject, get one from object pool)
+                    {
+                        var newChunk = new TerrainChunk(this, chunkCoord);
+                        TerrainChunkDict.Add(chunkCoord, newChunk);
+                    }
+                }
+            }
+        }
+        foreach (var coord in previouslyVisibleChunks)
+        {
+            TerrainChunk chunkToUnrender = TerrainChunkDict[coord];
+            chunkToUnrender.HandleChunkRemoval();
+            TerrainChunkDict.Remove(coord);
+        }
+    }
+
+    private  NativeArray<float> BakeCurve(AnimationCurve curve, int resolution)
+    {
+        var samples = new NativeArray<float>(resolution, Allocator.Persistent);
+        for (int i = 0; i < resolution; i++)
+        {
+            float time = (float)i / (resolution - 1);
+            samples[i] = curve.Evaluate(time);
+        }
+        return samples;
     }
 
     private int InitializeChunkPool()
@@ -88,12 +151,6 @@ public class EndlessTerrain : MonoBehaviour
         {
             ObjectPoolManager.Singleton.RegisterPrefab(placeable.prefab, initialAmountPerPf);
         }
-    }
-
-
-    public TerrainChunk GetChunk(int2 coords)
-    {
-        return TerrainChunkDict[coords];
     }
 
     private void GenerateNewBiomeArrays()
@@ -140,160 +197,11 @@ public class EndlessTerrain : MonoBehaviour
             octaveOffsetsPlaceableObjectsDict[placeableObject.prefab.GetHashCode()] = Noise.Get3DOctaveOffsets(seedOffset, placeableObject.placementNoise.octaves);
             seedOffset += 10;
         }
-
     }
 
-    private void Update()
+    public TerrainChunk GetChunk(int2 coords)
     {
-        if (Vector3.Distance(viewerPosition, viewer.position) > 0.01f)
-        {
-            UpdateVisibleChunks();
-        }
-        viewerPosition = viewer.position;
-
-        if (shouldBakeNavMesh)
-        {
-            CleanupFinishedBakeOperations();
-
-            if (dirtyNavMeshBoundsQueue.Count > 0 && Time.time - lastNavMeshUpdateTime > navMeshUpdateTime)
-            {
-                lastNavMeshUpdateTime = Time.time;
-                BakeGlobalNavMeshAsync();
-            }
-        }
-    }
-
-    private void OnDrawGizmos()
-    {
-        // Draw chunks that are currently being baked in red
-        Gizmos.color = Color.red;
-        foreach (var bounds in activeBakeOperations.Values)
-        {
-            Gizmos.DrawWireCube(bounds.center, bounds.size);
-        }
-
-        // Draw chunks that are waiting in the queue in yellow
-        Gizmos.color = Color.yellow;
-        foreach (var bounds in dirtyNavMeshBoundsQueue)
-        {
-            Gizmos.DrawWireCube(bounds.center, bounds.size);
-        }
-    }
-
-    public void MarkNavMeshAsDirty(Bounds chunkBounds)
-    {
-        dirtyNavMeshBoundsQueue.Enqueue(chunkBounds);
-    }
-
-    private void BakeGlobalNavMeshAsync()
-    {
-        if (globalNavMeshSurface == null || dirtyNavMeshBoundsQueue.Count == 0)
-        {
-            return;
-        }
-
-        Bounds boundsToBake = dirtyNavMeshBoundsQueue.Dequeue();
-
-        var sources = new List<NavMeshBuildSource>();
-
-        var markups = new List<NavMeshBuildMarkup>();
-
-        NavMeshBuilder.CollectSources(
-            boundsToBake,
-            globalNavMeshSurface.layerMask,
-            globalNavMeshSurface.useGeometry,
-            globalNavMeshSurface.defaultArea,
-            markups,
-            sources
-        );
-
-        // Get the build settings from our surface component
-        var buildSettings = globalNavMeshSurface.GetBuildSettings();
-
-        // Call the async builder with the correctly collected sources and specific bounds
-        var operation = NavMeshBuilder.UpdateNavMeshDataAsync(
-            globalNavMeshSurface.navMeshData,
-            buildSettings,
-            sources,
-            boundsToBake
-        );
-
-        activeBakeOperations.Add(operation, boundsToBake); 
-    }
-
-    private void CleanupFinishedBakeOperations()
-    {
-        if (activeBakeOperations.Count == 0) return;
-        var finishedOperations = new List<AsyncOperation>(); 
-        foreach (var kvp in activeBakeOperations)
-        {
-            if (kvp.Key.isDone)
-            {
-                finishedOperations.Add(kvp.Key);
-            }
-        }
-        foreach (var op in finishedOperations)
-        {
-            activeBakeOperations.Remove(op);
-        }
-    }
-
-    private void UpdateVisibleChunks()
-    {
-
-        previouslyVisibleChunks.Clear();
-        foreach (int2 coord in TerrainChunkDict.Keys)
-        {
-            previouslyVisibleChunks.Add(coord);
-        }
-
-        int maxViewDist = lodInfoList.Last().visibleDistanceThreshold;
-        int viewerCoordX = Mathf.RoundToInt(viewerPosition.x / ChunkDimensions.x);
-        int viewerCoordZ = Mathf.RoundToInt(viewerPosition.z / ChunkDimensions.z);
-        int maxChunksFromViewer = Mathf.RoundToInt((float)maxViewDist / ChunkDimensions.x);
-
-        // Create new chunks or update existing ones
-        for (int xOffset = -maxChunksFromViewer; xOffset <= maxChunksFromViewer; xOffset++)
-        {
-            for (int zOffset = -maxChunksFromViewer; zOffset <= maxChunksFromViewer; zOffset++)
-            {
-                int2 chunkCoord = new int2(viewerCoordX + xOffset, viewerCoordZ + zOffset);
-                Vector3 position = new(chunkCoord.x * ChunkDimensions.x, 0, chunkCoord.y * ChunkDimensions.z);
-                Bounds tempBounds = new Bounds(position, new Vector3(ChunkDimensions.x, ChunkDimensions.y, ChunkDimensions.z));
-                float viewerDstFromChunk = Mathf.Sqrt(tempBounds.SqrDistance(viewerPosition));
-
-                if (viewerDstFromChunk <= maxViewDist)
-                {
-                    previouslyVisibleChunks.Remove(chunkCoord);
-                    if (TerrainChunkDict.ContainsKey(chunkCoord)) // was visible last rendering and should be visible this rendering, but might be different lod
-                    {
-                        TerrainChunkDict[chunkCoord].UpdateTerrainChunk();
-                    }
-                    else // was not visible last rendering but should be, so create a new chunk (not new gameobject, get one from object pool)
-                    {
-                        var newChunk = new TerrainChunk(this, chunkCoord);
-                        TerrainChunkDict.Add(chunkCoord, newChunk);
-                    }
-                }
-            }
-        }
-        foreach (var coord in previouslyVisibleChunks)
-        {
-            TerrainChunk chunkToUnrender = TerrainChunkDict[coord];
-            chunkToUnrender.HandleChunkRemoval();
-            TerrainChunkDict.Remove(coord);
-        }
-    }
-
-    private  NativeArray<float> BakeCurve(AnimationCurve curve, int resolution)
-    {
-        var samples = new NativeArray<float>(resolution, Allocator.Persistent);
-        for (int i = 0; i < resolution; i++)
-        {
-            float time = (float)i / (resolution - 1);
-            samples[i] = curve.Evaluate(time);
-        }
-        return samples;
+        return TerrainChunkDict[coords];
     }
 
     private void OnDestroy()
@@ -317,12 +225,6 @@ public class EndlessTerrain : MonoBehaviour
             octaveOffsets.Value.Dispose();
         }
         octaveOffsetsPlaceableObjectsDict.Clear();
-
-        // Clean up NavMesh data
-        if (globalNavMeshSurface != null && globalNavMeshSurface.navMeshData != null)
-        {
-            globalNavMeshSurface.RemoveData();
-        }
     }
 
     public class TerrainChunk
@@ -334,22 +236,20 @@ public class EndlessTerrain : MonoBehaviour
         private LODInfo[] lodInfoList;
         private LODMesh[] lodMeshes;
         private int2 chunkCoord;
-        private int previousLODIndex = -1;
+        private int previousLOD = -1;
         private EndlessTerrain endlessTerrain; // Reference to the parent manager
-        private bool hasNotifiedForNavMesh = false; // Flag to prevent spamming updates
-        public Dictionary<int, List<float4x4>> ObjectData = new Dictionary<int, List<float4x4>>();
         private List<(GameObject, GameObject)> activeGameObjects = new();
         private Dictionary<int, Transform> objectParents = new();
         private Coroutine placementCoroutine; // NEW: Store coroutine handle for object placement
         private List<(JobHandle, NativeList<PlacementData>, int, GameObject)> placementJobs;
         private bool isDestroyed; // NEW: Flag to track chunk destruction
         private int[] neighborLODs = new int[4]; // 0=North, 1=South, 2=East, 3=West
-    
-        public int GetNeighborLOD(int direction)
-        {
-            return neighborLODs[direction];
-        }
 
+        // Nav mesh fields
+        private NavMeshSurface navMeshSurface;
+        private NavMeshDataInstance navMeshInstance;
+        private AsyncOperation activeBakeOperation;
+        private bool isBakeCancelled = false; // Add this flag
 
         public TerrainChunk(EndlessTerrain endlessTerrain, int2 coord)
         {
@@ -362,7 +262,12 @@ public class EndlessTerrain : MonoBehaviour
             placementJobs = new();
 
             Vector3 position = new(coord.x * dimensions.x, 0, coord.y * dimensions.z);
-            Bounds = new Bounds(position, new Vector3(dimensions.x, dimensions.y, dimensions.z));
+            Vector3 boundsPosition = new(
+                position.x + dimensions.x / 2f,  
+                dimensions.y / 2f,                
+                position.z + dimensions.z / 2f
+            );
+            Bounds = new Bounds(boundsPosition, new Vector3(dimensions.x, dimensions.y, dimensions.z));
 
             MeshObject = ObjectPoolManager.Singleton.GetObject(endlessTerrain.pfTerrainChunk, position, Quaternion.identity);
             MeshObject.transform.SetParent(endlessTerrain.transform);
@@ -370,6 +275,8 @@ public class EndlessTerrain : MonoBehaviour
             MeshFilter = MeshObject.GetComponent<MeshFilter>();
             meshRenderer = MeshObject.GetComponent<MeshRenderer>();
             meshRenderer.material = endlessTerrain.terrainMaterial;
+
+            navMeshSurface = MeshObject.GetComponent<NavMeshSurface>();
 
             lodMeshes = new LODMesh[lodInfoList.Length];
             for (int i = 0; i < lodMeshes.Length; i++)
@@ -406,20 +313,28 @@ public class EndlessTerrain : MonoBehaviour
 
                 UpdateNeighborLODs();
 
-                if (lodIndex != previousLODIndex)
+                if (lodMeshes[lodIndex].lod != previousLOD)
                 {
                     LODMesh lodMesh = lodMeshes[lodIndex];
                     if (lodMesh.hasMesh)
                     {
-                        previousLODIndex = lodIndex;
+                        int oldLOD = previousLOD; // Store the old LOD before we change it
 
+                        // 1. Assign the new mesh and update the index FIRST.
+                        previousLOD = lodMesh.lod;
                         MeshFilter.mesh = lodMesh.mesh;
 
-                        // If this is the highest detail LOD, queue its bounds for a NavMesh bake
-                        if (lodMesh.lod == endlessTerrain.highestLOD && !hasNotifiedForNavMesh)
+                        // 2. NOW, handle NavMesh based on the transition.
+                        
+                        // Did we just ENTER the highest LOD?
+                        if (previousLOD == endlessTerrain.highestLOD && oldLOD != endlessTerrain.highestLOD && endlessTerrain.shouldBakeNavMesh)
                         {
-                            endlessTerrain.MarkNavMeshAsDirty(this.Bounds);
-                            hasNotifiedForNavMesh = true; // Only notify once
+                            BakeNavMesh();
+                        }
+                        // Did we just LEAVE the highest LOD?
+                        else if (previousLOD != endlessTerrain.highestLOD && oldLOD == endlessTerrain.highestLOD)
+                        {
+                            RemoveNavMesh();
                         }
                     }
                     else if (!lodMesh.isGenerating)
@@ -429,28 +344,92 @@ public class EndlessTerrain : MonoBehaviour
                 }
             }
         }
+        
+        private void BakeNavMesh()
+        {
+            if (activeBakeOperation != null && !activeBakeOperation.isDone) return;
+
+            isBakeCancelled = false; // Reset the flag before starting a new bake
+
+            var sources = new List<NavMeshBuildSource>();
+            var markups = new List<NavMeshBuildMarkup>();
+            var buildSettings = navMeshSurface.GetBuildSettings();
+            NavMeshBuilder.CollectSources
+            (
+                Bounds,
+                navMeshSurface.layerMask,
+                navMeshSurface.useGeometry,
+                navMeshSurface.defaultArea,
+                markups,
+                sources
+            );
+            Debug.Log($"Found {sources.Count} geometry sources to bake for chunk {chunkCoord}.");
+            var newBakeData = new NavMeshData(); // Bake into a temporary object
+
+            activeBakeOperation = NavMeshBuilder.UpdateNavMeshDataAsync(
+                newBakeData,
+                buildSettings,
+                sources,
+                Bounds
+            );
+
+            activeBakeOperation.completed += operation => {
+                
+                if (isBakeCancelled)
+                {
+                    activeBakeOperation = null; // The bake is done, so clear the handle.
+                    return; // Discard the result and do nothing.
+                }
+
+                if (navMeshInstance.valid) NavMesh.RemoveNavMeshData(navMeshInstance);
+                
+                navMeshSurface.navMeshData = newBakeData;
+                navMeshInstance = NavMesh.AddNavMeshData(navMeshSurface.navMeshData);
+
+                activeBakeOperation = null; // The bake is done, so clear the handle.
+            };
+        }
+
+        private void RemoveNavMesh()
+        {
+            // Signal to any running bake operation that its result is no longer needed.
+            isBakeCancelled = true;
+
+            // Immediately remove the currently active NavMesh data for this chunk.
+            if (navMeshInstance.valid)
+            {
+                NavMesh.RemoveNavMeshData(navMeshInstance);
+            }
+
+            // You are correct, we should also clear the handle if no operation is pending
+            // to allow a new bake to start if the chunk becomes visible again.
+            if (activeBakeOperation == null || activeBakeOperation.isDone)
+            {
+                activeBakeOperation = null;
+            }
+        }
 
         private void UpdateNeighborLODs()
         {
             // North neighbor (z+1)
             int2 northCoord = new int2(chunkCoord.x, chunkCoord.y + 1);
-            neighborLODs[0] = endlessTerrain.TerrainChunkDict.TryGetValue(northCoord, out var northChunk) 
-                ? northChunk.previousLODIndex : previousLODIndex;
-            
+            neighborLODs[0] = endlessTerrain.TerrainChunkDict.TryGetValue(northCoord, out var northChunk)
+                ? northChunk.previousLOD : previousLOD;
+
             // South neighbor (z-1)
             int2 southCoord = new int2(chunkCoord.x, chunkCoord.y - 1);
-            neighborLODs[1] = endlessTerrain.TerrainChunkDict.TryGetValue(southCoord, out var southChunk) 
-                ? southChunk.previousLODIndex : previousLODIndex;
-            
+            neighborLODs[1] = endlessTerrain.TerrainChunkDict.TryGetValue(southCoord, out var southChunk)
+                ? southChunk.previousLOD : previousLOD;
+
             // East neighbor (x+1)
             int2 eastCoord = new int2(chunkCoord.x + 1, chunkCoord.y);
-            neighborLODs[2] = endlessTerrain.TerrainChunkDict.TryGetValue(eastCoord, out var eastChunk) 
-                ? eastChunk.previousLODIndex : previousLODIndex;
-            
+            neighborLODs[2] = endlessTerrain.TerrainChunkDict.TryGetValue(eastCoord, out var eastChunk)
+                ? eastChunk.previousLOD : previousLOD;
+
             // West neighbor (x-1)
             int2 westCoord = new int2(chunkCoord.x - 1, chunkCoord.y);
-            neighborLODs[3] = endlessTerrain.TerrainChunkDict.TryGetValue(westCoord, out var westChunk) 
-                ? westChunk.previousLODIndex : previousLODIndex;
+            neighborLODs[3] = endlessTerrain.TerrainChunkDict.TryGetValue(westCoord, out var westChunk)
+                ? westChunk.previousLOD : previousLOD;
         }
 
         public void SchedulePlacementJobs(NativeArray<float> densityField, int lod)
@@ -502,6 +481,8 @@ public class EndlessTerrain : MonoBehaviour
                 int prefabHash = job.Item3;
                 GameObject prefab = job.Item4;
 
+                PlaceableObject placeableConfig = endlessTerrain.activeBiomeSO.placeableObjects.FirstOrDefault(p => p.prefab == prefab);
+
                 yield return new WaitUntil(() => jobHandle.IsCompleted);
 
                 if (isDestroyed)
@@ -530,7 +511,27 @@ public class EndlessTerrain : MonoBehaviour
                     newObject.transform.localPosition = data.position;
                     newObject.transform.localScale = Vector3.one * data.scale;
                     activeGameObjects.Add((newObject, prefab)); // Keep track of it
+                    
+                    if (placeableConfig != null && placeableConfig.isNavMeshObstacle)
+                    {
+                        NavMeshObstacle obstacle = newObject.GetComponent<NavMeshObstacle>();
+                        if (obstacle == null)
+                        {
+                            obstacle = newObject.AddComponent<NavMeshObstacle>();
+                        }
+                        
+                        // Set carving based on the BiomeSO config
+                        obstacle.carving = placeableConfig.carveNavMesh;
 
+                        // Optional: Try to auto-size the obstacle based on the object's collider
+                        if (newObject.TryGetComponent<Collider>(out var collider))
+                        {
+                            obstacle.shape = NavMeshObstacleShape.Box;
+                            // We use localScale because bounds size is in world units
+                            obstacle.size = Vector3.Scale(collider.bounds.size, newObject.transform.localScale);
+                        }
+                    }
+                    
                     objectsPlacedThisFrame++;
                     if (objectsPlacedThisFrame >= maxObjectsPerFrame)
                     {
@@ -575,8 +576,7 @@ public class EndlessTerrain : MonoBehaviour
                 lodMesh.CancelJob();
             }
 
-            // Queue bounds for NavMesh update
-            endlessTerrain.MarkNavMeshAsDirty(Bounds);
+            RemoveNavMesh();
 
             if (MeshObject != null)
             {

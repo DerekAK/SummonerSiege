@@ -35,6 +35,6 @@ public class DamageZone : NetworkBehaviour
     }
 
     private void ApplyDamageToAllPlayers(){
-        foreach (HealthComponent health in playersInZone){health.TakeDamage(damageAmount);}
+        foreach (HealthComponent health in playersInZone){health.Damage(damageAmount);}
     }
 }

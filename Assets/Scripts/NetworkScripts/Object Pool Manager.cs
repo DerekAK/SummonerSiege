@@ -65,7 +65,11 @@ public class ObjectPoolManager : MonoBehaviour
 
         void ActionOnDestroy(GameObject obj)
         {
-            Destroy(obj);
+            #if UNITY_EDITOR
+                DestroyImmediate(obj);
+            #else
+                Destroy(obj);
+            #endif
         }
 
 
