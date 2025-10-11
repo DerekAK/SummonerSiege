@@ -50,8 +50,11 @@ public class BiomeSO : ScriptableObject
     public PlaceableObject[] placeableObjects;
 
     [Header("Navigation Link Settings")]
-    [Tooltip("Rules for automatically generating NavMesh Links for things like cliff drops.")]
-    public NavMeshLinkRule[] navMeshLinkRules;
+    [Tooltip("A global spacing distance (in voxels) to prevent any two links from spawning too close.")]
+    public int globalLinkSpacing;
+    public NavMeshCliffRule[] navMeshCliffRules;
+    public NavMeshGapRule[] navMeshGapRules;
+    public NavMeshSlopeRule[] navMeshSlopeRules;
 
 }
 
@@ -106,6 +109,10 @@ public class PlaceableObject
     public bool isNavMeshObstacle;
     [Tooltip("If this is a NavMesh Obstacle, should it carve a hole in the NavMesh? Best for static objects. If false, it will be a dynamic avoidance obstacle.")]
     public bool carveNavMesh;
+    [Tooltip("Flags this object as a priority target for NavMesh Links to connect to.")]
+    public bool isPriorityLinkTarget;
+    [Tooltip("The local position of the link's anchor point relative to the object's pivot.")]
+    public Vector3 linkAnchorOffset;
 
 
     [Header("Placement Rules")]
@@ -122,19 +129,4 @@ public class PlaceableObject
     public Vector2 scaleRange;
     public bool randomYRotation;
     public bool placeVertical;
-}
-
-[Serializable]
-public struct NavMeshLinkRule
-{
-    [Tooltip("The minimum vertical drop distance to be considered for this link type.")]
-    public float minVerticalDistance;
-    [Tooltip("The maximum vertical drop distance to be considered for this link type.")]
-    public float maxVerticalDistance;
-    [Tooltip("The Agent Type ID this link is created for. 0 is the default 'Humanoid'.")]
-    public int agentTypeID;
-    [Tooltip("Can agents travel both up and down this link?")]
-    public bool bidirectional;
-    [Tooltip("A cost multiplier for pathfinding. Higher values make this link less desirable for agents. -1 to not override.")]
-    public float costOverride;
 }

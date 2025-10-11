@@ -318,22 +318,29 @@ public class EndlessTerrain : MonoBehaviour
                     LODMesh lodMesh = lodMeshes[lodIndex];
                     if (lodMesh.hasMesh)
                     {
-                        int oldLOD = previousLOD; // Store the old LOD before we change it
+                        int oldLOD = previousLOD; // ✅ Store old LOD BEFORE any changes
+                        int newLOD = lodMesh.lod; // ✅ Store new LOD
 
-                        // 1. Assign the new mesh and update the index FIRST.
-                        previousLOD = lodMesh.lod;
+                        // ✅ 1. Assign the mesh FIRST
                         MeshFilter.mesh = lodMesh.mesh;
-
-                        // 2. NOW, handle NavMesh based on the transition.
                         
-                        // Did we just ENTER the highest LOD?
-                        if (previousLOD == endlessTerrain.highestLOD && oldLOD != endlessTerrain.highestLOD && endlessTerrain.shouldBakeNavMesh)
+                        // ✅ 2. Update the tracking variable
+                        previousLOD = newLOD;
+
+                        // ✅ 3. Handle NavMesh transitions based on ACTUAL transition
+                        bool enteringHighestLOD = (newLOD == endlessTerrain.highestLOD) && 
+                                                (oldLOD != endlessTerrain.highestLOD);
+                        bool leavingHighestLOD = (newLOD != endlessTerrain.highestLOD) && 
+                                                (oldLOD == endlessTerrain.highestLOD);
+
+                        if (enteringHighestLOD && endlessTerrain.shouldBakeNavMesh)
                         {
+                            Debug.Log($"Chunk {chunkCoord} entering highest LOD, baking NavMesh");
                             BakeNavMesh();
                         }
-                        // Did we just LEAVE the highest LOD?
-                        else if (previousLOD != endlessTerrain.highestLOD && oldLOD == endlessTerrain.highestLOD)
+                        else if (leavingHighestLOD)
                         {
+                            Debug.Log($"Chunk {chunkCoord} leaving highest LOD, removing NavMesh");
                             RemoveNavMesh();
                         }
                     }
@@ -347,8 +354,13 @@ public class EndlessTerrain : MonoBehaviour
         
         private void BakeNavMesh()
         {
-            if (activeBakeOperation != null && !activeBakeOperation.isDone) return;
+            if (activeBakeOperation != null && !activeBakeOperation.isDone)
+            {
+                Debug.LogWarning($"Chunk {chunkCoord}: Attempted to bake while operation in progress");
+                return;
+            }
 
+            Debug.Log($"Chunk {chunkCoord}: Starting NavMesh bake at LOD {previousLOD}");
             isBakeCancelled = false; // Reset the flag before starting a new bake
 
             var sources = new List<NavMeshBuildSource>();
@@ -392,21 +404,25 @@ public class EndlessTerrain : MonoBehaviour
 
         private void RemoveNavMesh()
         {
-            // Signal to any running bake operation that its result is no longer needed.
+            Debug.Log("REMOVE NAV MESH!");
+            // Signal cancellation FIRST
             isBakeCancelled = true;
 
-            // Immediately remove the currently active NavMesh data for this chunk.
+            // Remove active NavMesh immediately
             if (navMeshInstance.valid)
             {
                 NavMesh.RemoveNavMeshData(navMeshInstance);
+                navMeshInstance = default; // ✅ Reset to invalid state
             }
 
-            // You are correct, we should also clear the handle if no operation is pending
-            // to allow a new bake to start if the chunk becomes visible again.
-            if (activeBakeOperation == null || activeBakeOperation.isDone)
+            // Clear the surface data reference
+            if (navMeshSurface != null && navMeshSurface.navMeshData != null)
             {
-                activeBakeOperation = null;
+                navMeshSurface.navMeshData = null;
             }
+
+            // Note: We intentionally don't clear activeBakeOperation here
+            // The completed callback will handle cleanup when it fires
         }
 
         private void UpdateNeighborLODs()
@@ -511,7 +527,8 @@ public class EndlessTerrain : MonoBehaviour
                     newObject.transform.localPosition = data.position;
                     newObject.transform.localScale = Vector3.one * data.scale;
                     activeGameObjects.Add((newObject, prefab)); // Keep track of it
-                    
+
+
                     if (placeableConfig != null && placeableConfig.isNavMeshObstacle)
                     {
                         NavMeshObstacle obstacle = newObject.GetComponent<NavMeshObstacle>();
