@@ -12,8 +12,6 @@ public class PersistenceManager : NetworkBehaviour
 
     private Dictionary<string, object> localPManData;
 
-    public event Action OnStatsProvided;
-
     void OnValidate()
     {
         if (string.IsNullOrEmpty(uniqueId))
@@ -40,6 +38,7 @@ public class PersistenceManager : NetworkBehaviour
 
     public void ProvideAllData(Dictionary<string, object> pManData)
     {
+        // pManData should never be null, otherwise the getworlddatafunction could fail
         localPManData = pManData;
     }
 
@@ -48,12 +47,12 @@ public class PersistenceManager : NetworkBehaviour
         string componentName = component.GetType().Name;
         if (localPManData.TryGetValue(componentName, out object componentData))
         {
-            Debug.Log($"Applying WORLD data for {component.GetType().Name}");
+            //Debug.Log($"Applying WORLD data for {component.GetType().Name}");
             return componentData as Dictionary<string, object>;
         }
         else
         {
-            Debug.Log($"Applying EMPTY data for {component.GetType().Name}");
+            //Debug.Log($"Applying EMPTY data for {component.GetType().Name}");
             return new Dictionary<string, object>();
         }
     }

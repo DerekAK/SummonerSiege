@@ -1,0 +1,155 @@
+CORE CONCEPTS ==================
+
+Our AI system is built on a clear separation of "why" an AI does something versus "how" it does it.
+
+Intentions (The "Why"): These are the AI's "brain" or goals (e.g., "I want to attack," "I want to wander," "I want to flee"). The AI's BehaviorManager constantly evaluates all possible intentions and picks the one with the highest score.
+
+States (The "How"): These are the AI's "body" or specialists. A state is a simple "doer" that knows how to perform one specific action (e.g., ChaseState knows how to move towards a target, AttackState knows how to perform an attack).
+
+Considerations (The "Logic"): These are the individual pieces of data that help an intention calculate its score. Each consideration returns a value between 0.0 (Veto/Bad Idea) and 1.0 (Perfect). By multiplying these scores together, we get a final "desirability" score for an intention.
+
+THE AI DECISION FLOW ========================
+
+This is the step-by-step loop that runs every frame:
+
+Check for Lock: The BehaviorManager.Update() first checks if the CombatManager.InAttack flag is true. If it is, the AI is "locked" in an attack and no new decisions are made.
+
+Decision Time: If not locked, the BehaviorManager checks if it's time to make a new decision (based on intentionDecisionFrequency).
+
+Scoring: The DecideNextIntention() method is called. It loops through every Intention in its availableIntentions list.
+
+Each Intention calculates its score (0.0 to 1.0) by multiplying its Considerations.
+
+For example, AttackIntention gets its score by finding the highest-scoring attack from the CombatManager.
+
+Execution: The BehaviorManager picks the Intention with the highest score.
+
+Intention.Execute() is Called: This is the most important part. The winning intention's Execute() method runs and acts as the "smart manager." It looks at the current situation and decides which "specialist" (State) to call.
+
+Example: The AttackIntention's Execute() method checks the distance to the target.
+
+If too far: It calls ai.SwitchState(ai.ChasingState).
+
+If in range: It calls ai.SwitchState(ai.AttackState).
+
+State Takes Over: The BehaviorManager is now in the chosen state (e.g., AttackState). It will remain in this state until its task is finished.
+
+Looping Back: The AttackState's job is just to tell the CombatManager to attack. The CombatManager plays the animation. When the animation is finished, its AnimationEvent_AttackFinished() function is called, which immediately calls _behaviorManager.DecideNextIntention() to start the whole loop over again from Step 3.
+
+HOW TO ADD NEW FUNCTIONALITY =================================
+
+Here are common scenarios and how to handle them.
+
+How to Add a New Consideration (e.g., "How much health do I have?")
+Create Script: Create a new C# script (e.g., HealthConsideration.cs) that inherits from Consideration.
+
+Add Attribute: Add the [CreateAssetMenu(...)] attribute to the top of the class.
+
+Implement Evaluate(): Write your logic in the Evaluate() method. Remember to always return a 0.0 to 1.0 value. For health, you could just return _behaviorManager.GetComponent<EntityStats>().CurrentHealth / MaxHealth;.
+
+Create Asset: In Unity, right-click in the Project folder (Create > AI > Considerations > ...) to create your new asset.
+
+Use Asset: Drag this new asset file into the considerations list on any Intention or EnemyAttackSO that needs it.
+
+How to Add a New Attack (e.g., "A ranged fireball attack")
+Create Script: Create a new C# script (e.g., FireballAttackSO.cs) that inherits from EnemyAttackSO.
+
+Add Attribute: Add the [CreateAssetMenu(...)] attribute.
+
+Add Fields: Add any new data this attack needs (e.g., public GameObject fireballPrefab;).
+
+Implement Logic:
+
+ExecuteAttack(): Write the logic for the start of the attack (e.g., "show fireball in hand").
+
+OnAnimationEvent(string eventTag, ...): Write the logic for mid-animation events. Use a switch statement on the eventTag. "if (eventTag == "ReleaseFireball") { // Spawn prefab }"
+
+Create Asset: In Unity (Create > AI > Attacks > ...), create the new asset.
+
+Configure Asset: Fill in all the fields (damage, range, the fireball prefab, the animation clip).
+
+Add Considerations: Create and add Considerations to this attack (like a NormalizedDistanceConsideration with a curve that scores high from 10-30 meters).
+
+Add to Enemy: Drag this new attack asset into the CombatManager's "Attack Prototypes" list. The system will handle instantiating it for cooldowns automatically.
+
+How to Add a New Intention (and State) (e.g., "A Flee intention and Flee state")
+Create the State (The "How"):
+
+Create BaseFleeState.cs and SimpleFleeState.cs that inherit from BaseBehaviorState.
+
+In SimpleFleeState.UpdateState(), write the logic to make the AI run away from ai.CurrentTarget.
+
+Add State to Manager:
+
+In BehaviorManager.cs, add a [SerializeField] private BaseFleeState fleeState; and a public property: public BaseFleeState FleeState => fleeState;.
+
+Create the Intention (The "Why"):
+
+Create a new C# script FleeIntention.cs that inherits from ConsideredIntention.
+
+Implement Execute() (The Critical Step):
+
+This is where you must handle the state-switching logic.
+
+CRITICAL: You must check if the AI is already in the FleeState to prevent spamming SwitchState() every frame.
+
+"if (ai.CurrentState is BaseFleeState) { return; }" "ai.SwitchState(ai.FleeState);"
+
+Create Assets:
+
+Create a Consideration that makes the AI want to flee (e.g., a HealthConsideration with a curve that scores 1.0 when health is low).
+
+Create the FleeIntention.asset from your new script (Create > AI > Intentions > ...).
+
+Drag your new HealthConsideration asset into the FleeIntention's considerations list.
+
+Add to Enemy: Drag the FleeIntention.asset into the BehaviorManager's availableIntentions list, alongside AttackIntention and WanderIntention. }
+
+{ type: uploaded file fileName: AI_System_Gist.txt fullContent: AI SYSTEM GIST
+This is a Utility AI system that separates the "brain" from the "body."
+
+Intentions (The "Why"): The brain. These are ScriptableObjects that represent a goal (e.g., AttackIntention, WanderIntention). They calculate a score (0.0 - 1.0) based on their Considerations.
+
+Considerations (The "Logic"): The scoring rules (e.g., NormalizedDistanceConsideration, HasTargetConsideration). Each returns a 0.0-1.0 score. An Intention multiplies all its Consideration scores to get its final score.
+
+States (The "How"): The body. These are simple MonoBehaviour "specialists" that perform one action (e.g., ChaseState, AttackState). They do not make big decisions.
+
+DECISION FLOW
+Score: Every intentionDecisionFrequency (if not locked by an attack), the BehaviorManager scores all available Intentions.
+
+Pick: It picks the Intention with the highest score (e.g., AttackIntention).
+
+Execute: It runs that Intention's Execute() method. This "smart" method looks at the situation and decides which State to run (e.g., "Am I in range? Run AttackState. Am I too far? Run ChaseState.").
+
+Finish & Repeat: The State runs until it's done (e.g., an AttackState finishes its animation). The state then calls behaviorManager.DecideNextIntention() to immediately start the loop over.
+
+HOW TO ADD NEW THINGS
+New Attack:
+
+Create a C# script inheriting from EnemyAttackSO.
+
+Implement ExecuteAttack() (for start-of-attack logic) and OnAnimationEvent() (for mid-attack logic).
+
+Create the ScriptableObject asset in Unity.
+
+Add Consideration assets to its list (like NormalizedDistanceConsideration).
+
+Drag the new attack asset into the CombatManager's "Attack Prototypes" list.
+
+New Consideration:
+
+Create a C# script inheriting from Consideration.
+
+Implement Evaluate(), making sure it returns a 0.0 to 1.0 value.
+
+Create the asset in Unity and drag it into any Intention or Attack's considerations list.
+
+New Intention / Behavior (e.g., Flee):
+
+Create the new FleeState script.
+
+Create the new FleeIntention script (inheriting from ConsideredIntention).
+
+Crucial: In the FleeIntention.Execute() method, you MUST check if the AI is already in the FleeState to prevent spamming the SwitchState command.
+
+"if (ai.CurrentState is BaseFleeState) { return; }" "ai.SwitchState(ai.FleeState);" }

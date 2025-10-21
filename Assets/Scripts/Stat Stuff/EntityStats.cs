@@ -21,7 +21,7 @@ public class EntityStats : NetworkBehaviour, IPersistable
     
     private void OnEnable()
     {
-        Debug.Log("Subscribing to onworlddataloaded event!");
+        //Debug.Log("Subscribing to onworlddataloaded event!");
         ServerSaveManager.OnWorldDataLoaded += OnWorldDataIsReady;
     }
 

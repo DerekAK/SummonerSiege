@@ -34201,21 +34201,21 @@ AnimationClip:
   m_HasMotionFloatCurves: 1
   m_Events:
   - time: 0.36666667
-    functionName: EnableHitBoxes
+    functionName: AnimationEvent_EnableHitBoxes
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0
     intParameter: 0
     messageOptions: 0
   - time: 0.46666667
-    functionName: DisableHitBoxes
+    functionName: AnimationEvent_DisableHitBoxes
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0
     intParameter: 0
     messageOptions: 0
   - time: 0.7
-    functionName: HoldAttackTransfer
+    functionName: AnimationEvent_ComboTransfer
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0
@@ -34229,7 +34229,7 @@ AnimationClip:
     intParameter: 0
     messageOptions: 0
   - time: 0.8
-    functionName: AttackFinish
+    functionName: AnimationEvent_AttackFinished
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0

@@ -1,0 +1,11 @@
+{
+    "asset": "2fdac11f96c4a417ca0b1c06b3e8c3d9",
+    "fileName": "0199f861-0436-73eb-aa85-a1bcbfad2759.pose.json",
+    "prompt": "throwing a powerful right hook punch",
+    "negativePrompt": "",
+    "model": "a9c27ca4-3ec9-43e8-96cd-ee891aba64c5",
+    "modelName": "Text to Motion",
+    "customSeed": 854689025,
+    "w3CTraceId": "6e194e896407130000f5bd838fc4e9c3",
+    "isTrimmed": false
+}

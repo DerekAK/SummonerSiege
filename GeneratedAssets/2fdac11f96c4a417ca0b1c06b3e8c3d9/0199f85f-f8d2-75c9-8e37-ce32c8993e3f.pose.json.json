@@ -1,0 +1,11 @@
+{
+    "asset": "2fdac11f96c4a417ca0b1c06b3e8c3d9",
+    "fileName": "0199f85f-f8d2-75c9-8e37-ce32c8993e3f.pose.json",
+    "prompt": "bodyslam",
+    "negativePrompt": "",
+    "model": "a9c27ca4-3ec9-43e8-96cd-ee891aba64c5",
+    "modelName": "Text to Motion",
+    "customSeed": 1872327885,
+    "w3CTraceId": "def2e1cbcea6820819db9adb6f841724",
+    "isTrimmed": false
+}

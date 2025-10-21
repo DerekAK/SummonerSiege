@@ -19,21 +19,28 @@ public class OwnerStatUI : NetworkBehaviour
         _targetStats = GetComponent<EntityStats>();
     }
 
-    // --- CHANGE: Use OnNetworkSpawn() for initialization ---
+    private void OnEnable()
+    {
+        _targetStats.OnStatsConfigured += InitializeBars;
+        _targetStats.OnStatValueChanged += OnStatChanged;
+    }
+
+    private void OnDisable()
+    {
+        _targetStats.OnStatsConfigured -= InitializeBars;
+        _targetStats.OnStatValueChanged -= OnStatChanged;
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
         if (!IsOwner)
         {
-            return; 
+            return;
         }
 
         container.SetActive(true);
-
-        _targetStats.OnStatValueChanged += OnStatChanged;
-
-        InitializeBars(); // Set initial values
     }
 
     private void InitializeBars()
@@ -44,6 +51,7 @@ public class OwnerStatUI : NetworkBehaviour
             if (_targetStats.TryGetStat(pair.statToDisplay, out NetStat stat))
             {
                 float fillAmount = stat.CurrentValue / stat.MaxValue;
+                Debug.Log($"Initializing {pair.statToDisplay} bar for gameobject{container.transform.root.name} with fill amount of {fillAmount}!");
                 pair.uiFillBar.fillAmount = fillAmount;
 
                 Vector3 fillVector3 = pair.uiFillBar.rectTransform.localScale;

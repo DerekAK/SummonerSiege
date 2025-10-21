@@ -1,0 +1,11 @@
+{
+    "asset": "2fdac11f96c4a417ca0b1c06b3e8c3d9",
+    "fileName": "0199f860-919f-76be-b85e-c982daa6417d.pose.json",
+    "prompt": "ramming into something with your shoulder",
+    "negativePrompt": "",
+    "model": "a9c27ca4-3ec9-43e8-96cd-ee891aba64c5",
+    "modelName": "Text to Motion",
+    "customSeed": 767353364,
+    "w3CTraceId": "3f1432996e0c34aa61e124e11b0803e9",
+    "isTrimmed": false
+}

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 0e91ace080e9d483d9bbcdd49ef5a37f
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - HitDetectionColliderGO: {instanceID: 0}
+  - TargetEnterColliderGO: {instanceID: 0}
+  - TargetExitColliderGO: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

@@ -45,7 +45,7 @@ public static class SaveLoadSystem
     public static Dictionary<string, object> LoadWorldData()
     {
         string filePath = Path.Combine(saveFolder, worldSaveFile);
-        Debug.Log(filePath);
+        //Debug.Log(filePath);
 
         if (File.Exists(filePath))
         {

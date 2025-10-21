@@ -343,7 +343,7 @@ MonoBehaviour:
   placeableObjects:
   - prefab: {fileID: 5677254746301284002, guid: 105377fe3a78c402c95c376a962f3ae5,
       type: 3}
-    density: 0.75
+    density: 0.433
     placementNoise:
       scale: 1
       power: 0
@@ -355,8 +355,13 @@ MonoBehaviour:
       persistence: 0.5
       frequency: 0.05
       amplitude: 1
+    isNavMeshObstacle: 0
+    carveNavMesh: 0
+    isPriorityLinkTarget: 1
+    linkAnchorOffset: {x: 0, y: 0, z: 0}
     heightRange: {x: 0, y: 1}
     slopeRange: {x: 0, y: 90}
     scaleRange: {x: 0.5, y: 1.5}
+    yOffsetRange: {x: 0, y: 0}
     randomYRotation: 1
     placeVertical: 1

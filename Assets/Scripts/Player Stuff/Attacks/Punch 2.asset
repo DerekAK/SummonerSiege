@@ -14,15 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   AttackClip: {fileID: 7400000, guid: 2dc48c7bc3b5445dea808dbe646a5f2d, type: 2}
   AirAttack: 0
-  Holdable: 1
   MovementSpeedFactor: 1
   RotationSpeedFactor: 1
   Cooldown: 0
-  MatrixHitboxes:
-  - Hitboxes:
-    - AttachBone: 17
-      Size: 0.15
-      ElementType: 0
-      DamageType: 1
-      TickRate: 0.01
-      DamageMultiplier: 1
+  HitboxGroups: []
+  Holdable: 1

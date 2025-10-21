@@ -75,7 +75,6 @@ public class PlayerMovement : NetworkBehaviour
 
     private void StatsConfigured()
     {
-        Debug.Log("Stats for player are configured!");
         statsConfigured = true;
     }
 
@@ -104,8 +103,7 @@ public class PlayerMovement : NetworkBehaviour
     private void Update()
     {
         // This is the gate that is likely blocking execution.
-        if (!statsConfigured) return; 
-
+        if (!statsConfigured) return;
         GroundedCheck();
         UpdateVerticalVelocity();
         HandleMovement();
@@ -159,8 +157,8 @@ public class PlayerMovement : NetworkBehaviour
         bool crouchPressed = GameInput.Instance.CrouchPressed();
 
         float targetMoveSpeed, targetX, targetY, targetCrouchWeight, targetStrafeWeight;
-
         float speed;
+        
         if (_playerStats.TryGetStat(StatType.Speed, out NetStat speedStat))
         {
             speed = speedStat.CurrentValue;

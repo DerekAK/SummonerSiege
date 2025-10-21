@@ -2,6 +2,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine.Android;
 using Random = Unity.Mathematics.Random;
 
 [BurstCompile]
@@ -21,7 +22,7 @@ public struct ObjectPlacementJob : IJob
     public float2 heightRange;
     public float2 slopeRange;
     public float2 scaleRange;
-    public float yOffset;
+    public float2 yOffsetRange; 
     public bool randomYRotation;
     public bool placeVertical;
 
@@ -114,8 +115,10 @@ public struct ObjectPlacementJob : IJob
                             baseRotation = math.mul(baseRotation, quaternion.RotateY(random.NextFloat(0, 2 * math.PI)));
                         }
 
+                        float randomYOffset = random.NextFloat(yOffsetRange.x, yOffsetRange.y);
+
                         // Adjust position to account for border offset
-                        float3 position = new float3((x - 1) * step, (surfaceY * step) + yOffset, (z - 1) * step);
+                        float3 position = new float3((x - 1) * step, (surfaceY * step) + randomYOffset, (z - 1) * step);
                         float scale = random.NextFloat(scaleRange.x, scaleRange.y);
 
                         objectDataList.Add(new PlacementData

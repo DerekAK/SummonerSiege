@@ -114,7 +114,6 @@ public static class UtilityFunctions{
             Debug.DrawRay(new Vector3(position.x, 1000f, position.z), Vector3.down, Color.red, 3f);
             NavMeshHit navHit;
             if (NavMesh.SamplePosition(hit.point, out navHit, 1000f, NavMesh.AllAreas)){
-                Debug.Log("RETURNING NAVMESH POSITION! " + navHit.position);
                 return navHit.position;
             } // Return the valid NavMesh position
         }
@@ -122,7 +121,30 @@ public static class UtilityFunctions{
         return defaultPosition;
     }
 
-    public static IEnumerator MoveWithGravityRigidbody(Rigidbody rigidbody, Vector3 destination, float timeframe){
+    public static Vector3 FindNavMeshPosition(Vector3 position, NavMeshAgent agent)
+    {
+        if (Physics.Raycast(new Vector3(position.x, 1000f, position.z), Vector3.down, out RaycastHit hit, Mathf.Infinity))
+        {
+            if (NavMesh.SamplePosition(hit.point, out NavMeshHit navHit, 1000f, NavMesh.AllAreas))
+            {
+                // If this works, draw a green line to visualize the successful point
+                Debug.DrawLine(hit.point, navHit.position, Color.green, 10f);
+                return navHit.position;
+            }
+            else
+            {
+                // DEBUG: This part is failing. Let's draw a red sphere to see where we are searching from.
+                // This sphere will be HUGE, but it confirms the start point.
+                Debug.LogError("NavMesh.SamplePosition failed! Searching from: " + hit.point);
+            }
+        }
+        
+        Debug.Log("Returning ZERO!");
+        return Vector3.zero;
+    }
+    
+    public static IEnumerator MoveWithGravityRigidbody(Rigidbody rigidbody, Vector3 destination, float timeframe)
+    {
         Vector3 startPosition = rigidbody.position;
         float elapsedTime = 0f;
         Vector3 horizontalDisplacement = new Vector3(destination.x - startPosition.x, 0, destination.z - startPosition.z);
@@ -130,7 +152,8 @@ public static class UtilityFunctions{
         float verticalDisplacement = destination.y - startPosition.y;
         float initialVerticalVelocity = (verticalDisplacement + 0.5f * Physics.gravity.y * timeframe * timeframe) / timeframe;
 
-        while (elapsedTime < timeframe){
+        while (elapsedTime < timeframe)
+        {
             elapsedTime += Time.deltaTime;
             Vector3 newPosition = startPosition + horizontalVelocity * elapsedTime;
             float verticalPosition = startPosition.y + initialVerticalVelocity * elapsedTime + 0.5f * Physics.gravity.y * elapsedTime * elapsedTime;

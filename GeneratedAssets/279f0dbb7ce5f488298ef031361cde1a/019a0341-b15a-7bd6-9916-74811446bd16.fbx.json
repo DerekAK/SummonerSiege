@@ -1,0 +1,11 @@
+{
+    "asset": "279f0dbb7ce5f488298ef031361cde1a",
+    "fileName": "019a0341-b15a-7bd6-9916-74811446bd16.fbx",
+    "prompt": "",
+    "negativePrompt": "",
+    "model": "f6513d46-5f92-4bd5-8e50-4c1d51b6c90d",
+    "modelName": "Video To Motion",
+    "customSeed": -1,
+    "w3CTraceId": "743ce091ed445d542669aa9dbb0aa1ae",
+    "isTrimmed": false
+}

@@ -19,6 +19,18 @@ public class NotOwnerStatUI : NetworkBehaviour
         _targetStats = GetComponent<EntityStats>();
     }
 
+    private void OnEnable()
+    {
+        _targetStats.OnStatsConfigured += InitializeBars;
+        _targetStats.OnStatValueChanged += OnStatChanged;
+    }
+
+    private void OnDisable()
+    {
+        _targetStats.OnStatsConfigured -= InitializeBars;
+        _targetStats.OnStatValueChanged -= OnStatChanged;
+    }
+
     // --- CHANGE: Use OnNetworkSpawn() for initialization ---
     public override void OnNetworkSpawn()
     {
@@ -30,10 +42,6 @@ public class NotOwnerStatUI : NetworkBehaviour
         }
 
         container.SetActive(true);
-
-        _targetStats.OnStatValueChanged += OnStatChanged;
-
-        InitializeBars(); // Set initial values
     }
 
     private void InitializeBars()

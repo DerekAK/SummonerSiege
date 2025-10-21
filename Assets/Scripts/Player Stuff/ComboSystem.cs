@@ -11,7 +11,7 @@ public class ComboSystem
 
     [System.Serializable]
     public struct ComboStep{
-        public BaseAttackSO attack;
+        public PlayerAttackSO attack;
         public AttackPressType userPressType;
         public GameInput.AttackInput userInput;
     }
@@ -21,10 +21,19 @@ public class ComboSystem
         public List<ComboStep> comboSteps = new List<ComboStep>();
         public int currIndex {get; private set;}
         public ComboStep currComboStep {get; private set;}
-        public void Initialize(){
-            if (comboSteps.Count > 0){
+        public void Initialize()
+        {
+            if (comboSteps.Count > 0)
+            {
                 currIndex = 0;
                 currComboStep = comboSteps[currIndex];
+            }
+        }
+        public ComboStep nextComboStep {
+            get {
+                if (comboSteps.Count == 0) return default;
+                int nextIndex = (currIndex + 1) % comboSteps.Count;
+                return comboSteps[nextIndex];
             }
         }
 

@@ -48,14 +48,6 @@ public class BiomeSO : ScriptableObject
 
     [Header("Object Placement Settings")]
     public PlaceableObject[] placeableObjects;
-
-    [Header("Navigation Link Settings")]
-    [Tooltip("A global spacing distance (in voxels) to prevent any two links from spawning too close.")]
-    public int globalLinkSpacing;
-    public NavMeshCliffRule[] navMeshCliffRules;
-    public NavMeshGapRule[] navMeshGapRules;
-    public NavMeshSlopeRule[] navMeshSlopeRules;
-
 }
 
 public enum NoiseFunction { Standard, Power, Billow, Ridged, Terraced }
@@ -127,6 +119,10 @@ public class PlaceableObject
 
     [Tooltip("1 would be normal size, 0 would be invisible, 2 would be double")]
     public Vector2 scaleRange;
+
+    [Tooltip("0 would just be its pivot point is on the mesh surface")]
+    public Vector2 yOffsetRange;
     public bool randomYRotation;
     public bool placeVertical;
 }
+

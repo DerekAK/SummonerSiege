@@ -38,7 +38,7 @@ public class ServerSaveManager : NetworkBehaviour
         LoadWorld();
         
         // Subscribe to server shutdown to ensure a final save.
-        NetworkManager.Singleton.OnServerStopped += (isHost) => SaveWorld();
+        NetworkManager.Singleton.OnServerStopped += (isServer) => SaveWorld();
         
         // Start the periodic autosave routine.
         InvokeRepeating(nameof(SaveWorld), autoSaveInterval, autoSaveInterval);
@@ -63,9 +63,9 @@ public class ServerSaveManager : NetworkBehaviour
             string uniqueId = pManager.GetComponent<PersistenceManager>().GetUniqueId();
 
             // If we have saved data for this object's ID, apply it.
-            if (worldSaveData.TryGetValue(uniqueId, out object savedData))
+            if (worldSaveData.TryGetValue(uniqueId, out object savedDataForPManager))
             {
-                pManager.ProvideAllData(savedData as Dictionary<string, object>);
+                pManager.ProvideAllData(savedDataForPManager as Dictionary<string, object>);
             }
             else // worldSaveData doesn't have this value, most likely because it was empty
             {
