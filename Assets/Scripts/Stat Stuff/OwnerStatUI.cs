@@ -41,6 +41,7 @@ public class OwnerStatUI : NetworkBehaviour
         }
 
         container.SetActive(true);
+        InitializeBars();
     }
 
     private void InitializeBars()
@@ -51,7 +52,6 @@ public class OwnerStatUI : NetworkBehaviour
             if (_targetStats.TryGetStat(pair.statToDisplay, out NetStat stat))
             {
                 float fillAmount = stat.CurrentValue / stat.MaxValue;
-                Debug.Log($"Initializing {pair.statToDisplay} bar for gameobject{container.transform.root.name} with fill amount of {fillAmount}!");
                 pair.uiFillBar.fillAmount = fillAmount;
 
                 Vector3 fillVector3 = pair.uiFillBar.rectTransform.localScale;

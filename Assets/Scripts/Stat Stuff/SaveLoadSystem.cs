@@ -24,13 +24,10 @@ public static class SaveLoadSystem
     /// <param name="worldData">The dictionary containing all persistent object data.</param>
     public static void SaveWorldData(Dictionary<string, object> worldData)
     {
-        if (!Directory.Exists(saveFolder))
-        {
-            Directory.CreateDirectory(saveFolder);
-        }
+        EnsureSaveDirectoryExists();
 
         string filePath = Path.Combine(saveFolder, worldSaveFile);
-        Debug.Log($"Saving world data to: {filePath}");
+        // Debug.Log($"Saving world data to: {filePath}");
 
         // Use Newtonsoft to serialize the entire dictionary to a JSON string.
         string json = JsonConvert.SerializeObject(worldData, serializerSettings);
@@ -54,8 +51,62 @@ public static class SaveLoadSystem
             // Use Newtonsoft to deserialize the JSON string back into a dictionary.
             return JsonConvert.DeserializeObject<Dictionary<string, object>>(json, serializerSettings);
         }
-        
+
         // If no save file exists, return a new empty dictionary.
         return null;
+    }
+    
+    private static string GetPlayerSaveFile(string playerId)
+    {
+        // This will result in "player_host.json", "player_client.json", etc.
+        return $"player_{playerId}.json";
+    }
+
+    /// <summary>
+    /// Saves a specific player's data to their own file.
+    /// </summary>
+    public static void SavePlayerData(string playerId, Dictionary<string, object> playerData)
+    {
+        EnsureSaveDirectoryExists();
+        string fileName = GetPlayerSaveFile(playerId);
+        string filePath = Path.Combine(saveFolder, fileName);
+        //Debug.Log($"Saving PLAYER data for '{playerId}' to: {filePath}");
+
+        string json = JsonConvert.SerializeObject(playerData, serializerSettings);
+        File.WriteAllText(filePath, json);
+    }
+
+    /// <summary>
+    /// Loads a specific player's data from their file.
+    /// </summary>
+    public static Dictionary<string, object> LoadPlayerData(string playerId)
+    {
+        string fileName = GetPlayerSaveFile(playerId);
+        string filePath = Path.Combine(saveFolder, fileName);
+
+        if (File.Exists(filePath))
+        {
+            string json = File.ReadAllText(filePath);
+            return JsonConvert.DeserializeObject<Dictionary<string, object>>(json, serializerSettings);
+        }
+        
+        // If no save file exists for this player, return null.
+        return null;
+    }
+
+    private static void EnsureSaveDirectoryExists()
+    {
+        if (!Directory.Exists(saveFolder))
+        {
+            Directory.CreateDirectory(saveFolder);
+        }
+    }
+
+    /// <summary>
+    /// Helper to get the serializer settings for sending data over the network.
+    /// </summary>
+    public static JsonSerializerSettings GetSerializerSettings()
+    {
+        return serializerSettings;
     }
 }

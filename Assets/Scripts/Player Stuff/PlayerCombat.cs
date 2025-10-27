@@ -1,26 +1,26 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
-using Unity.Netcode;
+using System.Threading.Tasks;
 using UnityEngine;
 
 public class PlayerCombat : CombatManager
 {
-    [SerializeField] private GameObject pfTmpSword;
-    private Animator _anim;
     private PlayerState _playerState;
-    private PlayerClipsHandler _playerClipsHandler;
+    bool isReadyToReceiveInput = false;
 
     // Animator Hashes
     private int attackParamA = Animator.StringToHash("AttackTriggerA");
     private int attackParamB = Animator.StringToHash("AttackTriggerB");
     private int isHoldingParam = Animator.StringToHash("IsHolding"); // New parameter to control looping
 
+    // Animation placeholder strings
+    private const string animAttackStringPlaceholderA = "Attack A Placeholder";
+    private const string animAttackStringPlaceholderB = "Attack B Placeholder";
+
     // Input & State Management (Your original boolean-based system)
     private float inputHoldTime = 0f;
     [SerializeField] private float longAttackThreshold = 0.2f;
     private Coroutine inputHoldCoroutine;
-    private Coroutine attackCoroutine;
 
     private bool isAttacking = false;
     private bool checkingForInputRelease = false;
@@ -34,38 +34,36 @@ public class PlayerCombat : CombatManager
     private bool inHoldCombo = false;
     
     private int currAnimAttackState = 0;
-    [HideInInspector] public List<BaseWeapon> EquippedWeapons = new List<BaseWeapon>();
 
     [Tooltip("Time required before and after triggering the next attack in combo sequence")]
     [SerializeField] private float comboTimeBeforeThreshold = 0.3f;
     [SerializeField] private float comboTimeEndThreshold = 0.8f;
 
     [Header("Attack Data")]
-    public PlayerAttackSO[] attackSOList;
-    [HideInInspector] public NetworkVariable<int> nvAttackSOIndex = new NetworkVariable<int>();
     [SerializeField] private List<ComboSystem.Combo> defaultCombos = new List<ComboSystem.Combo>();
     private List<ComboSystem.Combo> possibleCombos = new List<ComboSystem.Combo>();
 
-    private bool isInitialized = false;
 
-    private void Awake(){
-        _anim = GetComponent<Animator>();
+    protected override void Awake(){
+        base.Awake();
         _playerState = GetComponent<PlayerState>();
-        _playerClipsHandler = GetComponent<PlayerClipsHandler>();
     }
 
     public override void OnNetworkSpawn()
     {
+        base.OnNetworkSpawn();
         if (!IsOwner) return;
         
         GameInput.Instance.OnAttackButtonStarted += AttackButtonStart;
         GameInput.Instance.OnAttackButtonCanceled += AttackButtonCanceled;
 
-        foreach (ComboSystem.Combo combo in defaultCombos){
+        foreach (ComboSystem.Combo combo in defaultCombos)
+        {
             possibleCombos.Add(combo);
             combo.Initialize();
         }
-        isInitialized = true;
+
+        isReadyToReceiveInput = true;
     }
 
     public override void OnNetworkDespawn()
@@ -86,16 +84,19 @@ public class PlayerCombat : CombatManager
             return; // Invalid state, do nothing.
         }
 
+        if (!loadedClips.ContainsKey(ChosenAttack.UniqueID))
+        {
+            Debug.LogWarning($"Attack {ChosenAttack.UniqueID} not loaded yet!");
+            AttackFinish(); 
+            return;
+        }
+
         isAttacking = true;
         _playerState.currentAttack = ChosenAttack;
         _playerState.ChangeAttackStatus(true);
         
         ResetHitboxIndex();
         ChosenAttack.ExecuteAttack(this);
-
-        int attackIndex = GetIndexByAttackSO((PlayerAttackSO)ChosenAttack);
-        ChangeAttackSOIndexServerRpc(attackIndex);
-        _playerClipsHandler.ChangeOverriderClipsServerRpc(attackIndex);
         
         if (currAnimAttackState == 0) _anim.SetTrigger(attackParamA);
         else _anim.SetTrigger(attackParamB);
@@ -108,6 +109,7 @@ public class PlayerCombat : CombatManager
 
     private void AttackButtonStart(GameInput.AttackInput inputButton)
     {
+        if (!isReadyToReceiveInput) return;
         // If we're waiting for a combo input, start tracking the press type.
         if (inComboWindow)
         {
@@ -147,7 +149,7 @@ public class PlayerCombat : CombatManager
             _anim.SetBool(isHoldingParam, false);
             
             // The "release" attack is the one AFTER the holdable one in the combo list.
-            ChosenAttack = currentCombo.nextComboStep.attack;
+            SetChosenAttack(currentCombo.nextComboStep.attack);
             
             if (ChosenAttack)
             {
@@ -170,7 +172,7 @@ public class PlayerCombat : CombatManager
         if (inputHoldTime < longAttackThreshold)
         {
             // This is a Quick press.
-            ChosenAttack = DecideChosenAttack(inputButton, ComboSystem.AttackPressType.Quick);
+            SetChosenAttack(DecideChosenAttack(inputButton, ComboSystem.AttackPressType.Quick));
             if (ChosenAttack)
             {
                 PerformAttack();
@@ -184,7 +186,7 @@ public class PlayerCombat : CombatManager
         inputHoldTime = 0f;
 
         // --- Check for HOLD press ---
-        ChosenAttack = DecideChosenAttack(inputButton, ComboSystem.AttackPressType.Hold);
+        SetChosenAttack(DecideChosenAttack(inputButton, ComboSystem.AttackPressType.Hold));
         if (ChosenAttack)
         {
             inHoldCombo = true;
@@ -200,7 +202,7 @@ public class PlayerCombat : CombatManager
             if (inputHoldTime > longAttackThreshold)
             {
                 checkingForInputRelease = false;
-                ChosenAttack = DecideChosenAttack(inputButton, ComboSystem.AttackPressType.Long);
+                SetChosenAttack(DecideChosenAttack(inputButton, ComboSystem.AttackPressType.Long));
                 if (ChosenAttack)
                 {
                     PerformAttack();
@@ -297,7 +299,7 @@ public class PlayerCombat : CombatManager
 
     // --- Animation Events ---
     
-    public override void AnimationEvent_AttackFinished()
+    protected override void AnimationEvent_AttackFinished()
     {
 
         if (inHoldCombo)
@@ -309,9 +311,8 @@ public class PlayerCombat : CombatManager
         AttackFinish();
     }
     
-    private void AnimationEvent_ComboTransfer()
+    protected override void AnimationEvent_ComboTransfer()
     {
-        Debug.Log($"Calling comboTransfer for {this.name}");
         if (inComboWindow && comboInputBuffered)
         {
             // Input was correct and buffered in time.
@@ -320,7 +321,7 @@ public class PlayerCombat : CombatManager
             
             // Move to the next step and perform the attack.
             currentCombo.UpdateComboStep();
-            ChosenAttack = currentCombo.currComboStep.attack;
+            SetChosenAttack(currentCombo.currComboStep.attack);
             PerformAttack();
         }
     }
@@ -332,14 +333,39 @@ public class PlayerCombat : CombatManager
         // Currently, all hold logic is on release (AttackButtonCanceled).
     }
 
-    [ServerRpc]
-    private void ChangeAttackSOIndexServerRpc(int newIndex){
-        nvAttackSOIndex.Value = newIndex;
+
+    protected override async Task LoadDefaultAttackAnimations()
+    {
+        var tasks = new List<Task>();
+        var uniqueIDs = new HashSet<int>(); // Auto-handles duplicate attacks in combos
+
+        foreach (ComboSystem.Combo combo in defaultCombos)
+        {
+            foreach (ComboSystem.ComboStep comboStep in combo.comboSteps)
+            {
+                if(comboStep.attack != null)
+                    uniqueIDs.Add(comboStep.attack.UniqueID);
+            }
+        }
+
+        foreach (int id in uniqueIDs)
+        {
+            tasks.Add(LoadClipFromReference(id)); // Add the awaitable Task
+        }
+
+        // Wait for all clips to finish loading in parallel
+        await Task.WhenAll(tasks);
     }
 
-    public int GetIndexByAttackSO(PlayerAttackSO attackSO){
-        return Array.IndexOf(attackSOList, attackSO);
+    protected override void ApplyClipToAnimator(AnimationClip clip)
+    {
+        if (clip == null)
+        {
+            Debug.LogError("Animation clip was not loaded in time for the enemy to use it for their attack!");
+            return;
+        }
+        _animOverrideController[animAttackStringPlaceholderA] = clip;
+        _animOverrideController[animAttackStringPlaceholderB] = clip;
     }
-    
 }
 

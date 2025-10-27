@@ -8,15 +8,17 @@ public abstract class BaseStatusEffect
     public bool IsFinished { get; protected set; }
 
     protected readonly GameObject target;
+    protected readonly GameObject applier;
     protected readonly EntityStats targetStats;
 
     // Constructor
-    public BaseStatusEffect(BaseStatusEffectSO effectSO, GameObject target)
+    public BaseStatusEffect(BaseStatusEffectSO effectSO, GameObject applier, GameObject target)
     {
         this.EffectSO = effectSO;
+        this.TimeLeft = effectSO.Duration;
         this.target = target;
         this.targetStats = target.GetComponent<EntityStats>();
-        this.TimeLeft = effectSO.Duration;
+        this.applier = applier;
     }
 
     public virtual void Apply()
@@ -24,12 +26,12 @@ public abstract class BaseStatusEffect
         // Base implementation can be empty
     }
 
-    public virtual void Tick(float deltaTime)
+    public virtual void Tick()
     {
         // If duration is 0 or less, it's a permanent effect that must be removed manually.
         if (EffectSO.Duration > 0)
         {
-            TimeLeft -= deltaTime;
+            TimeLeft -= Time.deltaTime;
             if (TimeLeft <= 0)
             {
                 IsFinished = true;

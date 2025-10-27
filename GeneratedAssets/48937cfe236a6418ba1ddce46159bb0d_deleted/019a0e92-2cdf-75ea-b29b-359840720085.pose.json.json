@@ -1,0 +1,11 @@
+{
+    "asset": "48937cfe236a6418ba1ddce46159bb0d",
+    "fileName": "019a0e92-2cdf-75ea-b29b-359840720085.pose.json",
+    "prompt": "Dash Thrust: The character lowers their stance and propels themselves forward several feet, ending with a powerful, single-handed stab.",
+    "negativePrompt": "",
+    "model": "a9c27ca4-3ec9-43e8-96cd-ee891aba64c5",
+    "modelName": "Text to Motion",
+    "customSeed": 1249757963,
+    "w3CTraceId": "8ee8f963cb6070a1d68b6c7f9a070b34",
+    "isTrimmed": false
+}

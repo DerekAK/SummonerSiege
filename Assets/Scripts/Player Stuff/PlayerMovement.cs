@@ -104,6 +104,16 @@ public class PlayerMovement : NetworkBehaviour
     {
         // This is the gate that is likely blocking execution.
         if (!statsConfigured) return;
+
+        if (Input.GetKeyDown(KeyCode.Mouse1))
+        {
+            _playerStats.ModifyStatServerRpc(StatType.Speed, 10);
+        }
+        if (Input.GetKeyDown(KeyCode.H))
+        {
+            _playerStats.ModifyStatServerRpc(StatType.Health, 10);
+        }
+
         GroundedCheck();
         UpdateVerticalVelocity();
         HandleMovement();
@@ -267,7 +277,7 @@ public class PlayerMovement : NetworkBehaviour
     public void ApplyForce(Vector3 force) {
         if (!IsServer) return;
         nvPhysicsVelocity.Value = force;
-        Debug.Log($"Server applied force: {force}, Velocity: {nvPhysicsVelocity.Value}, ID: {OwnerClientId}");
+        // Debug.Log($"Server applied force: {force}, Velocity: {nvPhysicsVelocity.Value}, ID: {OwnerClientId}");
     }
 
     private void PhysicsVelocityChanged(Vector3 oldValue, Vector3 newValue) {

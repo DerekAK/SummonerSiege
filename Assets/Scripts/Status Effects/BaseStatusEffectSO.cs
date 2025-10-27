@@ -6,7 +6,7 @@ public abstract class BaseStatusEffectSO : ScriptableObject
 
     public StackingBehavior Stacking;
 
-    public abstract BaseStatusEffect CreateEffect(GameObject target);
+    public abstract BaseStatusEffect CreateEffect(GameObject applier, GameObject target);
 }
 
 public enum StackingBehavior

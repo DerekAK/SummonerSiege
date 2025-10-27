@@ -21,18 +21,6 @@ public class HealthComponent : NetworkBehaviour
         if (type != StatType.Health) return;
         if (newValue == 0) Die();
     }
-
-    private void Update()
-    {
-        if (Input.GetMouseButtonDown(1))
-        {
-            Damage(10);
-        }
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            Heal(10);
-        }
-    }    
     
     public void Damage(float amount)
     {

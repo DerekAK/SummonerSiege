@@ -2,10 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-/// <summary>
-/// This component goes on any character that can be affected by status effects.
-/// It manages adding, updating, and removing effects.
-/// </summary>
 public class StatusEffectManager : MonoBehaviour
 {
     private readonly List<BaseStatusEffect> activeEffects = new List<BaseStatusEffect>();
@@ -16,7 +12,7 @@ public class StatusEffectManager : MonoBehaviour
         for (int i = activeEffects.Count - 1; i >= 0; i--)
         {
             BaseStatusEffect statusEffect = activeEffects[i];
-            statusEffect.Tick(Time.deltaTime);
+            statusEffect.Tick();
 
             if (statusEffect.IsFinished)
             {
@@ -26,11 +22,7 @@ public class StatusEffectManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Applies a status effect to this character.
-    /// </summary>
-    /// <param name="effectSO">The ScriptableObject defining the effect.</param>
-    public void ApplyEffect(BaseStatusEffectSO effectSO)
+    public void ApplyEffect(GameObject applier, BaseStatusEffectSO effectSO)
     {
         // Handle stacking logic
         if (effectSO.Stacking != StackingBehavior.AddInstance)
@@ -51,10 +43,10 @@ public class StatusEffectManager : MonoBehaviour
         }
 
         // If we're here, we need to add a new instance.
-        BaseStatusEffect newEffect = effectSO.CreateEffect(gameObject);
+        BaseStatusEffect newEffect = effectSO.CreateEffect(applier, gameObject);
         activeEffects.Add(newEffect);
         newEffect.Apply();
-        Debug.Log($"Applied {effectSO.name} to {gameObject.name}.");
+        // Debug.Log($"Applied {effectSO.name} to {gameObject.name}.");
     }
 }
 

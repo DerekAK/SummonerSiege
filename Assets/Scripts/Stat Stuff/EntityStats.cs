@@ -11,51 +11,23 @@ public class EntityStats : NetworkBehaviour, IPersistable
     private NetworkList<NetStat> Stats = new NetworkList<NetStat>();
     public event Action<StatType, float> OnStatValueChanged;
     public event Action OnStatsConfigured;
-    private PersistenceManager _persistenceManager;
-    private bool isWorldDataReady;
-
-    private void Awake()
-    {
-        _persistenceManager = GetComponent<PersistenceManager>();
-    }
     
-    private void OnEnable()
-    {
-        //Debug.Log("Subscribing to onworlddataloaded event!");
-        ServerSaveManager.OnWorldDataLoaded += OnWorldDataIsReady;
-    }
-
-    private void OnDisable()
-    {
-        ServerSaveManager.OnWorldDataLoaded -= OnWorldDataIsReady;
-    }
-
+    private bool isNetworkReady = false;
+    
+    public bool IsNetworkReady() => isNetworkReady;
+    
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
         Stats.OnListChanged += HandleListChanged;
-        TryInitializeStats();
+
+        isNetworkReady = true;
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
         Stats.OnListChanged -= HandleListChanged;
-    }
-
-    private void OnWorldDataIsReady()
-    {
-        isWorldDataReady = true;
-        // After receiving the signal, we try to initialize.
-        TryInitializeStats();
-    }
-
-    private void TryInitializeStats()
-    {
-        if (IsSpawned && IsServer && isWorldDataReady)
-        {
-            ApplyData(_persistenceManager.GetWorldDataFor(this));
-        }
     }
 
     private void HandleListChanged(NetworkListEvent<NetStat> changeEvent)
@@ -66,11 +38,19 @@ public class EntityStats : NetworkBehaviour, IPersistable
             // Fire our custom, specific event for other scripts to hear.
             OnStatValueChanged?.Invoke(changedStat.Type, changedStat.CurrentValue);
         }
+
+        // this will run when the client receives changes to its NetworkList Stats when first loading it.
+        if (changeEvent.Type == NetworkListEvent<NetStat>.EventType.Add)
+        {
+            OnStatsConfigured?.Invoke();
+        }
     }
 
     public void ApplyData(Dictionary<string, object> data)
     {
-        // Loop through the stats defined in our configuration
+        // 1. Create a local list of stats to apply
+        List<NetStat> statsToApply = new List<NetStat>();
+
         foreach (StatDefinition statDef in statsConfigurationSO.baseStats)
         {
             // Check if the save data contains info for this stat
@@ -81,7 +61,8 @@ public class EntityStats : NetworkBehaviour, IPersistable
                 float current = System.Convert.ToSingle(currentValue);
                 float max = System.Convert.ToSingle(maxValue);
 
-                Stats.Add(new NetStat
+                // Add to our local list, NOT the NetworkList
+                statsToApply.Add(new NetStat
                 {
                     Type = statDef.type,
                     CurrentValue = current,
@@ -91,7 +72,8 @@ public class EntityStats : NetworkBehaviour, IPersistable
             else
             {
                 // If no saved data, use the default from the configuration
-                Stats.Add(new NetStat
+                // Add to our local list, NOT the NetworkList
+                statsToApply.Add(new NetStat
                 {
                     Type = statDef.type,
                     CurrentValue = statDef.baseValue,
@@ -99,8 +81,31 @@ public class EntityStats : NetworkBehaviour, IPersistable
                 });
             }
         }
+        
+        // 2. Convert to an array and send it to the server
+        // The NetStat struct is already INetworkSerializable, so this is easy!
+        ApplyStatsServerRpc(statsToApply.ToArray());
+        
+    }
 
-        OnStatsConfigured?.Invoke();
+    /// <summary>
+    /// --- NEW ServerRpc ---
+    /// This runs ON THE SERVER. It receives the stats from the
+    /// client and safely adds them to the synced NetworkList.
+    /// </summary>
+    [ServerRpc]
+    private void ApplyStatsServerRpc(NetStat[] statsToApply)
+    {
+        Debug.Log($"Server receiving {statsToApply.Length} stats to apply.");
+        
+        // Clear any existing stats first
+        Stats.Clear();
+        
+        // Now, the SERVER safely writes to the NetworkList
+        foreach (NetStat stat in statsToApply)
+        {
+            Stats.Add(stat);
+        }
     }
 
     public Dictionary<string, object> SaveData()

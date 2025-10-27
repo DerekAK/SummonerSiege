@@ -1,0 +1,11 @@
+{
+    "asset": "48937cfe236a6418ba1ddce46159bb0d",
+    "fileName": "019a0e93-21d6-70dd-85e4-a81709920ae5.pose.json",
+    "prompt": "propel forward ending with a powerful, single-handed stab with a sword",
+    "negativePrompt": "",
+    "model": "a9c27ca4-3ec9-43e8-96cd-ee891aba64c5",
+    "modelName": "Text to Motion",
+    "customSeed": 584436887,
+    "w3CTraceId": "124f36d0c5e80b8a8966942a7cfc3e02",
+    "isTrimmed": false
+}
