@@ -12,20 +12,13 @@ public abstract class BaseIdleState : BaseBehaviorState
 
     [Tooltip("Min and Max idling time between patrol points")]
     [SerializeField] protected Vector2 idleTimeRange;
-    protected BehaviorManager _behaviorManager;
-    protected NavMeshAgent _agent;
-    protected Coroutine idleCoroutine;
 
     public override void InitializeState(BehaviorManager behaviorManager)
     {
-        _behaviorManager = behaviorManager;
-        _agent = _behaviorManager.GetComponent<NavMeshAgent>();
-        
     }
 
-    public override void DeInitializeState()
+    public override void DeInitializeState(BehaviorManager behaviorManager)
     {
-        return;
     }
 
 }

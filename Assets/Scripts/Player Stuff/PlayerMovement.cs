@@ -69,12 +69,11 @@ public class PlayerMovement : NetworkBehaviour
         _anim = GetComponent<Animator>();
         _playerStats = GetComponent<EntityStats>();
         _playerState = GetComponent<PlayerState>();
-
-        _playerStats.OnStatsConfigured += StatsConfigured;
     }
 
     private void StatsConfigured()
     {
+        Debug.Log("StatsConfigured!!");
         statsConfigured = true;
     }
 
@@ -82,6 +81,7 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (IsOwner)
         {
+            _playerStats.OnStatsConfigured += StatsConfigured;
             Initialize();
         }
         else
@@ -89,6 +89,14 @@ public class PlayerMovement : NetworkBehaviour
             if (_mainCamera != null) _mainCamera.SetActive(false);
             if (_playerFollowCamera != null) _playerFollowCamera.SetActive(false);
         }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (GameInput.Instance != null) GameInput.Instance.OnAttackButtonStarted -= OnRightClickPerform;
+
+        if (NetworkManager.Singleton != null) nvPhysicsVelocity.OnValueChanged -= PhysicsVelocityChanged;
+        
     }
 
     private void Initialize()
@@ -102,7 +110,8 @@ public class PlayerMovement : NetworkBehaviour
 
     private void Update()
     {
-        // This is the gate that is likely blocking execution.
+
+        if (!IsOwner) return;
         if (!statsConfigured) return;
 
         if (Input.GetKeyDown(KeyCode.Mouse1))
@@ -118,21 +127,6 @@ public class PlayerMovement : NetworkBehaviour
         UpdateVerticalVelocity();
         HandleMovement();
         CursorStuffIDontUnderstand();
-    }
-
-    public override void OnNetworkDespawn()
-    {
-        if (GameInput.Instance != null)
-        {
-            GameInput.Instance.OnAttackButtonStarted -= OnRightClickPerform;
-        }
-
-        if (NetworkManager.Singleton != null)
-        {
-            nvPhysicsVelocity.OnValueChanged -= PhysicsVelocityChanged;
-        }
-
-        _playerStats.OnStatsConfigured -= StatsConfigured;
     }
     
     private IEnumerator BillboardShit(){
@@ -158,7 +152,8 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
-    private void HandleMovement(){
+    private void HandleMovement()
+    {
         Vector2 moveDir = GameInput.Instance.GetPlayerMovementVectorNormalized();
         bool isMoving = moveDir.sqrMagnitude > _threshold;
         bool isSprinting = GameInput.Instance.SprintingPressed();
@@ -168,7 +163,7 @@ public class PlayerMovement : NetworkBehaviour
 
         float targetMoveSpeed, targetX, targetY, targetCrouchWeight, targetStrafeWeight;
         float speed;
-        
+
         if (_playerStats.TryGetStat(StatType.Speed, out NetStat speedStat))
         {
             speed = speedStat.CurrentValue;
@@ -200,22 +195,26 @@ public class PlayerMovement : NetworkBehaviour
             targetY = 0;
         }
 
-        if (isLockedOn){
+        if (isLockedOn)
+        {
             targetMoveSpeed = speed * lockOnFactor;
             targetX = moveDir.x;
             targetY = moveDir.y;
             targetStrafeWeight = 1;
         }
-        else{
+        else
+        {
             targetStrafeWeight = 0;
         }
 
-        if (crouchPressed){
+        if (crouchPressed)
+        {
             if (!isLockedOn)
                 targetMoveSpeed *= crouchFactor;
             targetCrouchWeight = 1;
         }
-        else{
+        else
+        {
             targetCrouchWeight = 0;
         }
 
@@ -231,26 +230,32 @@ public class PlayerMovement : NetworkBehaviour
         float newStrafeWeight = Mathf.Lerp(currStrafeWeight, targetStrafeWeight, Time.deltaTime * animationSmoothSpeed);
         currentMoveSpeed = moveSpeed;
 
-        if (!isGrounded){
+        if (!isGrounded)
+        {
             if (_verticalVelocity < 0) currentMovementState = MovementState.Falling;
             else currentMovementState = MovementState.Jumping;
             _playerState.InAir = true;
         }
-        else{
+        else
+        {
             _playerState.InAir = false;
-            if (rollTriggered){
+            if (rollTriggered)
+            {
                 rollCoroutine = StartCoroutine(WaitEndRoll());
                 currentMovementState = MovementState.Rolling;
-                if (isLockedOn){
+                if (isLockedOn)
+                {
                     _anim.SetFloat(rollXParam, moveDir.x);
                     _anim.SetFloat(rollYParam, moveDir.y);
                 }
-                else{
+                else
+                {
                     _anim.SetFloat(rollXParam, 0);
                     _anim.SetFloat(rollYParam, 1);
                 }
             }
-            else{
+            else
+            {
                 currentMovementState = MovementState.Locomotion;
             }
         }
@@ -263,21 +268,28 @@ public class PlayerMovement : NetworkBehaviour
 
         Vector3 targetDirection = HandlePlayerAndCameraRotation(isLockedOn, moveDir, isMoving);
 
-        if (_playerState.Attacking){
+        if (_playerState.Attacking)
+        {
             moveSpeed *= _playerState.currentAttack.MovementSpeedFactor;
         }
 
         Vector3 moveVector = targetDirection.normalized * moveSpeed + new Vector3(0.0f, _verticalVelocity, 0.0f);
         moveVector += physicsVelocity;
-        if (moveVector.sqrMagnitude > _threshold){
+        if (moveVector.sqrMagnitude > _threshold)
+        {
             _characterController.Move(moveVector * Time.deltaTime);
         }
     }
 
-    public void ApplyForce(Vector3 force) {
-        if (!IsServer) return;
+    public void ApplyForce(Vector3 force)
+    {
+        ApplyForceServerRpc(force);
+    }
+    
+    [ServerRpc(RequireOwnership = false)]
+    private void ApplyForceServerRpc(Vector3 force)
+    {
         nvPhysicsVelocity.Value = force;
-        // Debug.Log($"Server applied force: {force}, Velocity: {nvPhysicsVelocity.Value}, ID: {OwnerClientId}");
     }
 
     private void PhysicsVelocityChanged(Vector3 oldValue, Vector3 newValue) {

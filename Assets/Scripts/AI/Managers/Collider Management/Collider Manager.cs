@@ -13,7 +13,7 @@ public class ColliderManager : MonoBehaviour
     public event Action<Collider> OnTargetEntrance;
     public event Action<Collider> OnTargetExit;
 
-    private void Awake()
+    private void Start()
     {
         HitDetectionColliderGO.PassColliderManagerReference(this);
         TargetEnterColliderGO.PassColliderManagerReference(this);

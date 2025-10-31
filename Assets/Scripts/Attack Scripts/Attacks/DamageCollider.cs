@@ -55,7 +55,7 @@ public class DamageCollider : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        Debug.Log($"On Trigger Enter for {other.gameObject.name}!");
+        // for now removing this check because enabling hitbox detection on clients for responsiveness and laziness too tbh
         if (!NetworkManager.Singleton.IsServer) return;
 
         NetworkObject hitNetworkObject = other.GetComponentInParent<NetworkObject>();
@@ -75,6 +75,7 @@ public class DamageCollider : MonoBehaviour
         // apply damage
         if (other.TryGetComponent(out HealthComponent healthComponent))
         {
+            Debug.Log("Detected opponent health component!");
             float totalDamage = ComputeDamage();
 
             if (damageType == BaseAttackSO.eDamageType.Single)
@@ -105,6 +106,7 @@ public class DamageCollider : MonoBehaviour
 
     private void OnTriggerExit(Collider other)
     {
+        if (!NetworkManager.Singleton.IsServer) return;
         if (other.TryGetComponent(out HealthComponent health))
         {
             if (healthComponentsToDamage.Contains(health))

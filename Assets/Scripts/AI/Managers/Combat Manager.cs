@@ -12,21 +12,10 @@ public abstract class CombatManager: NetworkBehaviour
     protected Animator _anim;
     protected AnimatorOverrideController _animOverrideController;
     private NetworkVariable<int> nvChosenAttackId = new NetworkVariable<int>(0);
-    
-    // --- FIX: Updated Caching System ---
-    
-    // Cache for clips that are fully loaded
     protected Dictionary<int, AnimationClip> loadedClips = new Dictionary<int, AnimationClip>();
-    
-    // Tracks the *task* of clips currently being loaded to prevent duplicate loads
-    private Dictionary<int, Task<AnimationClip>> loadingTasks = new Dictionary<int, Task<AnimationClip>>();
-    
-    // Used to manage cache eviction (FIFO)
+    private Dictionary<int, Task<AnimationClip>> loadingTasks = new Dictionary<int, Task<AnimationClip>>();    
     private Queue<int> clipLoadOrder = new Queue<int>();
     [SerializeField] private int cacheCapacity = 10;
-    
-    // --- End Fix ---
-
 
     protected virtual void Awake()
     {
@@ -65,6 +54,9 @@ public abstract class CombatManager: NetworkBehaviour
     private async void OnAttackIDChanged(int previousID, int newID)
     {
         // This just wraps our new safe loading function
+        if (newID == 0) return;
+
+        ChosenAttack = AttackDatabase.GetAttack(newID);
         await LoadAndApplyClip(newID);
     }
 
@@ -74,8 +66,6 @@ public abstract class CombatManager: NetworkBehaviour
     /// </summary>
     private async Task LoadAndApplyClip(int attackID)
     {
-        if (attackID == 0) return;
-
         // LoadClipFromReference now returns the clip and handles all
         // concurrent loading logic internally.
         AnimationClip clip = await LoadClipFromReference(attackID);
@@ -126,16 +116,17 @@ public abstract class CombatManager: NetworkBehaviour
     private async Task<AnimationClip> DoLoadClip(int attackID)
     {
         BaseAttackSO attackData = AttackDatabase.GetAttack(attackID);
-        Debug.Log($"attackData is null: {attackData == null}");
-        Debug.Log($"attackData.AnimationClipRef is valid: {attackData.AnimationClipRef.IsValid()}");
-        if (attackData == null || !attackData.AnimationClipRef.IsValid())
+        
+        if (attackData == null || !attackData.AnimationClipRef.RuntimeKeyIsValid())
         {
             Debug.LogWarning($"No attack data or invalid AssetRef for ID {attackID}");
-            loadingTasks.Remove(attackID); // Remove from loading list
+            loadingTasks.Remove(attackID);
             return null;
         }
 
-        AsyncOperationHandle<AnimationClip> handle = attackData.AnimationClipRef.LoadAssetAsync<AnimationClip>();
+        // Load using Addressables directly with the RuntimeKey - this creates a new handle each time
+        AsyncOperationHandle<AnimationClip> handle = Addressables.LoadAssetAsync<AnimationClip>(attackData.AnimationClipRef.RuntimeKey);
+        
         AnimationClip clip = null;
         try
         {
@@ -144,34 +135,30 @@ public abstract class CombatManager: NetworkBehaviour
         catch (System.Exception e)
         {
             Debug.LogError($"Exception awaiting handle for {attackID}: {e.Message}");
-            // Ensure we release the handle if awaiting it fails
             if(handle.IsValid()) Addressables.Release(handle);
             loadingTasks.Remove(attackID);
             return null;
         }
 
-        // Task is complete, remove it from the loading dictionary
         loadingTasks.Remove(attackID);
 
         if (handle.Status == AsyncOperationStatus.Succeeded && clip != null)
         {
-            // Success! Manage cache size *before* adding.
             if (loadedClips.Count >= cacheCapacity)
             {
                 EvictOldestClip(); 
             }
 
-            if (!loadedClips.ContainsKey(attackID)) // Check again just in case
+            if (!loadedClips.ContainsKey(attackID))
             {
-                 loadedClips.Add(attackID, clip);
-                 clipLoadOrder.Enqueue(attackID);
+                loadedClips.Add(attackID, clip);
+                clipLoadOrder.Enqueue(attackID);
             }
             
             return clip;
         }
         else
         {
-            // Load failed
             Debug.LogError($"Failed to load AnimationClip for attack ID {attackID}.");
             if(handle.IsValid()) Addressables.Release(handle);
             return null;
@@ -234,7 +221,6 @@ public abstract class CombatManager: NetworkBehaviour
         nvChosenAttackId.Value = newId;
     }
 
-    // --- No changes to the functions below this line ---
 
     protected abstract Task LoadDefaultAttackAnimations();
 
@@ -261,14 +247,14 @@ public abstract class CombatManager: NetworkBehaviour
 
     protected void AnimationEvent_EnableHitBoxes()
     {
-        if (ChosenAttack == null || (!IsServer && !IsOwner)) return;
+        if (ChosenAttack == null || !IsServer) return;
  
         ChosenAttack.EnableHitBoxes(damageColliderDict, currentHitboxGroupIndex);
     }
 
     protected void AnimationEvent_DisableHitBoxes()
     {
-        if (ChosenAttack == null || (!IsServer && !IsOwner)) return;
+        if (ChosenAttack == null || !IsServer) return;
         
         ChosenAttack.DisableHitBoxes(damageColliderDict, currentHitboxGroupIndex);
         

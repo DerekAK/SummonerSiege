@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: AttackSOs
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: AttackSOs
+  m_GUID: bf337367523d74a8894d513709686411
+  m_SerializeEntries:
+  - m_GUID: 72864110c43b44b1d8daf48b83c5f8d0
+    m_Address: Assets/Scripts/Attack Scripts/Attacks/AttackSOs/Player Attack SOs/Holdable.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - AttackData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 88596da102d0b4096980c1754318cb45
+    m_Address: Assets/Scripts/Attack Scripts/Attacks/AttackSOs/AI Attack SOs/SlowPunch.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - AttackData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9efed206a1e2047c0853223b2567afa6
+    m_Address: Assets/Scripts/Attack Scripts/Attacks/AttackSOs/Player Attack SOs/Heavy
+      Punch.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - AttackData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f32b82c4ee96d421aa22d93f56273d08
+    m_Address: Assets/Scripts/Attack Scripts/Attacks/AttackSOs/Player Attack SOs/Quick
+      Punch.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - AttackData
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 8e6cb2697cb354d3cb27ecf11a97c5a1, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 90978fbe12d6a42dd810307867401bf6, type: 2}
+    - {fileID: 11400000, guid: bb70d6710862b443da89323c42a1474b, type: 2}

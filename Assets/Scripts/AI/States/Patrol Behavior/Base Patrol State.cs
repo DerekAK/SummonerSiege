@@ -7,22 +7,15 @@ using UnityEngine.AI;
 /// </summary>
 public abstract class BasePatrolState : BaseBehaviorState
 {
-    protected NavMeshAgent _agent;
-    protected ColliderManager _colliderManager;
-    protected BehaviorManager _behaviorManager;
 
     public override void InitializeState(BehaviorManager behaviorManager)
     {
-        _behaviorManager = behaviorManager;
-        _agent = behaviorManager.GetComponent<NavMeshAgent>();
-        if (!_agent.isActiveAndEnabled) return;
-
-        _colliderManager = behaviorManager.GetComponent<ColliderManager>();
+        if (!behaviorManager.GetComponent<NavMeshAgent>().isActiveAndEnabled) return;
     }
 
-    public override void DeInitializeState()
+    public override void DeInitializeState(BehaviorManager behaviorManager)
     {
-        return;
+        
     }
 
 

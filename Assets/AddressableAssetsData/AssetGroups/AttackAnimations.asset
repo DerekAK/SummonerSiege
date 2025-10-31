@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: AttackAnimations
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: AttackAnimations
+  m_GUID: adbc654c36a534f799de2aa6d9e64ede
+  m_SerializeEntries:
+  - m_GUID: 2dc48c7bc3b5445dea808dbe646a5f2d
+    m_Address: Assets/Scripts/Attack Scripts/Attack Animations/Humanoid/Unarmed/Unarmed-Attack-L2.anim
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 58d880ed421834f8eb669381312cb982
+    m_Address: Assets/Scripts/Attack Scripts/Attack Animations/Humanoid/Unarmed/Unarmed-Attack-L1.anim
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 99aa1bbebd3f543fb98a6ee566b90d0d
+    m_Address: Assets/Scripts/Attack Scripts/Attack Animations/Humanoid/Unarmed/Unarmed-Attack-L3.anim
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 8e6cb2697cb354d3cb27ecf11a97c5a1, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 3803b9fce303b4f5b9d50e5f07382717, type: 2}
+    - {fileID: 11400000, guid: c33daa9f80e01455ebbb98e9febc7431, type: 2}

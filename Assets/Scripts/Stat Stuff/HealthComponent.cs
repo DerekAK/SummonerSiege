@@ -12,7 +12,6 @@ public class HealthComponent : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-
         _entityStats.OnStatValueChanged += HandleChangeInHealth;
     }
 
@@ -24,8 +23,6 @@ public class HealthComponent : NetworkBehaviour
     
     public void Damage(float amount)
     {
-        if (!IsServer) return;
-
         float damageAmount = -amount;
         _entityStats.ModifyStatServerRpc(StatType.Health, damageAmount);
     }
@@ -33,8 +30,6 @@ public class HealthComponent : NetworkBehaviour
     
     public void Heal(float healAmount)
     {
-        if (!IsServer) return;
-
         _entityStats.ModifyStatServerRpc(StatType.Health, healAmount);
     }
 

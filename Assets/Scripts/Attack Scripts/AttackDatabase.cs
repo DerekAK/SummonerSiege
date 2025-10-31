@@ -29,12 +29,16 @@ public static class AttackDatabase
     }
 
     private static async Task DoInitialize()
-    {
+    {    
+        // Initialize Addressables (don't check status after awaiting)
+        await Addressables.InitializeAsync().Task;
+        
         AllAttacks = new Dictionary<int, BaseAttackSO>();
-
-        // Load all ScriptableObjects labeled "AttackData"
+        
         var handle = Addressables.LoadAssetsAsync<BaseAttackSO>("AttackData", (attackSO) =>
         {
+            //Debug.Log($"  - RuntimeKeyIsValid: {attackSO.AnimationClipRef?.RuntimeKeyIsValid()}"); // Changed!
+            
             if (!AllAttacks.ContainsKey(attackSO.UniqueID))
             {
                 AllAttacks.Add(attackSO.UniqueID, attackSO);
@@ -45,9 +49,8 @@ public static class AttackDatabase
             }
         });
 
-        await handle.Task; // Wait for it to finish
+        await handle.Task;
         isInitialized = true;
-        Debug.Log($"Attack Database initialized with {AllAttacks.Count} attacks.");
     }
 
     public static BaseAttackSO GetAttack(int id)
@@ -58,8 +61,16 @@ public static class AttackDatabase
             Debug.LogError("AttackDatabase.GetAttack called before initialization!");
             return null;
         }
-        
+
         AllAttacks.TryGetValue(id, out BaseAttackSO attack);
         return attack;
+    }
+    
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    public static void ResetStaticData()
+    {
+        isInitialized = false;
+        AllAttacks?.Clear(); // Also clear the dictionary just in case
+        initializationTask = null; // And reset the task
     }
 }

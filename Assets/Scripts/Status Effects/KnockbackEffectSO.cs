@@ -1,4 +1,3 @@
-using TMPro;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "NewKnockbackEffect", menuName = "Scriptable Objects/Status Effects/Knockback Effect")]

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 
 public abstract class BaseAttackSO : ScriptableObject
 {
@@ -31,7 +33,7 @@ public abstract class BaseAttackSO : ScriptableObject
 
     [Header("General Settings")]
     public int UniqueID = 0; // set this to default because editor script will set this based on GUID
-    public UnityEngine.AddressableAssets.AssetReference AnimationClipRef;
+    public AssetReference AnimationClipRef;
     public float AttackDamage;
     public bool AirAttack;
     public float MovementSpeedFactor = 1f;
@@ -65,6 +67,7 @@ public abstract class BaseAttackSO : ScriptableObject
     // Now accepts an index from the CombatManager
     public void EnableHitBoxes(Dictionary<eBodyPart, DamageCollider> damageColliderDict, int groupIndex)
     {
+        if (!NetworkManager.Singleton.IsServer) return;
         if (groupIndex < 0 || groupIndex >= HitboxGroups.Count) return;
 
         foreach (Hitbox hitbox in HitboxGroups[groupIndex].hitboxes)
@@ -101,6 +104,7 @@ public abstract class BaseAttackSO : ScriptableObject
 
     public void DisableHitBoxes(Dictionary<eBodyPart, DamageCollider> damageColliderDict, int groupIndex)
     {
+        if (!NetworkManager.Singleton.IsServer) return;
         if (groupIndex < 0 || groupIndex >= HitboxGroups.Count) return;
 
         foreach (Hitbox hitbox in HitboxGroups[groupIndex].hitboxes)

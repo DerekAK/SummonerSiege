@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using Unity.Netcode;
 using System;
+using System.Collections;
 
 public class PersistenceManager : NetworkBehaviour
 {
@@ -9,17 +10,42 @@ public class PersistenceManager : NetworkBehaviour
     [SerializeField] private string uniqueId;
     public ePersistenceType PersistenceType;
     public string GetUniqueId() => uniqueId;
-    private Dictionary<string, object> localPManData;
     public bool ReceivedData = false;
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        if (!IsServer) return;
+
+        if (PersistenceType == ePersistenceType.World) StartCoroutine(WaitBeforeLoadingData());
+    }
+
+    private IEnumerator WaitBeforeLoadingData()
+    {
+        
+        yield return new WaitForSeconds(0.5f);
+
+        if (WorldSaveManager.Instance.GetWorldSaveData().TryGetValue(uniqueId, out object pManData))
+        {
+            ApplyAllData(pManData as Dictionary<string, object>);
+        }
+        else
+        {
+            ApplyAllData(new Dictionary<string, object>());
+        }
+    }
 
     public override void OnNetworkDespawn()
     {
+        base.OnNetworkDespawn();
+
         if (PersistenceType == ePersistenceType.Player)
         {
             PlayerSaveManager.Instance.SavePlayer(OwnerClientId);
         }
     }
+
 
     public enum ePersistenceType
     {

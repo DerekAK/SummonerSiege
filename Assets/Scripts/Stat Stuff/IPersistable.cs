@@ -7,7 +7,6 @@ using System.Collections.Generic;
 /// </summary>
 public interface IPersistable
 {
-    public bool IsNetworkReady();
     public Dictionary<string, object> SaveData();
     public void ApplyData(Dictionary<string, object> data);
     public event Action OnStatsConfigured;

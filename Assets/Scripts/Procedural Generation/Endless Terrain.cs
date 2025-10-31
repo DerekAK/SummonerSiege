@@ -53,20 +53,26 @@ public class EndlessTerrain : MonoBehaviour
     [SerializeField] private AgentNavigationProfileSO[] agentProfiles;
     [SerializeField] private Transform navMeshLinksParent;
 
+    public void SetViewerTransform(Transform viewerTransform)
+    {
+        viewer = viewerTransform;
+    }
 
     private void Start()
     {
         int numChunks = InitializeChunkPool();
         InitializePlacementPools(numChunks);
-        viewerPosition = viewer.position;
+        viewerPosition = viewer ? viewer.position : Vector3.zero;
         GenerateNewBiomeArrays();
-        UpdateVisibleChunks();
         highestLOD = lodInfoList[0].lod;
         lastUpdateTime = Time.time;
+        UpdateVisibleChunks();
     }
 
     private void Update()
     {
+        if (!viewer) return;
+        
         float timeSinceLastUpdate = Time.time - lastUpdateTime;
         
         if (Vector3.Distance(viewerPosition, viewer.position) > 0.01f && 
@@ -150,7 +156,7 @@ public class EndlessTerrain : MonoBehaviour
 
         int numChunks = maxChunksX * maxChunksZ + chunkBuffer;
 
-        ObjectPoolManager.Singleton.RegisterPrefab(pfTerrainChunk, numChunks);
+        SimpleObjectPool.Singleton.CreatePool(pfTerrainChunk, numChunks, numChunks);
 
         return numChunks;
     }
@@ -160,7 +166,7 @@ public class EndlessTerrain : MonoBehaviour
         int initialAmountPerPf = 1000;
         foreach (PlaceableObject placeable in activeBiomeSO.placeableObjects)
         {
-            ObjectPoolManager.Singleton.RegisterPrefab(placeable.prefab, initialAmountPerPf);
+            SimpleObjectPool.Singleton.CreatePool(placeable.prefab, initialAmountPerPf, initialAmountPerPf);
         }
     }
 
@@ -288,7 +294,7 @@ public class EndlessTerrain : MonoBehaviour
             );
             Bounds = new Bounds(boundsPosition, new Vector3(dimensions.x, dimensions.y, dimensions.z));
 
-            MeshObject = ObjectPoolManager.Singleton.GetObject(endlessTerrain.pfTerrainChunk, position, Quaternion.identity);
+            MeshObject = SimpleObjectPool.Singleton.GetObject(endlessTerrain.pfTerrainChunk, position, Quaternion.identity);
             MeshObject.transform.SetParent(endlessTerrain.transform);
 
             MeshFilter = MeshObject.GetComponent<MeshFilter>();
@@ -575,7 +581,7 @@ public class EndlessTerrain : MonoBehaviour
                     {
                         yield break;
                     }
-                    GameObject newObject = ObjectPoolManager.Singleton.GetObject(prefab, Vector3.zero, data.rotation);
+                    GameObject newObject = SimpleObjectPool.Singleton.GetObject(prefab, Vector3.zero, data.rotation);
                     newObject.transform.SetParent(parentTransform, false);
                     newObject.transform.localPosition = data.position;
                     newObject.transform.localScale = Vector3.one * data.scale;
@@ -658,14 +664,14 @@ public class EndlessTerrain : MonoBehaviour
 
             if (MeshObject != null)
             {
-                ObjectPoolManager.Singleton.ReturnObject(MeshObject, endlessTerrain.pfTerrainChunk);
+                SimpleObjectPool.Singleton.ReturnObject(MeshObject, endlessTerrain.pfTerrainChunk);
             }
             
             foreach ((GameObject obj, PlaceableObject config) in activePlaceableObjects)
             {
                 if (obj != null)
                 {
-                    ObjectPoolManager.Singleton.ReturnObject(obj, config.prefab);
+                    SimpleObjectPool.Singleton.ReturnObject(obj, config.prefab);
                 }
             }
             

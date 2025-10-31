@@ -69,7 +69,6 @@ public class PlayerSaveManager : NetworkBehaviour
     /// </summary>
     public void RegisterPlayer(ulong clientId, PersistenceManager pManager)
     {
-        Debug.Log("Registering player for client " + clientId);
         connectedPlayers[clientId] = pManager;
     }
 

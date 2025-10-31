@@ -18,7 +18,7 @@ EditorBuildSettings:
     path: Assets/Scenes/Procedural Generation.unity
     guid: 81a9402c4341b46759a05bff7c820fa1
   m_configObjects:
-    com.unity.addressableassets: {fileID: 11400000, guid: 982a2d433e59b4d07bacc164afd2369a,
+    com.unity.addressableassets: {fileID: 11400000, guid: 47a22788ca1fa457583625453cfc9fa0,
       type: 2}
     com.unity.input.settings: {fileID: 11400000, guid: 9e7be553448fa2546aea5752021cbcf7,
       type: 2}

@@ -2,6 +2,7 @@ using UnityEngine;
 using Unity.Netcode;
 using System.Collections.Generic;
 using System;
+using System.Collections;
 
 public class EntityStats : NetworkBehaviour, IPersistable
 {
@@ -9,26 +10,24 @@ public class EntityStats : NetworkBehaviour, IPersistable
 
     // A dictionary to hold all stats for this entity, easily accessible by their type
     private NetworkList<NetStat> Stats = new NetworkList<NetStat>();
+    private NetworkVariable<bool> AreStatsConfigured = new(false);
     public event Action<StatType, float> OnStatValueChanged;
     public event Action OnStatsConfigured;
-    
-    private bool isNetworkReady = false;
-    
-    public bool IsNetworkReady() => isNetworkReady;
-    
+        
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        Stats.OnListChanged += HandleListChanged;
 
-        isNetworkReady = true;
+        Stats.OnListChanged += HandleListChanged;
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
+
         Stats.OnListChanged -= HandleListChanged;
     }
+
 
     private void HandleListChanged(NetworkListEvent<NetStat> changeEvent)
     {
@@ -37,12 +36,6 @@ public class EntityStats : NetworkBehaviour, IPersistable
             NetStat changedStat = changeEvent.Value;
             // Fire our custom, specific event for other scripts to hear.
             OnStatValueChanged?.Invoke(changedStat.Type, changedStat.CurrentValue);
-        }
-
-        // this will run when the client receives changes to its NetworkList Stats when first loading it.
-        if (changeEvent.Type == NetworkListEvent<NetStat>.EventType.Add)
-        {
-            OnStatsConfigured?.Invoke();
         }
     }
 
@@ -94,18 +87,29 @@ public class EntityStats : NetworkBehaviour, IPersistable
     /// client and safely adds them to the synced NetworkList.
     /// </summary>
     [ServerRpc]
-    private void ApplyStatsServerRpc(NetStat[] statsToApply)
+    private void ApplyStatsServerRpc(NetStat[] statsToApply, ServerRpcParams serverRpcParams = default)
     {
-        Debug.Log($"Server receiving {statsToApply.Length} stats to apply.");
-        
-        // Clear any existing stats first
+        StartCoroutine(ApplyStatsAfterWait(statsToApply, serverRpcParams));
+    }
+
+    private IEnumerator ApplyStatsAfterWait(NetStat[] statsToApply, ServerRpcParams serverRpcParams){
+
         Stats.Clear();
-        
-        // Now, the SERVER safely writes to the NetworkList
         foreach (NetStat stat in statsToApply)
         {
             Stats.Add(stat);
         }
+
+        yield return new WaitForSeconds(1);
+                
+        // Send the event notification back to ONLY that client
+        NotifyStatsConfiguredClientRpc();
+    }
+
+    [ClientRpc]
+    private void NotifyStatsConfiguredClientRpc()
+    {
+        OnStatsConfigured?.Invoke();
     }
 
     public Dictionary<string, object> SaveData()

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 
 [CreateAssetMenu(fileName = "SimpleChase", menuName = "Scriptable Objects/AI Behavior/States/Chase/SimpleChase")]
 public class SimpleChase : BaseChasingState
@@ -7,34 +8,34 @@ public class SimpleChase : BaseChasingState
     [Range(0f, 2f)]
     [SerializeField] private float chaseSpeedFactor = 1f;
 
-    public override void EnterState()
+    public override void EnterState(BehaviorManager behaviorManager)
     {
         // Set the speed for chasing
-        _behaviorManager.HandleSpeedChangeWithFactor(chaseSpeedFactor);          
+        behaviorManager.HandleSpeedChangeWithFactor(chaseSpeedFactor);          
     }
 
-    public override void ExitState()
+    public override void ExitState(BehaviorManager behaviorManager)
     {
         return;
     }
 
-    public override void UpdateState()
+    public override void UpdateState(BehaviorManager behaviorManager)
     {
-        if (_behaviorManager.CurrentTarget == null)
+        if (behaviorManager.CurrentTarget == null)
         {
             return;
         }
         
         // Standard chase logic
-        if (!_agent.isOnOffMeshLink)
+        if (!behaviorManager.GetComponent<NavMeshAgent>().isOnOffMeshLink)
         {
-            Chase();
+            Chase(behaviorManager);
         }
     }
 
-    public override void Chase()
+    public override void Chase(BehaviorManager behaviorManager)
     {
-        _agent.SetDestination(_behaviorManager.CurrentTarget.transform.position);
+        behaviorManager.GetComponent<NavMeshAgent>().SetDestination(behaviorManager.CurrentTarget.transform.position);
     }
 
 }

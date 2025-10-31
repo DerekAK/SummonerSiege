@@ -39,14 +39,12 @@ public class PlayerSaveDataRelay : NetworkBehaviour
 
         if (IsServer)
         {
-            Debug.Log($"Registering client {OwnerClientId} with playerSaveManager");
             PlayerSaveManager.Instance.RegisterPlayer(OwnerClientId, _pManager);
         }
 
         if (IsOwner)
         {
             // The client requests its data from the server
-            Debug.Log("Requesting Data Server Rpc!");
             RequestPlayerDataServerRpc();
         }
     }
@@ -58,7 +56,6 @@ public class PlayerSaveDataRelay : NetworkBehaviour
     private void RequestPlayerDataServerRpc(ServerRpcParams rpcParams = default)
     {
         if (!IsServer) return;
-        Debug.Log($"Server sending data to client {rpcParams.Receive.SenderClientId}");
         PlayerSaveManager.Instance.LoadAndSendDataToClient(rpcParams.Receive.SenderClientId);
     }
 
@@ -68,7 +65,6 @@ public class PlayerSaveDataRelay : NetworkBehaviour
     [ClientRpc]
     public void ReceivePlayerDataClientRpc(string jsonPlayerData, ClientRpcParams clientRpcParams = default)
     {
-        Debug.Log($"Client {OwnerClientId} recieved data from PlayerSave Manager, has yet to provide it though");
         // Deserialize the data
         Dictionary<string, object> playerData = JsonConvert.DeserializeObject<Dictionary<string, object>>(
             jsonPlayerData,

@@ -1,7 +1,8 @@
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 
-public class PlayerState: MonoBehaviour
+public class PlayerState: NetworkBehaviour
 {
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     [SerializeField] private string lockOnTargetTag;
@@ -12,13 +13,25 @@ public class PlayerState: MonoBehaviour
     public bool Rolling = false;
     public BaseAttackSO currentAttack;
 
-    public float TimeSinceLastSpawn;
+    private float timeSinceLastEnemySpawn = 0f;
+    public float TimeSinceLastEnemySpawn
+    {
+        get { return timeSinceLastEnemySpawn; }
+        set { timeSinceLastEnemySpawn = value; }
+    }
 
-    private void Start(){
-        TimeSinceLastSpawn = 0f;
+    public override void OnNetworkSpawn()
+    {
+        EndlessTerrain endlessTerrain = FindFirstObjectByType<EndlessTerrain>();
+        endlessTerrain.SetViewerTransform(transform);
+    }
+
+    private void Start()
+    {
+        timeSinceLastEnemySpawn = 0f;
     }
     private void Update(){
-        TimeSinceLastSpawn += Time.deltaTime;
+        timeSinceLastEnemySpawn += Time.deltaTime;
     }
 
     public void ChangeAttackStatus(bool attacking){

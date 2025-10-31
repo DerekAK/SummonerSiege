@@ -1,12 +1,13 @@
 using System.Collections.Generic;
-using Unity.VisualScripting;
+using System.Runtime.CompilerServices;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 
 // This enum defines the physical states the character can be in.
 
 [RequireComponent(typeof(EntityStats), typeof(JumpManager), typeof(EnemyCombat))]
-public class BehaviorManager : MonoBehaviour
+public class BehaviorManager : NetworkBehaviour
 {
     // Components
     private Animator _anim;
@@ -50,6 +51,7 @@ public class BehaviorManager : MonoBehaviour
     private GameObject currentTarget = null;
     public GameObject CurrentTarget => currentTarget;
     public string TargetTag;
+    public Coroutine IdleCoroutine;
 
 
     private void Awake()
@@ -65,7 +67,7 @@ public class BehaviorManager : MonoBehaviour
 
     private void OnEnable()
     {
-        _agent.enabled = true;
+        _agent.enabled = false;
         _entityStats.OnStatsConfigured += StatsConfigured;
 
         // call the initialize function for each state
@@ -79,12 +81,26 @@ public class BehaviorManager : MonoBehaviour
         _colliderManager.OnTargetExit += TargetExited;
     }
 
+    public override void OnNetworkSpawn()
+    {
+        Debug.Log($"BehaviorManager.OnNetworkSpawn() called. IsSpawned={IsSpawned}");
+        base.OnNetworkSpawn();
+
+        _agent.enabled = true;
+
+        if (IsServer && isStatsConfigured)
+        {
+            DecideNextIntention();
+        }
+    }
+
     private void StatsConfigured()
     {
         isStatsConfigured = true;
-
-        _agent.updateRotation = false;
-        SwitchState(IdleState);
+        if (IsSpawned && IsServer)
+        {
+            DecideNextIntention();
+        }
     }
 
     private void OnDisable()
@@ -92,10 +108,10 @@ public class BehaviorManager : MonoBehaviour
         _entityStats.OnStatsConfigured -= StatsConfigured;
 
         // call the deinitialize function for each state
-        IdleState.DeInitializeState();
-        PatrolState.DeInitializeState();
-        ChasingState.DeInitializeState();
-        AttackState.DeInitializeState();
+        IdleState.DeInitializeState(this);
+        PatrolState.DeInitializeState(this);
+        ChasingState.DeInitializeState(this);
+        AttackState.DeInitializeState(this);
 
         _colliderManager.OnHitDetection -= HitDetected;
         _colliderManager.OnTargetEntrance -= TargetEntered;
@@ -104,6 +120,7 @@ public class BehaviorManager : MonoBehaviour
 
     private void Start()
     {
+        _agent.updateRotation = false;
         _agent.autoTraverseOffMeshLink = false;
         _rb.isKinematic = true;
         startPosition = transform.position;
@@ -111,12 +128,13 @@ public class BehaviorManager : MonoBehaviour
 
     private void Update()
     {
-        if (!isStatsConfigured || currentState == null) return;
+        if (!isStatsConfigured || !IsSpawned || currentState == null) return;
 
+        if (!IsServer) return;
+        
         HandleRotation();
         HandleJumping();
-        currentState.UpdateState();
-
+        currentState.UpdateState(this);
 
         if (_combatManager.InAttack) return; // needs to come before deciding an intention and setting a target
 
@@ -127,7 +145,10 @@ public class BehaviorManager : MonoBehaviour
 
         SetCurrentTarget();
 
-        // Debug.Log(currentState);
+        if (Time.frameCount % 60 == 0) // Log every 60 frames
+        {
+            Debug.Log($"[{gameObject.name}] IsServer={IsServer}, IsSpawned={IsSpawned}, currentState={currentState?.name}, currentTarget={CurrentTarget?.name}");
+        }
     }
 
     public void DecideNextIntention()
@@ -243,10 +264,16 @@ public class BehaviorManager : MonoBehaviour
     
     public void HandleSpeedChangeWithFactor(float speedFactor)
     {
+        // Debug.Log($"BehaviorManager IsSpawned: {IsSpawned}");
+        // Debug.Log($"EntityStats IsSpawned: {_entityStats.IsSpawned}");
+        // Debug.Log($"EntityStats IsServer: {_entityStats.IsServer}");
+        // Debug.Log($"EntityStats NetworkObject: {_entityStats.NetworkObject}");
+        // Debug.Log($"EntityStats NetworkObjectId: {_entityStats.NetworkObjectId}");
+
         _entityStats.TryGetStat(StatType.Speed, out NetStat speedNetStat);
         float newSpeedValue = speedFactor * speedNetStat.MaxValue;
-       
-       // 1.
+
+        // 1.
         _entityStats.SetStatServerRpc(StatType.Speed, newSpeedValue);
         // 2.
         _agent.speed = newSpeedValue;
@@ -259,9 +286,10 @@ public class BehaviorManager : MonoBehaviour
         // Don't switch to a null state
         if (newState == null) return;
 
-        currentState?.ExitState();
+        currentState?.ExitState(this);
+        Debug.Log($"Switching state to new state: {newState.name}");
         currentState = newState;
-        currentState.EnterState();
+        currentState.EnterState(this);
     }
 
     private void HitDetected(Collider other)

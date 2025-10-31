@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ad1c2d473413941819ad2690ef25d3d9, type: 3}
   m_Name: Slow
   m_EditorClassIdentifier: Assembly-CSharp::StatModificationEffectSO
-  Duration: 2
+  Duration: 10
   Stacking: 0
   StatToModify: 2
   ModifierValue: -50

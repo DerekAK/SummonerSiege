@@ -1,6 +1,7 @@
 using UnityEngine;
 using Unity.Netcode; // Make sure this is included
 using System.Collections.Generic;
+using System;
 
 // --- CHANGE: Inherit from NetworkBehaviour instead of MonoBehaviour ---
 public class OwnerStatUI : NetworkBehaviour
@@ -19,21 +20,11 @@ public class OwnerStatUI : NetworkBehaviour
         _targetStats = GetComponent<EntityStats>();
     }
 
-    private void OnEnable()
-    {
-        _targetStats.OnStatsConfigured += InitializeBars;
-        _targetStats.OnStatValueChanged += OnStatChanged;
-    }
-
-    private void OnDisable()
-    {
-        _targetStats.OnStatsConfigured -= InitializeBars;
-        _targetStats.OnStatValueChanged -= OnStatChanged;
-    }
-
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        InitializeBars();
 
         if (!IsOwner)
         {
@@ -41,14 +32,21 @@ public class OwnerStatUI : NetworkBehaviour
         }
 
         container.SetActive(true);
-        InitializeBars();
+
+        _targetStats.OnStatsConfigured += InitializeBars;
+        _targetStats.OnStatValueChanged += OnStatChanged;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        _targetStats.OnStatsConfigured -= InitializeBars;
+        _targetStats.OnStatValueChanged -= OnStatChanged;
     }
 
     private void InitializeBars()
     {
         foreach (StatUIPair pair in statUIPairs)
         {
-
             if (_targetStats.TryGetStat(pair.statToDisplay, out NetStat stat))
             {
                 float fillAmount = stat.CurrentValue / stat.MaxValue;

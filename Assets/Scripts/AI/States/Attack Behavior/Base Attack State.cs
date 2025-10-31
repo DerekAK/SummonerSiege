@@ -1,30 +1,29 @@
 public abstract class BaseAttackState : BaseBehaviorState
 {
-    protected EnemyCombat _combatManager;
 
     public override void InitializeState(BehaviorManager behaviorManager)
     {
-        _combatManager = behaviorManager.GetComponent<EnemyCombat>();
+        
     }
 
-    public override void EnterState()
+    public override void EnterState(BehaviorManager behaviorManager)
     {
-        _combatManager.StartChosenAttack();
+        behaviorManager.GetComponent<EnemyCombat>().StartChosenAttack();
     }
 
-    public override void DeInitializeState()
+    public override void DeInitializeState(BehaviorManager behaviorManager)
     {
-        return;
+        
     }
 
     // States that interrupt an attack (like getting stunned) would call this
-    public override void ExitState()
+    public override void ExitState(BehaviorManager behaviorManager)
     {
-        return;
+        
     }
 
-    public override void UpdateState()
+    public override void UpdateState(BehaviorManager behaviorManager)
     {
-        return;
+       
     }
 }

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 
 [CreateAssetMenu(fileName = "SimplePatrol", menuName = "Scriptable Objects/AI Behavior/States/Patrol/SimplePatrol")]
 public class SimplePatrolState : BasePatrolState
@@ -14,35 +15,37 @@ public class SimplePatrolState : BasePatrolState
         base.InitializeState(behaviorManager);
     }
 
-    public override void EnterState()
+    public override void EnterState(BehaviorManager behaviorManager)
     {
         // Set the speed for patrolling
-        _behaviorManager.HandleSpeedChangeWithFactor(patrolSpeedFactor);
+        behaviorManager.HandleSpeedChangeWithFactor(patrolSpeedFactor);
 
-        MoveToPatrolPosition();
+        MoveToPatrolPosition(behaviorManager);
 
     }
 
-    public override void ExitState()
+    public override void ExitState(BehaviorManager behaviorManager)
     {
-        _agent.ResetPath();
+        behaviorManager.GetComponent<NavMeshAgent>().ResetPath();
     }
 
-    public override void UpdateState()
+    public override void UpdateState(BehaviorManager behaviorManager)
     {
+        NavMeshAgent agent = behaviorManager.GetComponent<NavMeshAgent>();
         // Check if we've reached the destination
-        if (!_agent.pathPending && _agent.remainingDistance < _agent.stoppingDistance)
+        if (!agent.pathPending && agent.remainingDistance < agent.stoppingDistance)
         {
             // Move to the next patrol point
-            _behaviorManager.SwitchState(_behaviorManager.IdleState);
+            behaviorManager.SwitchState(behaviorManager.IdleState);
         }
     }
 
-    private void MoveToPatrolPosition(){
+    private void MoveToPatrolPosition(BehaviorManager behaviorManager){
+        NavMeshAgent agent = behaviorManager.GetComponent<NavMeshAgent>();
         Vector3 randDir = new Vector3(Random.Range(-1f, 1f), 0, Random.Range(-1f, 1f)).normalized;
         float roamingRange = Random.Range(10, patrolRange);
-        Vector3 newPos = _behaviorManager.StartPosition + (randDir * roamingRange);
-        _agent.SetDestination(UtilityFunctions.FindNavMeshPosition(newPos, _agent));
+        Vector3 newPos = behaviorManager.StartPosition + (randDir * roamingRange);
+        agent.SetDestination(UtilityFunctions.FindNavMeshPosition(newPos, agent));
     }
 
 }
