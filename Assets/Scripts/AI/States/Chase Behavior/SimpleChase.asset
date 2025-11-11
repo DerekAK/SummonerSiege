@@ -12,5 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3669e467b650c49c7905a71cc4b3dc38, type: 3}
   m_Name: SimpleChase
   m_EditorClassIdentifier: Assembly-CSharp::SimpleChase
-  _agent: {fileID: 0}
-  _anim: {fileID: 0}
+  chaseSpeedFactor: 1.544

@@ -71,9 +71,12 @@ public class GameInput : MonoBehaviour
 
     public bool ScrolledUp(){return gameInputScript.Player.MouseScroll.ReadValue<Vector2>().y > 0 || gameInputScript.Player.MouseScroll.ReadValue<Vector2>().x < 0;}
 
-    public bool ScrolledDown(){return gameInputScript.Player.MouseScroll.ReadValue<Vector2>().y < 0 || gameInputScript.Player.MouseScroll.ReadValue<Vector2>().x > 0;}
+    public bool ScrolledDown() { return gameInputScript.Player.MouseScroll.ReadValue<Vector2>().y < 0 || gameInputScript.Player.MouseScroll.ReadValue<Vector2>().x > 0; }
 
-    public bool JumpPressed(){return gameInputScript.Player.Jump.triggered;}
+    public float GetMouseScrollValue() { return gameInputScript.Player.MouseScroll.ReadValue<Vector2>().normalized.y; }
+
+    public bool JumpPressed()
+    { return gameInputScript.Player.Jump.triggered; }
 
     public bool SprintingPressed(){return gameInputScript.Player.Sprint.IsPressed();}
 

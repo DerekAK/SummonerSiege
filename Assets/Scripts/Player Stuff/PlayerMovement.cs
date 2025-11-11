@@ -1,12 +1,52 @@
 using System;
 using System.Collections;
+using Cinemachine;
+using Unity.Entities.UniversalDelegates;
 using Unity.Netcode;
 using UnityEngine;
 
 public class PlayerMovement : NetworkBehaviour
-{      
-    [SerializeField] private string billBoardTag;
-    public NetworkVariable<Vector3> PlayerPosition = new NetworkVariable<Vector3>(writePerm: NetworkVariableWritePermission.Owner);
+{
+    // Core Settings
+    private Animator _anim;
+    private Rigidbody _rb;
+    private ConfigurableJoint _configJoint;
+    private EntityStats _playerStats;
+    private PlayerCombat _playerCombat;
+
+    [Header("Grounded Settings")]
+    [SerializeField] private float groundedOffset;
+    [SerializeField] private float groundedRadius;
+    [SerializeField] private LayerMask groundLayers;
+    private bool isGrounded = true;
+
+    [Header("Movement Settings")]
+    [Range(0, 1)] [SerializeField] private float walkSpeedFactor = 0.3f;
+    [SerializeField] private float fastFallFactor = 1.5f;
+    [SerializeField] private float jumpHeight = 10;
+    [SerializeField] private float rotationSpeed = 3f;
+    [SerializeField] private float crouch_lockOn_Factor;
+    [SerializeField] private float movementSmoothSpeed = 10f;
+    private float walkTargetSpeed;
+    private float sprintTargetSpeed;
+    private float currentSpeed;
+    private const float moveThreshold = 0.01f;
+    
+    // settings to decouple input processing in update() and actual movement in fixedupdate()
+    private bool moveRequested;
+    private Vector3 moveForce;
+    private bool jumpRequested;
+
+
+    // Rolling / Air variables
+    private bool inAir = false;
+    public bool InAir => inAir;
+    private bool isRolling = false;
+    public bool IsRolling => isRolling;
+
+
+    [Header("Animator settings")]
+    [SerializeField] private float animationSmoothSpeed = 10f;
     private int moveXParam = Animator.StringToHash("InputX");
     private int moveYParam = Animator.StringToHash("InputY");
     private int rollXParam = Animator.StringToHash("RollX");
@@ -14,176 +54,158 @@ public class PlayerMovement : NetworkBehaviour
     private int animMovementStateParam = Animator.StringToHash("Movement State");
     private int crouchLayerIndex = 1;
     private int strafeLayerIndex = 2;
-    private float currentMoveSpeed = 0f;
-    [SerializeField] private float rollTime = 1f;
-    private Coroutine rollCoroutine;
-    [SerializeField] private LayerMask groundLayers;
-    
-    [Header("Grounded Settings")]
-    [SerializeField] private bool isGrounded = true;
-    [SerializeField, Tooltip("Useful for rough ground")]
-    private float groundedOffset = -0.14f;
-    [SerializeField, Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
-    private float groundedRadius;
-    private float _verticalVelocity;
-    private float gravity = Physics.gravity.y;
-    [SerializeField] private float fastFallFactor = 100f;
-    [SerializeField] private float jumpHeight = 100f;
-    [SerializeField] private float rotationSpeed = 3f;
-    [SerializeField] private float animationSmoothSpeed = 10f;
-    [SerializeField] private float lockOnFactor = 0.5f;
-    [SerializeField] private float sprintFactor = 3f;
-    [SerializeField] private float crouchFactor = 0.5f;
-    [SerializeField] private Transform eyesTransform;    
-    public enum MovementState { Locomotion = 0, Jumping = 1, Falling = 2, Rolling = 3 }
-    public MovementState currentMovementState { get; private set; }
-    private CharacterController _characterController;
-    private Animator _anim;
-    private EntityStats _playerStats;
-    private PlayerState _playerState;
-    private int playerTargetIndex = 0;
-    
-    [Header("Physics Settings")]
-    [SerializeField, Tooltip("Rate to dampen external forces (1/s).")]
-    private float forceDecay = 5f;
-    private NetworkVariable<Vector3> nvPhysicsVelocity = new NetworkVariable<Vector3>(Vector3.zero);
-    private Vector3 physicsVelocity;
 
-    [Header("Mouse Cursor Settings")]
-    public bool cursorLocked = true;
-    public bool cursorInputForLook = true;
-    private const float _threshold = 0.01f;
+    [Header("Miscellaneous")]
+    [SerializeField] private string billBoardTag = "BillBoard";
+    private enum MovementState { Locomotion = 0, Jumping = 1, Falling = 2, Rolling = 3 }
+    private MovementState currentMovementState;
+    private bool statsConfigured = false;
+    private int playerTargetIndex = 0;
+
+
+    // mouse settings
+    private bool cursorLocked = true;
+    private bool cursorInputForLook = true;
+
+
+    [Header("Camera Settings")]
     [SerializeField] private GameObject cinemachineCameraTarget;
+    [SerializeField] private GameObject playerFollowCamera;
+    [SerializeField] private GameObject mainCamera;
     [SerializeField] private float topClamp = 70.0f;
     [SerializeField] private float bottomClamp = -30.0f;
+    [SerializeField] private float minCameraDistance = 0.2f;  // First person
+    [SerializeField] private float maxCameraDistance = 8.0f;  // Third person far
+    [SerializeField] private float zoomSpeed = 1.0f;
+    [SerializeField] private float currentCameraDistance = 5.0f;
+    [SerializeField] private float firstPersonThreshold = 0.5f; // Hide body below this distance
+    private Cinemachine3rdPersonFollow thirdPersonFollow;
     private float _cinemachineTargetYaw;
     private float _cinemachineTargetPitch;
-    public GameObject _mainCamera;
-    [SerializeField] private GameObject _playerFollowCamera;
 
-    private bool statsConfigured = false;
 
     private void Awake()
     {
-        _characterController = GetComponent<CharacterController>();
         _anim = GetComponent<Animator>();
+        _rb = GetComponent<Rigidbody>();
         _playerStats = GetComponent<EntityStats>();
-        _playerState = GetComponent<PlayerState>();
+        _playerCombat = GetComponent<PlayerCombat>();
+        _configJoint = GetComponent<ConfigurableJoint>();
     }
 
-    private void StatsConfigured()
+    private void Start()
     {
-        Debug.Log("StatsConfigured!!");
-        statsConfigured = true;
+        _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
+        SetCursorState(cursorLocked);
     }
 
     public override void OnNetworkSpawn()
     {
         if (IsOwner)
         {
-            _playerStats.OnStatsConfigured += StatsConfigured;
-            Initialize();
+            _playerStats.OnStatsConfigured += OnStatsConfigured;
+            GameInput.Instance.OnAttackButtonStarted += OnRightClickPerform;
+            StartCoroutine(BillboardShit());
+            thirdPersonFollow = playerFollowCamera.GetComponent<CinemachineVirtualCamera>().GetCinemachineComponent<Cinemachine3rdPersonFollow>();
+
         }
         else
         {
-            if (_mainCamera != null) _mainCamera.SetActive(false);
-            if (_playerFollowCamera != null) _playerFollowCamera.SetActive(false);
+            if (mainCamera != null) mainCamera.SetActive(false);
+            if (playerFollowCamera != null) playerFollowCamera.SetActive(false);
         }
     }
 
     public override void OnNetworkDespawn()
     {
         if (GameInput.Instance != null) GameInput.Instance.OnAttackButtonStarted -= OnRightClickPerform;
-
-        if (NetworkManager.Singleton != null) nvPhysicsVelocity.OnValueChanged -= PhysicsVelocityChanged;
-        
+        _playerStats.OnStatsConfigured -= OnStatsConfigured;
     }
 
-    private void Initialize()
+    private void OnStatsConfigured()
     {
-        _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
-        SetCursorState(cursorLocked);
-        GameInput.Instance.OnAttackButtonStarted += OnRightClickPerform;
-        StartCoroutine(BillboardShit());
-        nvPhysicsVelocity.OnValueChanged += PhysicsVelocityChanged;
+        statsConfigured = true;
+        HandleTargetSpeeds();
+    }
+    
+    private void HandleTargetSpeeds()
+    {
+        if (!_playerStats.TryGetStat(StatType.Speed, out NetStat speedStat)) return;
+        walkTargetSpeed = speedStat.MaxValue * walkSpeedFactor;
+        sprintTargetSpeed = speedStat.MaxValue;
     }
 
     private void Update()
     {
-
-        if (!IsOwner) return;
-        if (!statsConfigured) return;
-
-        if (Input.GetKeyDown(KeyCode.Mouse1))
-        {
-            _playerStats.ModifyStatServerRpc(StatType.Speed, 10);
-        }
-        if (Input.GetKeyDown(KeyCode.H))
-        {
-            _playerStats.ModifyStatServerRpc(StatType.Health, 10);
-        }
+        if (!IsOwner || !statsConfigured) return;
 
         GroundedCheck();
-        UpdateVerticalVelocity();
-        HandleMovement();
+        HandleCameraZoom();
         CursorStuffIDontUnderstand();
-    }
-    
-    private IEnumerator BillboardShit(){
-        while (isActiveAndEnabled){
-            if (_mainCamera == null) yield break;
-            GameObject[] healthBars = GameObject.FindGameObjectsWithTag(billBoardTag);
-            foreach (GameObject healthBar in healthBars){
-                healthBar.transform.LookAt(healthBar.transform.position + _mainCamera.transform.forward, _mainCamera.transform.up);
-            }
-            yield return null;
-        }
+        HandleMovement();
+        HandleJump();
     }
 
-    private void UpdateVerticalVelocity(){
-        if (isGrounded){
-            if (_verticalVelocity < 0.0f)
-                _verticalVelocity = 0f;
-            if (GameInput.Instance.JumpPressed())
-                _verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * fastFallFactor * gravity);
+    private void FixedUpdate()
+    {
+        if (!IsOwner || !statsConfigured) return;
+
+        if (moveRequested)
+        {
+            _rb.AddForce(moveForce, ForceMode.VelocityChange);
+            moveRequested = false;
         }
-        else{
-            _verticalVelocity += fastFallFactor * gravity * Time.deltaTime;
+
+        if (jumpRequested)
+        {
+            float jumpVelocity = Mathf.Sqrt(jumpHeight * -2f * Physics.gravity.y);
+            
+            _rb.AddForce(Vector3.up * jumpVelocity, ForceMode.VelocityChange);
+            jumpRequested = false;
+        }
+
+        if (!isGrounded)
+        {
+            //_rb.AddForce(Vector3.down * fastFallFactor, ForceMode.Force);
+        }
+        
+    }
+
+    private void GroundedCheck() {
+        Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - groundedOffset, transform.position.z);
+        isGrounded = Physics.CheckSphere(spherePosition, groundedRadius, groundLayers, QueryTriggerInteraction.Ignore);
+    }
+
+    private void HandleJump(){
+
+        if (isGrounded && GameInput.Instance.JumpPressed())
+        {
+            jumpRequested = true;
         }
     }
 
     private void HandleMovement()
     {
         Vector2 moveDir = GameInput.Instance.GetPlayerMovementVectorNormalized();
-        bool isMoving = moveDir.sqrMagnitude > _threshold;
+        bool isMoving = moveDir.sqrMagnitude > moveThreshold;
         bool isSprinting = GameInput.Instance.SprintingPressed();
         bool isLockedOn = GameInput.Instance.IsAttackButtonPressed(GameInput.AttackInput.RightMouse);
         bool rollTriggered = GameInput.Instance.MouseMiddleTriggered();
         bool crouchPressed = GameInput.Instance.CrouchPressed();
 
         float targetMoveSpeed, targetX, targetY, targetCrouchWeight, targetStrafeWeight;
-        float speed;
-
-        if (_playerStats.TryGetStat(StatType.Speed, out NetStat speedStat))
-        {
-            speed = speedStat.CurrentValue;
-        }
-        else
-        {
-            return;
-        }
 
         if (isMoving)
         {
             if (isSprinting && !isLockedOn)
             {
-                targetMoveSpeed = speed * sprintFactor;
+                targetMoveSpeed = sprintTargetSpeed;
                 targetX = 0;
                 targetY = 2;
             }
             else
             {
-                targetMoveSpeed = speed;
+                targetMoveSpeed = walkTargetSpeed;
                 targetX = 0;
                 targetY = 1;
             }
@@ -197,7 +219,7 @@ public class PlayerMovement : NetworkBehaviour
 
         if (isLockedOn)
         {
-            targetMoveSpeed = speed * lockOnFactor;
+            targetMoveSpeed *= crouch_lockOn_Factor;
             targetX = moveDir.x;
             targetY = moveDir.y;
             targetStrafeWeight = 1;
@@ -209,8 +231,7 @@ public class PlayerMovement : NetworkBehaviour
 
         if (crouchPressed)
         {
-            if (!isLockedOn)
-                targetMoveSpeed *= crouchFactor;
+            if (!isLockedOn) targetMoveSpeed *= crouch_lockOn_Factor;
             targetCrouchWeight = 1;
         }
         else
@@ -225,23 +246,23 @@ public class PlayerMovement : NetworkBehaviour
 
         float newX = Mathf.Lerp(currentX, targetX, Time.deltaTime * animationSmoothSpeed);
         float newY = Mathf.Lerp(currentY, targetY, Time.deltaTime * animationSmoothSpeed);
-        float moveSpeed = Mathf.Lerp(currentMoveSpeed, targetMoveSpeed, Time.deltaTime * animationSmoothSpeed);
+        float moveSpeed = Mathf.Lerp(currentSpeed, targetMoveSpeed, Time.deltaTime * animationSmoothSpeed);
         float newCrouchWeight = Mathf.Lerp(currCrouchWeight, targetCrouchWeight, Time.deltaTime * animationSmoothSpeed);
         float newStrafeWeight = Mathf.Lerp(currStrafeWeight, targetStrafeWeight, Time.deltaTime * animationSmoothSpeed);
-        currentMoveSpeed = moveSpeed;
+        currentSpeed = moveSpeed;
 
         if (!isGrounded)
         {
-            if (_verticalVelocity < 0) currentMovementState = MovementState.Falling;
+            if (_rb.linearVelocity.y < 0) currentMovementState = MovementState.Falling;
             else currentMovementState = MovementState.Jumping;
-            _playerState.InAir = true;
+            inAir = true;
         }
         else
         {
-            _playerState.InAir = false;
+            inAir = false;
             if (rollTriggered)
             {
-                rollCoroutine = StartCoroutine(WaitEndRoll());
+                Roll();
                 currentMovementState = MovementState.Rolling;
                 if (isLockedOn)
                 {
@@ -267,101 +288,127 @@ public class PlayerMovement : NetworkBehaviour
         _anim.SetLayerWeight(strafeLayerIndex, newStrafeWeight);
 
         Vector3 targetDirection = HandlePlayerAndCameraRotation(isLockedOn, moveDir, isMoving);
+       
 
-        if (_playerState.Attacking)
+        if (_playerCombat.InAttack)
         {
-            moveSpeed *= _playerState.currentAttack.MovementSpeedFactor;
+            moveSpeed *= _playerCombat.ChosenAttack.MovementSpeedFactor;
         }
 
-        Vector3 moveVector = targetDirection.normalized * moveSpeed + new Vector3(0.0f, _verticalVelocity, 0.0f);
-        moveVector += physicsVelocity;
-        if (moveVector.sqrMagnitude > _threshold)
+        Vector3 moveVector = targetDirection.normalized * moveSpeed * 0.05f;
+        if (moveVector.sqrMagnitude > moveThreshold)
         {
-            _characterController.Move(moveVector * Time.deltaTime);
+            moveForce = moveVector;
+            moveRequested = true;
         }
     }
 
-    public void ApplyForce(Vector3 force)
-    {
-        ApplyForceServerRpc(force);
-    }
-    
-    [ServerRpc(RequireOwnership = false)]
-    private void ApplyForceServerRpc(Vector3 force)
-    {
-        nvPhysicsVelocity.Value = force;
-    }
-
-    private void PhysicsVelocityChanged(Vector3 oldValue, Vector3 newValue) {
-        if (!IsOwner) { return; }
-        StartCoroutine(UpdateLocalPhysicsVelocity(newValue));
-    }
-
-    private IEnumerator UpdateLocalPhysicsVelocity(Vector3 newValue) {
-        physicsVelocity = newValue;
-        while (physicsVelocity != Vector3.zero) {
-            physicsVelocity.x = Mathf.Lerp(physicsVelocity.x, 0, forceDecay * Time.deltaTime);
-            physicsVelocity.z = Mathf.Lerp(physicsVelocity.z, 0, forceDecay * Time.deltaTime);
-            physicsVelocity.y = Math.Abs(physicsVelocity.y) < 3f ? 0 :
-                Mathf.Lerp(physicsVelocity.y, 0, forceDecay * Time.deltaTime);
+    private IEnumerator BillboardShit(){
+        while (isActiveAndEnabled){
+            GameObject[] healthBars = GameObject.FindGameObjectsWithTag(billBoardTag);
+            foreach (GameObject healthBar in healthBars){
+                healthBar.transform.LookAt(healthBar.transform.position + mainCamera.transform.forward, mainCamera.transform.up);
+            }
             yield return null;
         }
     }
 
-    private Vector3 HandlePlayerAndCameraRotation(bool isLockedOn, Vector2 moveDir, bool isMoving) {
+    private Vector3 HandlePlayerAndCameraRotation(bool isLockedOn, Vector2 moveDir, bool isMoving)
+    {
         Vector3 playerTargetDirection = Vector3.zero;
         bool scrolledUp = GameInput.Instance.ScrolledUp();
         bool scrolledDown = GameInput.Instance.ScrolledDown();
         float targetRotation;
-        float rotationSpeedFactor = _playerState.Attacking ? _playerState.currentAttack.RotationSpeedFactor : 1f;
+        float rotationSpeedFactor = _playerCombat.InAttack ? _playerCombat.ChosenAttack.RotationSpeedFactor : 1f;
 
-        if (isLockedOn) {
-            bool hasLockOnTarget = _playerState.lockOnTargets.Count > 0;
-            if (hasLockOnTarget) {
-                if (scrolledUp) playerTargetIndex = (playerTargetIndex + 1) % _playerState.lockOnTargets.Count;
-                if (scrolledDown) playerTargetIndex = (playerTargetIndex - 1 + _playerState.lockOnTargets.Count) % _playerState.lockOnTargets.Count;
+        if (isLockedOn)
+        {
+            bool hasLockOnTarget = _playerCombat.LockOnTargets.Count > 0;
+            if (hasLockOnTarget)
+            {
+                if (scrolledUp) playerTargetIndex = (playerTargetIndex + 1) % _playerCombat.LockOnTargets.Count;
+                if (scrolledDown) playerTargetIndex = (playerTargetIndex - 1 + _playerCombat.LockOnTargets.Count) % _playerCombat.LockOnTargets.Count;
 
-                Transform lockOnTarget = _playerState.lockOnTargets[playerTargetIndex];
+                Transform lockOnTarget = _playerCombat.LockOnTargets[playerTargetIndex];
                 Vector3 directionToTarget = (lockOnTarget.position - transform.position).normalized;
                 targetRotation = Mathf.Atan2(directionToTarget.x, directionToTarget.z) * Mathf.Rad2Deg;
             }
-            else {
-                targetRotation = _mainCamera.transform.eulerAngles.y;
+            else
+            {
+                targetRotation = mainCamera.transform.eulerAngles.y;
             }
 
             Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y);
-            if (inputDirection.sqrMagnitude > _threshold) {
+            if (inputDirection.sqrMagnitude > moveThreshold)
+            {
                 playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * inputDirection.normalized;
             }
 
-            Quaternion targetRot = Quaternion.Euler(0.0f, targetRotation, 0.0f);
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotationSpeed * rotationSpeedFactor * Time.deltaTime);
+            // Quaternion targetRot = Quaternion.Euler(0.0f, targetRotation, 0.0f);
+            // transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotationSpeed * rotationSpeedFactor * Time.deltaTime);
+            SetJointTargetRotation(targetRotation, rotationSpeedFactor);
         }
-        else {
-            if (isMoving) {
+        else
+        {
+            if (isMoving)
+            {
                 Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y).normalized;
-                targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + _mainCamera.transform.eulerAngles.y;
+                targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + mainCamera.transform.eulerAngles.y;
                 playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * Vector3.forward;
 
-                Quaternion targetRot = Quaternion.Euler(0.0f, targetRotation, 0.0f);
-                transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotationSpeed * rotationSpeedFactor * Time.deltaTime);
+                // Quaternion targetRot = Quaternion.Euler(0.0f, targetRotation, 0.0f);
+                // transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotationSpeed * rotationSpeedFactor * Time.deltaTime);
+                SetJointTargetRotation(targetRotation, rotationSpeedFactor);
             }
         }
         return playerTargetDirection;
     }
 
-    private IEnumerator WaitEndRoll() {
-        _playerState.Rolling = true;
-        if (rollCoroutine != null) { StopCoroutine(rollCoroutine); }
+    private void SetJointTargetRotation(float targetWorldYAngle, float rotationSpeedFactor)
+    {   
+        Quaternion desiredWorldRotation = Quaternion.Euler(0f, targetWorldYAngle, 0f);
+    
+        Quaternion localTargetRotation = Quaternion.Inverse(transform.rotation) * desiredWorldRotation;
+
+        // Set as target
+        _configJoint.targetRotation = Quaternion.RotateTowards(_configJoint.targetRotation, localTargetRotation, rotationSpeedFactor);
+    }
+    
+    private void HandleCameraZoom()
+    {
+        if (thirdPersonFollow == null) return;
+
+        // Get scroll input
+        float scrollInput = GameInput.Instance.GetMouseScrollValue();
+        
+        if (Mathf.Abs(scrollInput) > 0.01f)
+        {
+            // Adjust camera distance
+            currentCameraDistance -= scrollInput * zoomSpeed;
+            currentCameraDistance = Mathf.Clamp(currentCameraDistance, minCameraDistance, maxCameraDistance);
+            
+            // Apply to camera
+            thirdPersonFollow.CameraDistance = currentCameraDistance;
+            
+            // Hide body in first person
+        }
+    }
+
+    private void Roll()
+    {
+        isRolling = true;
         _anim.applyRootMotion = true;
-        yield return new WaitForSeconds(rollTime);
+    }
+    
+    private void AnimationEvent_EndRoll()
+    {
         _anim.applyRootMotion = false;
-        _playerState.Rolling = false;
+        isRolling = false;
     }
 
     private void OnRightClickPerform(GameInput.AttackInput input) {
         if (input == GameInput.AttackInput.RightMouse) {
-            _playerState.lockOnTargets.Sort((a, b) => Vector3.Distance(a.position, transform.position).CompareTo(Vector3.Distance(b.position, transform.position)));
+            _playerCombat.LockOnTargets.Sort((a, b) => Vector3.Distance(a.position, transform.position).CompareTo(Vector3.Distance(b.position, transform.position)));
             playerTargetIndex = 0;
         }
     }
@@ -370,13 +417,9 @@ public class PlayerMovement : NetworkBehaviour
         if (cursorInputForLook && cursorLocked) { CameraRotation(); }
     }
 
-    private void GroundedCheck() {
-        Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - groundedOffset, transform.position.z);
-        isGrounded = Physics.CheckSphere(spherePosition, groundedRadius, groundLayers, QueryTriggerInteraction.Ignore);
-    }
 
     private void CameraRotation() {
-        if (GameInput.Instance.GetPlayerLookVectorNormalized().sqrMagnitude >= _threshold)
+        if (GameInput.Instance.GetPlayerLookVectorNormalized().sqrMagnitude >= moveThreshold)
         {
             _cinemachineTargetYaw += GameInput.Instance.GetPlayerLookVectorNormalized().x * 1.2f;
             _cinemachineTargetPitch += GameInput.Instance.GetPlayerLookVectorNormalized().y * 1.2f;
@@ -415,7 +458,4 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
-    public Transform GetEyesTransform() {
-        return eyesTransform;
-    }
 }

@@ -104,7 +104,7 @@ public class SimpleObjectPool : MonoBehaviour
             }
         }
 
-        Debug.Log($"PoolManager: Created pool for {prefab.name} (Capacity: {defaultCapacity}, Max: {maxSize}!");
+        //Debug.Log($"PoolManager: Created pool for {prefab.name} (Capacity: {defaultCapacity}, Max: {maxSize}!");
     }
 
     private GameObject CreatePooledObject(GameObject prefab)

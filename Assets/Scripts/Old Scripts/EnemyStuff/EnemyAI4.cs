@@ -191,7 +191,7 @@ public class EnemyAI4 : NetworkBehaviour{
     private void TryDetectPlayer(){
         foreach(Transform target in targetsInRangeOfEnemy){
             Vector3 directionToTarget;
-            if(target.CompareTag(playerTag)){directionToTarget = target.GetComponent<PlayerMovement>().GetEyesTransform().position - eyes.position;}
+            if(target.CompareTag(playerTag)){directionToTarget = target.transform.position - eyes.position;}
             else{directionToTarget = target.GetComponent<EnemyAI4>().GetEyesTransform().position - eyes.position;}
             if (!Physics.Raycast(eyes.position, directionToTarget.normalized, out RaycastHit hit, directionToTarget.magnitude, obstacleL)){
                 currentTarget = target; 
@@ -746,7 +746,7 @@ public class EnemyAI4 : NetworkBehaviour{
     private bool IsVisible(){
         Debug.Log("Checking if is Visible!");
         Vector3 directionToTarget;
-        if(currentTarget.CompareTag(playerTag)){directionToTarget = currentTarget.GetComponent<PlayerMovement>().GetEyesTransform().position - eyes.position;}
+        if(currentTarget.CompareTag(playerTag)){directionToTarget = currentTarget.transform.position - eyes.position;}
         else{directionToTarget = currentTarget.GetComponent<EnemyAI4>().GetEyesTransform().position - eyes.position;}
 
         if (!Physics.Raycast(eyes.position, directionToTarget.normalized, out RaycastHit hit, directionToTarget.magnitude, obstacleL)){

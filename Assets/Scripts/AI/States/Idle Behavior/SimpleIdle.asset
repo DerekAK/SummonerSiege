@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a99ff4fcdbce4864928efa1ee145cf9, type: 3}
   m_Name: SimpleIdle
   m_EditorClassIdentifier: Assembly-CSharp::SimpleIdleState
-  idleTimeRange: {x: 5, y: 10}
+  idleTimeRange: {x: 2, y: 5}

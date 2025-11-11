@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.AI;
 
 public class EnemyCombat: CombatManager
 {
@@ -10,19 +11,18 @@ public class EnemyCombat: CombatManager
     [SerializeField] private List<EnemyAttackSO> availableAttacks;
     public List<EnemyAttackSO> AvailableAttacks => availableAttacks;
 
-    private bool inAttack = false;
-    public bool InAttack => inAttack;
-
     private bool stopRotate = false;
     public bool StopRotate => stopRotate;
 
     private BehaviorManager _behaviorManager;
+    private NavMeshAgent _agent;
 
     protected override void Awake()
     {
         base.Awake();
 
         _behaviorManager = GetComponent<BehaviorManager>();
+        _agent = GetComponent<NavMeshAgent>();
     }
 
     public void StartChosenAttack()
@@ -43,6 +43,7 @@ public class EnemyCombat: CombatManager
 
         inAttack = true;
         _anim.SetTrigger(animAttack);
+        _behaviorManager.HandleSpeedChangeWithValue(0);
 
         ChosenAttack.ExecuteAttack(this);
     }
@@ -61,8 +62,11 @@ public class EnemyCombat: CombatManager
     protected override void AnimationEvent_AttackFinished()
     {
         inAttack = false;
+        stopRotate = false;
         SetChosenAttack(null);
+        
         _behaviorManager.DecideNextIntention();
+        
     }
 
     private void StopRotation()

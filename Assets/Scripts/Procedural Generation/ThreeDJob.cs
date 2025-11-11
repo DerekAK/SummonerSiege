@@ -13,7 +13,6 @@ public struct ThreeDJob : IJob
     public float isoLevel;
     public float caveStrength;
     public int lod;
-    [ReadOnly] public NativeArray<int> neighborLODs;
 
     // --- Reusable Input/Output Arrays ---
     public NativeArray<float> cubeDensities;

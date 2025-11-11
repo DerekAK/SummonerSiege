@@ -1,6 +1,7 @@
 // In a new file: AttackIntention.cs
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
 [CreateAssetMenu(fileName = "AttackIntention", menuName = "Scriptable Objects/AI Behavior/Intentions/Attack")]
 public class AttackIntention : Intention
@@ -43,7 +44,7 @@ public class AttackIntention : Intention
 
         if (chosenAttack)
         {
-           if (distance >= chosenAttack.MinRange && distance <= chosenAttack.MaxRange)
+           if (distance >= chosenAttack.MinRange && distance <= chosenAttack.MaxRange && ai.GetComponent<BehaviorManager>().CanAttack())
             {
                 ai.SwitchState(ai.AttackState);
             }

@@ -37,7 +37,7 @@ MonoBehaviour:
       damageTickRate: 0.05
       damageMultiplier: 1
   MinRange: 0
-  MaxRange: 7
+  MaxRange: 5
   considerations:
   - {fileID: 11400000, guid: a8d5ef5c7a137486f8ee257b26942708, type: 2}
   - {fileID: 11400000, guid: b7ad63f553fd74fb1afab97345cb8730, type: 2}

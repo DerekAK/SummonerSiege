@@ -31,7 +31,7 @@ public class KnockbackEffect : BaseStatusEffect
             Vector3 forceDir = (target.transform.position - applier.transform.position).normalized;
             forceDir.y = Random.Range(0.2f, 0.5f);
             forceDir *= _effectSO.KnockbackForce;
-            _targetPlayerMovement.ApplyForce(forceDir);
+            //_targetPlayerMovement.ApplyForce(forceDir);
         }
 
         IsFinished = true;

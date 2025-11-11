@@ -13,6 +13,6 @@ public class WanderIntention : Intention
             return; // Already wandering, do nothing.
         }
         // If not wandering, start the loop by patrolling.
-        ai.SwitchState(ai.PatrolState);
+        ai.SwitchState(ai.IdleState);
     }
 }

@@ -1,6 +1,7 @@
+using System.Collections;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using Unity.Netcode;
+using UnityEditor.Build.Pipeline;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -21,6 +22,11 @@ public class BehaviorManager : NetworkBehaviour
     // Animator fields
     private static int animSpeedX = Animator.StringToHash("SpeedX");
     private static int animSpeedY = Animator.StringToHash("SpeedY");
+
+    [Header("Chunk Border Crossing")]
+    [SerializeField] private float boundaryProximityThreshold = 5f;
+    private bool isManuallyMovingAcrossBoundary = false;
+    private EndlessTerrain endlessTerrain;
 
 
     [Header("States")]
@@ -53,6 +59,9 @@ public class BehaviorManager : NetworkBehaviour
     public string TargetTag;
     public Coroutine IdleCoroutine;
 
+    private float cachedSpeed;
+    [SerializeField] private float manualStoppingDistance;
+    private bool agentWasStoppedManually = false;
 
     private void Awake()
     {
@@ -63,6 +72,7 @@ public class BehaviorManager : NetworkBehaviour
         _jumpManager = GetComponent<JumpManager>();
         _colliderManager = GetComponentInChildren<ColliderManager>();
         _combatManager = GetComponent<EnemyCombat>();
+        endlessTerrain = FindFirstObjectByType<EndlessTerrain>();
     }
 
     private void OnEnable()
@@ -83,7 +93,6 @@ public class BehaviorManager : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        Debug.Log($"BehaviorManager.OnNetworkSpawn() called. IsSpawned={IsSpawned}");
         base.OnNetworkSpawn();
 
         _agent.enabled = true;
@@ -121,7 +130,7 @@ public class BehaviorManager : NetworkBehaviour
     private void Start()
     {
         _agent.updateRotation = false;
-        _agent.autoTraverseOffMeshLink = false;
+        _agent.autoTraverseOffMeshLink = true;
         _rb.isKinematic = true;
         startPosition = transform.position;
     }
@@ -129,26 +138,17 @@ public class BehaviorManager : NetworkBehaviour
     private void Update()
     {
         if (!isStatsConfigured || !IsSpawned || currentState == null) return;
-
         if (!IsServer) return;
+
+        currentState.UpdateState(this);
         
         HandleRotation();
         HandleJumping();
-        currentState.UpdateState(this);
+        
 
         if (_combatManager.InAttack) return; // needs to come before deciding an intention and setting a target
-
-        if (Time.time > lastIntentionDecisionTime + intentionDecisionFrequency)
-        {
-            DecideNextIntention();
-        }
-
+        if (Time.time > lastIntentionDecisionTime + intentionDecisionFrequency) DecideNextIntention();
         SetCurrentTarget();
-
-        if (Time.frameCount % 60 == 0) // Log every 60 frames
-        {
-            Debug.Log($"[{gameObject.name}] IsServer={IsServer}, IsSpawned={IsSpawned}, currentState={currentState?.name}, currentTarget={CurrentTarget?.name}");
-        }
     }
 
     public void DecideNextIntention()
@@ -178,15 +178,14 @@ public class BehaviorManager : NetworkBehaviour
     private void HandleRotation()
     {
         Vector3 lookDirection = Vector3.zero;
-        if ((_agent.isOnOffMeshLink || _combatManager.InAttack) && currentTarget)
+        if (_combatManager.InAttack && currentTarget)
         {
             if (_combatManager.StopRotate) return;
 
             lookDirection = currentTarget.transform.position - transform.position;
-            lookDirection.y = transform.position.y;
+            lookDirection.y = transform.rotation.y;
         }
-        else if (_agent.isOnNavMesh)
-        {
+        else if (_agent.isActiveAndEnabled){
             lookDirection = _agent.desiredVelocity;
         }
 
@@ -244,8 +243,35 @@ public class BehaviorManager : NetworkBehaviour
         }
         return null;
     }
+
+    
+    public void MoveTowardsTarget(Vector3 targetPosition)
+    {
+        if (!CanMove()) _agent.isStopped = true;
+
+        else
+        {
+            _agent.isStopped = false;
+            _agent.SetDestination(GetClosestNavMeshPosition(targetPosition, 100, _agent.agentTypeID).Value);
+        }
+        
+    }
+
+
     private bool CanDetect(GameObject target)
     {
+        return true;
+    }
+
+    private bool CanMove()
+    {
+        bool canMove = !_combatManager.InAttack;
+        return canMove;
+    }
+
+    public bool CanAttack()
+    {
+        if (!isManuallyMovingAcrossBoundary && !agentWasStoppedManually && !_agent.enabled) return false;
         return true;
     }
     
@@ -264,11 +290,6 @@ public class BehaviorManager : NetworkBehaviour
     
     public void HandleSpeedChangeWithFactor(float speedFactor)
     {
-        // Debug.Log($"BehaviorManager IsSpawned: {IsSpawned}");
-        // Debug.Log($"EntityStats IsSpawned: {_entityStats.IsSpawned}");
-        // Debug.Log($"EntityStats IsServer: {_entityStats.IsServer}");
-        // Debug.Log($"EntityStats NetworkObject: {_entityStats.NetworkObject}");
-        // Debug.Log($"EntityStats NetworkObjectId: {_entityStats.NetworkObjectId}");
 
         _entityStats.TryGetStat(StatType.Speed, out NetStat speedNetStat);
         float newSpeedValue = speedFactor * speedNetStat.MaxValue;
@@ -287,7 +308,7 @@ public class BehaviorManager : NetworkBehaviour
         if (newState == null) return;
 
         currentState?.ExitState(this);
-        Debug.Log($"Switching state to new state: {newState.name}");
+        // Debug.Log($"Switching state to new state: {newState.name}");
         currentState = newState;
         currentState.EnterState(this);
     }
@@ -303,12 +324,50 @@ public class BehaviorManager : NetworkBehaviour
             targetsInRange.Add(other.gameObject);
         }
     }
-    
+
     private void TargetExited(Collider other)
     {
         if (other.CompareTag(TargetTag) && targetsInRange.Contains(other.gameObject))
         {
             targetsInRange.Remove(other.gameObject);
+        }
+    }
+
+
+
+    public Vector3? GetClosestNavMeshPosition(Vector3 worldPosition, float searchRadius, int agentTypeID)
+    {
+        if (NavMesh.SamplePosition(worldPosition, out NavMeshHit hit, searchRadius, 1 << agentTypeID))
+        {
+            return hit.position;
+        }
+
+        return null;
+    }
+    
+    private void OnDrawGizmos()
+    {
+        if (!Application.isPlaying) return;
+        
+        // Draw cached destination when manually moving
+    
+        // Also try to draw agent destination if agent is enabled
+        if (_agent != null && _agent.enabled && _agent.hasPath)
+        {
+            // Red line to agent's actual destination
+            Gizmos.color = Color.red;
+            Vector3 start = transform.position;
+            Vector3 end = _agent.destination;
+            
+            for (float offset = -0.2f; offset <= 0.2f; offset += 0.1f)
+            {
+                Gizmos.DrawLine(start + Vector3.right * offset, end + Vector3.right * offset);
+                Gizmos.DrawLine(start + Vector3.forward * offset, end + Vector3.forward * offset);
+            }
+            
+            // Yellow sphere at agent destination
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawSphere(_agent.destination, 0.5f);
         }
     }
 }

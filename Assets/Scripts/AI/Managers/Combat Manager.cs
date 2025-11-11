@@ -17,6 +17,9 @@ public abstract class CombatManager: NetworkBehaviour
     private Queue<int> clipLoadOrder = new Queue<int>();
     [SerializeField] private int cacheCapacity = 10;
 
+    protected bool inAttack = false;
+    public bool InAttack => inAttack;
+
     protected virtual void Awake()
     {
         _anim = GetComponent<Animator>();

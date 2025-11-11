@@ -1,11 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using UnityEngine;
 
 public class PlayerCombat : CombatManager
 {
-    private PlayerState _playerState;
+    private PlayerMovement _playerMovement;
     bool isReadyToReceiveInput = false;
 
     // Animator Hashes
@@ -21,8 +22,6 @@ public class PlayerCombat : CombatManager
     private float inputHoldTime = 0f;
     [SerializeField] private float longAttackThreshold = 0.2f;
     private Coroutine inputHoldCoroutine;
-
-    private bool isAttacking = false;
     private bool checkingForInputRelease = false;
     
     // Combo Management (Your original system)
@@ -44,9 +43,14 @@ public class PlayerCombat : CombatManager
     private List<ComboSystem.Combo> possibleCombos = new List<ComboSystem.Combo>();
 
 
+    [SerializeField] private string lockOnTargetTag;
+    private List<Transform> lockOnTargets = new List<Transform>();
+    public List<Transform> LockOnTargets => lockOnTargets;
+
+
     protected override void Awake(){
         base.Awake();
-        _playerState = GetComponent<PlayerState>();
+        _playerMovement = GetComponent<PlayerMovement>(); 
     }
 
     public override void OnNetworkSpawn()
@@ -64,6 +68,10 @@ public class PlayerCombat : CombatManager
         }
 
         isReadyToReceiveInput = true;
+
+        // temporary fix to make the spawned in player the viewer
+        EndlessTerrain endlessTerrain = FindFirstObjectByType<EndlessTerrain>();
+        if (endlessTerrain) endlessTerrain.SetViewerTransform(transform);
     }
 
     public override void OnNetworkDespawn()
@@ -79,7 +87,7 @@ public class PlayerCombat : CombatManager
     private void PerformAttack()
     {
         // Check if player is in a valid state to perform the chosen attack
-        if (!((ChosenAttack.AirAttack && _playerState.InAir) || (!ChosenAttack.AirAttack && !_playerState.InAir)) || _playerState.Rolling)
+        if (!((ChosenAttack.AirAttack && _playerMovement.InAir) || (!ChosenAttack.AirAttack && !_playerMovement.InAir)) || _playerMovement.IsRolling)
         {
             return; // Invalid state, do nothing.
         }
@@ -91,9 +99,7 @@ public class PlayerCombat : CombatManager
             return;
         }
 
-        isAttacking = true;
-        _playerState.currentAttack = ChosenAttack;
-        _playerState.ChangeAttackStatus(true);
+        inAttack = true;
         
         ResetHitboxIndex();
         ChosenAttack.ExecuteAttack(this);
@@ -117,7 +123,7 @@ public class PlayerCombat : CombatManager
             comboPressTypeCoroutine = StartCoroutine(TrackComboPressType(inputButton));
         }
         // If we are not busy, start a new attack sequence.
-        else if (!isAttacking)
+        else if (!inAttack)
         {
             if (inputHoldCoroutine != null) StopCoroutine(inputHoldCoroutine);
             inputHoldCoroutine = StartCoroutine(HandleInputHeldTime(inputButton));
@@ -227,7 +233,7 @@ public class PlayerCombat : CombatManager
         }
         
         // If not in a combo window, we are looking for the FIRST step of ANY combo.
-        if (!isAttacking)
+        if (!inAttack)
         {
             foreach (var combo in possibleCombos)
             {
@@ -285,8 +291,7 @@ public class PlayerCombat : CombatManager
     private void AttackFinish()
     {
         // This is the definitive end of an attack sequence.
-        isAttacking = false;
-        _playerState.ChangeAttackStatus(false);
+        inAttack = false;
         inComboWindow = false;
         inHoldCombo = false;
         comboInputBuffered = false;
@@ -366,6 +371,15 @@ public class PlayerCombat : CombatManager
         }
         _animOverrideController[animAttackStringPlaceholderA] = clip;
         _animOverrideController[animAttackStringPlaceholderB] = clip;
+    }
+
+
+    private void OnTriggerEnter(Collider other){
+        if(other.CompareTag(lockOnTargetTag)){lockOnTargets.Add(other.transform);}
+    }
+    
+    private void OnTriggerExit(Collider other){
+        if(other.CompareTag(lockOnTargetTag)){lockOnTargets.Remove(other.transform);}
     }
 }
 

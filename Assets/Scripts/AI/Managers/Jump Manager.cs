@@ -9,6 +9,7 @@ public class JumpManager: MonoBehaviour
     [SerializeField] private AnimationCurve jumpPositionCurve;
     [SerializeField] private AnimationCurve jumpSpeedCurve;
     private bool inJump = false;
+    public bool InJump => inJump;
     private Coroutine jumpCoroutine;
     private Vector3 startPos;
     private Vector3 endPos;
@@ -26,7 +27,7 @@ public class JumpManager: MonoBehaviour
         if (inJump) return;
         inJump = true;
 
-        _agent.updatePosition = false;
+        _agent.enabled = false;
 
         this.startPos = startPos;
         this.endPos = endPos;
@@ -67,7 +68,7 @@ public class JumpManager: MonoBehaviour
         }
         jumpCoroutine = StartCoroutine(JumpCoroutine(startPos, endPos));
     }
-    
+
     private void FinishLand()
     {
         if (jumpCoroutine != null)
@@ -75,12 +76,10 @@ public class JumpManager: MonoBehaviour
             StopCoroutine(jumpCoroutine);
             jumpCoroutine = null;
         }
-
-        _agent.updatePosition = true;
+        _agent.enabled = true;
+        _agent.Warp(transform.position);
 
         inJump = false;
         _agent.CompleteOffMeshLink();
     }
-
-    
 }

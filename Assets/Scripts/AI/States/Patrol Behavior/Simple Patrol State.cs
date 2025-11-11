@@ -1,3 +1,4 @@
+using UnityEditor.Profiling.Memory.Experimental;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -20,8 +21,7 @@ public class SimplePatrolState : BasePatrolState
         // Set the speed for patrolling
         behaviorManager.HandleSpeedChangeWithFactor(patrolSpeedFactor);
 
-        MoveToPatrolPosition(behaviorManager);
-
+        behaviorManager.GetComponent<NavMeshAgent>().SetDestination(GetPatrolPosition(behaviorManager));
     }
 
     public override void ExitState(BehaviorManager behaviorManager)
@@ -33,19 +33,21 @@ public class SimplePatrolState : BasePatrolState
     {
         NavMeshAgent agent = behaviorManager.GetComponent<NavMeshAgent>();
         // Check if we've reached the destination
-        if (!agent.pathPending && agent.remainingDistance < agent.stoppingDistance)
+
+        if (!agent.isActiveAndEnabled) return;
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
         {
-            // Move to the next patrol point
             behaviorManager.SwitchState(behaviorManager.IdleState);
         }
     }
 
-    private void MoveToPatrolPosition(BehaviorManager behaviorManager){
-        NavMeshAgent agent = behaviorManager.GetComponent<NavMeshAgent>();
+    private Vector3 GetPatrolPosition(BehaviorManager behaviorManager){
+    
         Vector3 randDir = new Vector3(Random.Range(-1f, 1f), 0, Random.Range(-1f, 1f)).normalized;
         float roamingRange = Random.Range(10, patrolRange);
         Vector3 newPos = behaviorManager.StartPosition + (randDir * roamingRange);
-        agent.SetDestination(UtilityFunctions.FindNavMeshPosition(newPos, agent));
+
+        return UtilityFunctions.FindNavMeshPosition(newPos, behaviorManager.GetComponent<NavMeshAgent>());
     }
 
 }

@@ -58,7 +58,7 @@ public class NetworkObjectPool : MonoBehaviour
         {
             InitializePools();
             isInitialized = true;
-            Debug.Log("NetworkPoolManager: Initialized pools after server started.");
+            // Debug.Log("NetworkPoolManager: Initialized pools after server started.");
         }
     }
 
@@ -134,7 +134,7 @@ public class NetworkObjectPool : MonoBehaviour
             PrewarmPool(prefab, defaultCapacity);
         }
 
-        Debug.Log($"NetworkPoolManager: Created pool for {prefab.name} (Capacity: {defaultCapacity}, Max: {maxSize}, Prewarmed: {prewarm})");
+        // Debug.Log($"NetworkPoolManager: Created pool for {prefab.name} (Capacity: {defaultCapacity}, Max: {maxSize}, Prewarmed: {prewarm})");
     }
 
     private NetworkObject CreatePooledNetworkObject(NetworkObject prefab)
@@ -220,7 +220,7 @@ public class NetworkObjectPool : MonoBehaviour
             pools[prefab].Release(obj);
         }
 
-        Debug.Log($"NetworkPoolManager: Prewarmed {count} objects for {prefab.name}");
+        // Debug.Log($"NetworkPoolManager: Prewarmed {count} objects for {prefab.name}");
     }
 
     /// <summary>

@@ -36,7 +36,6 @@ public class SimpleIdleState : BaseIdleState
         // Ensure the agent can move again when leaving the idle state
         if (behaviorManager.IdleCoroutine != null) behaviorManager.StopCoroutine(behaviorManager.IdleCoroutine);
         behaviorManager.IdleCoroutine = null;
-        
     }
 
     public override void UpdateState(BehaviorManager behaviorManager)

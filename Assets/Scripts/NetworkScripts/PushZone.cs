@@ -58,7 +58,7 @@ public class PushZone : NetworkBehaviour
 
             if (obj.TryGetComponent(out PlayerMovement movementComponent))
             {
-                movementComponent.ApplyForce(force);
+                //movementComponent.ApplyForce(force);
             }
             else if (obj.TryGetComponent(out Rigidbody rb))
             {

@@ -191,7 +191,7 @@ public class EnemyAI3 : MonoBehaviour{
     private void TryDetectPlayer(){
         foreach(Transform target in targetsInRangeOfEnemy){
             Vector3 directionToTarget;
-            if(target.CompareTag(playerTag)){directionToTarget = target.GetComponent<PlayerMovement>().GetEyesTransform().position - eyes.position;}
+            if(target.CompareTag(playerTag)){directionToTarget = target.transform.position - eyes.position;}
             else{directionToTarget = target.GetComponent<EnemyAI3>().GetEyesTransform().position - eyes.position;}
             if (!Physics.Raycast(eyes.position, directionToTarget.normalized, out RaycastHit hit, directionToTarget.magnitude, obstacleL))
             {
@@ -475,7 +475,7 @@ public class EnemyAI3 : MonoBehaviour{
     }
     private bool IsVisible(){
         Vector3 directionToTarget;
-        if(currentTarget.CompareTag(playerTag)){directionToTarget = currentTarget.GetComponent<PlayerMovement>().GetEyesTransform().position - eyes.position;}
+        if(currentTarget.CompareTag(playerTag)){directionToTarget = currentTarget.transform.position - eyes.position;}
         else{directionToTarget = currentTarget.GetComponent<EnemyAI3>().GetEyesTransform().position - eyes.position;}
 
         if (!Physics.Raycast(eyes.position, directionToTarget.normalized, out RaycastHit hit, directionToTarget.magnitude, obstacleL)){

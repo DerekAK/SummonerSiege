@@ -7,8 +7,6 @@ using UnityEngine.AI;
 /// </summary>
 public abstract class BaseIdleState : BaseBehaviorState
 {
-    // You could add shared properties or methods for all idle states here in the future.
-    // For example, a reference to a specific idle animation.
 
     [Tooltip("Min and Max idling time between patrol points")]
     [SerializeField] protected Vector2 idleTimeRange;
