@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using Cinemachine;
-using Unity.Entities.UniversalDelegates;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -13,6 +12,15 @@ public class PlayerMovement : NetworkBehaviour
     private ConfigurableJoint _configJoint;
     private EntityStats _playerStats;
     private PlayerCombat _playerCombat;
+    private PhysicsManager _physicsManager;
+    private Rigidbody[] ragdollRigidbodies;
+    private SynchronizedJoint[] ragdollJoints;
+    
+
+    [Header("Model References")]
+    [SerializeField] private GameObject ragdollGO;
+    [SerializeField] private GameObject animatedGO;
+
 
     [Header("Grounded Settings")]
     [SerializeField] private float groundedOffset;
@@ -21,7 +29,7 @@ public class PlayerMovement : NetworkBehaviour
     private bool isGrounded = true;
 
     [Header("Movement Settings")]
-    [Range(0, 1)] [SerializeField] private float walkSpeedFactor = 0.3f;
+    [Range(0, 1)] [SerializeField] private float walkSpeedFactor = 0.5f;
     [SerializeField] private float fastFallFactor = 1.5f;
     [SerializeField] private float jumpHeight = 10;
     [SerializeField] private float rotationSpeed = 3f;
@@ -86,11 +94,14 @@ public class PlayerMovement : NetworkBehaviour
 
     private void Awake()
     {
-        _anim = GetComponent<Animator>();
+        _anim = animatedGO.GetComponent<Animator>();
         _rb = GetComponent<Rigidbody>();
+        _configJoint = GetComponent<ConfigurableJoint>();
         _playerStats = GetComponent<EntityStats>();
         _playerCombat = GetComponent<PlayerCombat>();
-        _configJoint = GetComponent<ConfigurableJoint>();
+        _physicsManager = GetComponent<PhysicsManager>();
+        ragdollRigidbodies = ragdollGO.GetComponentsInChildren<Rigidbody>();
+        ragdollJoints = ragdollGO.GetComponentsInChildren<SynchronizedJoint>();
     }
 
     private void Start()
@@ -142,13 +153,43 @@ public class PlayerMovement : NetworkBehaviour
         GroundedCheck();
         HandleCameraZoom();
         CursorStuffIDontUnderstand();
-        HandleMovement();
-        HandleJump();
+        HandleMovementInput();
+        HandleJumpInput();
+    }
+
+    private void LateUpdate() {
+        if (cursorInputForLook && cursorLocked) { CameraRotation(); }
     }
 
     private void FixedUpdate()
     {
         if (!IsOwner || !statsConfigured) return;
+
+        HandleRotation();
+        HandleMovementJumpExecution();
+        SyncJointsWithAnimation();
+
+    }
+
+    private void SyncJointsWithAnimation()
+    {
+        foreach (SynchronizedJoint joint in ragdollJoints)
+        {
+            joint.SyncJoint();
+        }
+    }
+
+    private void HandleMovementJumpExecution()
+    {
+        if (moveRequested)
+        {
+            _rb.linearVelocity = new Vector3(
+                moveForce.x,
+                _rb.linearVelocity.y,
+                moveForce.z
+            );
+            moveRequested = false;
+        }
 
         if (moveRequested)
         {
@@ -159,16 +200,17 @@ public class PlayerMovement : NetworkBehaviour
         if (jumpRequested)
         {
             float jumpVelocity = Mathf.Sqrt(jumpHeight * -2f * Physics.gravity.y);
-            
-            _rb.AddForce(Vector3.up * jumpVelocity, ForceMode.VelocityChange);
+            foreach (var rb in ragdollRigidbodies)
+            {
+                rb.linearVelocity = new Vector3(rb.linearVelocity.x, jumpVelocity, rb.linearVelocity.z);
+            }
             jumpRequested = false;
         }
 
-        if (!isGrounded)
+        if (!isGrounded && _rb.linearVelocity.y < 1)
         {
-            //_rb.AddForce(Vector3.down * fastFallFactor, ForceMode.Force);
+            _rb.AddForce(Vector3.down * fastFallFactor, ForceMode.Acceleration);
         }
-        
     }
 
     private void GroundedCheck() {
@@ -176,15 +218,12 @@ public class PlayerMovement : NetworkBehaviour
         isGrounded = Physics.CheckSphere(spherePosition, groundedRadius, groundLayers, QueryTriggerInteraction.Ignore);
     }
 
-    private void HandleJump(){
-
-        if (isGrounded && GameInput.Instance.JumpPressed())
-        {
-            jumpRequested = true;
-        }
+    private void HandleJumpInput()
+    {
+        if (isGrounded && GameInput.Instance.JumpPressed() && !isRolling) jumpRequested = true;  
     }
 
-    private void HandleMovement()
+    private void HandleMovementInput()
     {
         Vector2 moveDir = GameInput.Instance.GetPlayerMovementVectorNormalized();
         bool isMoving = moveDir.sqrMagnitude > moveThreshold;
@@ -194,7 +233,7 @@ public class PlayerMovement : NetworkBehaviour
         bool crouchPressed = GameInput.Instance.CrouchPressed();
 
         float targetMoveSpeed, targetX, targetY, targetCrouchWeight, targetStrafeWeight;
-
+        
         if (isMoving)
         {
             if (isSprinting && !isLockedOn)
@@ -264,7 +303,7 @@ public class PlayerMovement : NetworkBehaviour
             {
                 Roll();
                 currentMovementState = MovementState.Rolling;
-                if (isLockedOn)
+                if (isLockedOn && moveDir != Vector2.zero)
                 {
                     _anim.SetFloat(rollXParam, moveDir.x);
                     _anim.SetFloat(rollYParam, moveDir.y);
@@ -287,20 +326,119 @@ public class PlayerMovement : NetworkBehaviour
         _anim.SetLayerWeight(crouchLayerIndex, newCrouchWeight);
         _anim.SetLayerWeight(strafeLayerIndex, newStrafeWeight);
 
-        Vector3 targetDirection = HandlePlayerAndCameraRotation(isLockedOn, moveDir, isMoving);
-       
+
+        // Calculate movement direction
+        Vector3 playerTargetDirection = CalculateMovementDirection(isLockedOn, moveDir, isMoving);
 
         if (_playerCombat.InAttack)
         {
             moveSpeed *= _playerCombat.ChosenAttack.MovementSpeedFactor;
         }
 
-        Vector3 moveVector = targetDirection.normalized * moveSpeed * 0.05f;
-        if (moveVector.sqrMagnitude > moveThreshold)
+        if (isRolling)
         {
-            moveForce = moveVector;
+            moveSpeed = 0;
+        }
+
+        moveForce = playerTargetDirection.normalized * moveSpeed;
+        if (moveForce.sqrMagnitude > moveThreshold)
+        {
             moveRequested = true;
         }
+    }
+
+    private Vector3 CalculateMovementDirection(bool isLockedOn, Vector2 moveDir, bool isMoving)
+    {
+        if (!isMoving) return Vector3.zero;
+
+        Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y);
+
+        if (isLockedOn)
+        {
+            // Movement is relative to current facing (strafe movement)
+            if (inputDirection.sqrMagnitude > moveThreshold)
+            {
+                float targetRotation;
+                bool hasLockOnTarget = _playerCombat.LockOnTargets.Count > 0;
+
+                if (hasLockOnTarget)
+                {
+                    Transform lockOnTarget = _playerCombat.LockOnTargets[playerTargetIndex];
+                    Vector3 directionToTarget = (lockOnTarget.position - transform.position).normalized;
+                    targetRotation = Mathf.Atan2(directionToTarget.x, directionToTarget.z) * Mathf.Rad2Deg;
+                }
+                else
+                {
+                    targetRotation = mainCamera.transform.eulerAngles.y;
+                }
+
+                return Quaternion.Euler(0.0f, targetRotation, 0.0f) * inputDirection.normalized;
+            }
+        }
+        else
+        {
+            // Movement is in camera-relative direction
+            float targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + mainCamera.transform.eulerAngles.y;
+            return Quaternion.Euler(0.0f, targetRotation, 0.0f) * Vector3.forward;
+        }
+
+        return Vector3.zero;
+    }
+
+    private void HandleRotation()
+    {
+        if (isRolling) return;
+
+        Vector2 moveDir = GameInput.Instance.GetPlayerMovementVectorNormalized();
+        bool isMoving = moveDir.sqrMagnitude > moveThreshold;
+        bool isLockedOn = GameInput.Instance.IsAttackButtonPressed(GameInput.AttackInput.RightMouse);
+        
+        float rotationSpeedFactor = _playerCombat.InAttack ? _playerCombat.ChosenAttack.RotationSpeedFactor : 1f;
+
+        Vector3 targetDirection;
+
+        if (isLockedOn)
+        {
+            bool hasLockOnTarget = _playerCombat.LockOnTargets.Count > 0;
+            if (hasLockOnTarget)
+            {
+                Transform lockOnTarget = _playerCombat.LockOnTargets[playerTargetIndex];
+                targetDirection = (lockOnTarget.position - transform.position).normalized;
+                targetDirection.y = 0;
+            }
+            else
+            {
+                targetDirection = mainCamera.transform.forward;
+                targetDirection.y = 0;
+                targetDirection.Normalize();
+            }
+
+            SetJointTargetRotation(targetDirection, rotationSpeedFactor);
+        }
+        else
+        {
+            if (isMoving)
+            {
+                Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y).normalized;
+                // Calculate the world direction we want to face
+                targetDirection = Quaternion.Euler(0, mainCamera.transform.eulerAngles.y, 0) * inputDirection;
+
+                SetJointTargetRotation(targetDirection, rotationSpeedFactor);
+            }
+        }
+    }
+
+    private void SetJointTargetRotation(Vector3 worldDirection, float rotationSpeedFactor)
+    {   
+        // Create rotation from the direction vector
+        Quaternion desiredWorldRotation = Quaternion.LookRotation(worldDirection);
+        float targetAngle = desiredWorldRotation.eulerAngles.y;
+        Vector3 currentEuler = _configJoint.targetRotation.eulerAngles;
+        
+        // use negated angle, because this for some reason is how configurable joints expect it
+        float newY = Mathf.LerpAngle(currentEuler.y, -targetAngle, rotationSpeed * rotationSpeedFactor * Time.fixedDeltaTime * 0.01f);
+        _configJoint.targetRotation = Quaternion.Euler(0, newY, 0);
+        
     }
 
     private IEnumerator BillboardShit(){
@@ -311,67 +449,6 @@ public class PlayerMovement : NetworkBehaviour
             }
             yield return null;
         }
-    }
-
-    private Vector3 HandlePlayerAndCameraRotation(bool isLockedOn, Vector2 moveDir, bool isMoving)
-    {
-        Vector3 playerTargetDirection = Vector3.zero;
-        bool scrolledUp = GameInput.Instance.ScrolledUp();
-        bool scrolledDown = GameInput.Instance.ScrolledDown();
-        float targetRotation;
-        float rotationSpeedFactor = _playerCombat.InAttack ? _playerCombat.ChosenAttack.RotationSpeedFactor : 1f;
-
-        if (isLockedOn)
-        {
-            bool hasLockOnTarget = _playerCombat.LockOnTargets.Count > 0;
-            if (hasLockOnTarget)
-            {
-                if (scrolledUp) playerTargetIndex = (playerTargetIndex + 1) % _playerCombat.LockOnTargets.Count;
-                if (scrolledDown) playerTargetIndex = (playerTargetIndex - 1 + _playerCombat.LockOnTargets.Count) % _playerCombat.LockOnTargets.Count;
-
-                Transform lockOnTarget = _playerCombat.LockOnTargets[playerTargetIndex];
-                Vector3 directionToTarget = (lockOnTarget.position - transform.position).normalized;
-                targetRotation = Mathf.Atan2(directionToTarget.x, directionToTarget.z) * Mathf.Rad2Deg;
-            }
-            else
-            {
-                targetRotation = mainCamera.transform.eulerAngles.y;
-            }
-
-            Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y);
-            if (inputDirection.sqrMagnitude > moveThreshold)
-            {
-                playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * inputDirection.normalized;
-            }
-
-            // Quaternion targetRot = Quaternion.Euler(0.0f, targetRotation, 0.0f);
-            // transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotationSpeed * rotationSpeedFactor * Time.deltaTime);
-            SetJointTargetRotation(targetRotation, rotationSpeedFactor);
-        }
-        else
-        {
-            if (isMoving)
-            {
-                Vector3 inputDirection = new Vector3(moveDir.x, 0.0f, moveDir.y).normalized;
-                targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg + mainCamera.transform.eulerAngles.y;
-                playerTargetDirection = Quaternion.Euler(0.0f, targetRotation, 0.0f) * Vector3.forward;
-
-                // Quaternion targetRot = Quaternion.Euler(0.0f, targetRotation, 0.0f);
-                // transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotationSpeed * rotationSpeedFactor * Time.deltaTime);
-                SetJointTargetRotation(targetRotation, rotationSpeedFactor);
-            }
-        }
-        return playerTargetDirection;
-    }
-
-    private void SetJointTargetRotation(float targetWorldYAngle, float rotationSpeedFactor)
-    {   
-        Quaternion desiredWorldRotation = Quaternion.Euler(0f, targetWorldYAngle, 0f);
-    
-        Quaternion localTargetRotation = Quaternion.Inverse(transform.rotation) * desiredWorldRotation;
-
-        // Set as target
-        _configJoint.targetRotation = Quaternion.RotateTowards(_configJoint.targetRotation, localTargetRotation, rotationSpeedFactor);
     }
     
     private void HandleCameraZoom()
@@ -396,13 +473,15 @@ public class PlayerMovement : NetworkBehaviour
 
     private void Roll()
     {
+        _physicsManager.EnableAnimationMode();
         isRolling = true;
-        _anim.applyRootMotion = true;
+
+        //_rb.AddForce()
     }
     
-    private void AnimationEvent_EndRoll()
+    public void AnimationEvent_EndRoll()
     {
-        _anim.applyRootMotion = false;
+        _physicsManager.EnablePhysicsMode();
         isRolling = false;
     }
 
@@ -412,11 +491,6 @@ public class PlayerMovement : NetworkBehaviour
             playerTargetIndex = 0;
         }
     }
-
-    private void LateUpdate() {
-        if (cursorInputForLook && cursorLocked) { CameraRotation(); }
-    }
-
 
     private void CameraRotation() {
         if (GameInput.Instance.GetPlayerLookVectorNormalized().sqrMagnitude >= moveThreshold)

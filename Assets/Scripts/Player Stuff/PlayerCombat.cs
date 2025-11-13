@@ -1,13 +1,15 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using UnityEngine;
 
 public class PlayerCombat : CombatManager
 {
+
+    [Header("Core Settings")]
     private PlayerMovement _playerMovement;
-    bool isReadyToReceiveInput = false;
+    private PhysicsManager _physicsManager;
+    [SerializeField] private GameObject animatedGO;
 
     // Animator Hashes
     private int attackParamA = Animator.StringToHash("AttackTriggerA");
@@ -23,6 +25,7 @@ public class PlayerCombat : CombatManager
     [SerializeField] private float longAttackThreshold = 0.2f;
     private Coroutine inputHoldCoroutine;
     private bool checkingForInputRelease = false;
+    private bool isReadyToReceiveInput = false;
     
     // Combo Management (Your original system)
     private ComboSystem.Combo currentCombo;
@@ -48,9 +51,21 @@ public class PlayerCombat : CombatManager
     public List<Transform> LockOnTargets => lockOnTargets;
 
 
-    protected override void Awake(){
-        base.Awake();
-        _playerMovement = GetComponent<PlayerMovement>(); 
+    private void Awake(){
+        _anim = animatedGO.GetComponent<Animator>();     
+
+        if (_anim.runtimeAnimatorController != null)
+        {
+            _animOverrideController = new AnimatorOverrideController(_anim.runtimeAnimatorController);
+            _anim.runtimeAnimatorController = _animOverrideController;
+        }
+        else
+        {
+            Debug.LogError($"Animator on {gameObject.name} does not have a Runtime Animator Controller!");
+        }
+
+        _playerMovement = GetComponent<PlayerMovement>();
+        _physicsManager = GetComponent<PhysicsManager>();
     }
 
     public override void OnNetworkSpawn()
@@ -95,9 +110,11 @@ public class PlayerCombat : CombatManager
         if (!loadedClips.ContainsKey(ChosenAttack.UniqueID))
         {
             Debug.LogWarning($"Attack {ChosenAttack.UniqueID} not loaded yet!");
-            AttackFinish(); 
+            AttackFinish();
             return;
         }
+
+        _physicsManager.EnableAnimationMode();
 
         inAttack = true;
         
@@ -300,12 +317,15 @@ public class PlayerCombat : CombatManager
         {
             currentCombo.ResetComboStep();
         }
+
+        _physicsManager.EnablePhysicsMode();
     }
 
     // --- Animation Events ---
     
-    protected override void AnimationEvent_AttackFinished()
+    public override void AnimationEvent_AttackFinished()
     {
+        Debug.Log("Attack finished!");
 
         if (inHoldCombo)
         {
@@ -316,7 +336,7 @@ public class PlayerCombat : CombatManager
         AttackFinish();
     }
     
-    protected override void AnimationEvent_ComboTransfer()
+    public override void AnimationEvent_ComboTransfer()
     {
         if (inComboWindow && comboInputBuffered)
         {
@@ -331,7 +351,7 @@ public class PlayerCombat : CombatManager
         }
     }
     
-    private void AnimationEvent_HoldTransfer()
+    public void AnimationEvent_HoldTransfer()
     {
         // This event is called by the looping "hold" animation.
         // It's a placeholder in case you need logic during the hold.

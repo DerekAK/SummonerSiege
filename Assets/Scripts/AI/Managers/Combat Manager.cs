@@ -20,20 +20,6 @@ public abstract class CombatManager: NetworkBehaviour
     protected bool inAttack = false;
     public bool InAttack => inAttack;
 
-    protected virtual void Awake()
-    {
-        _anim = GetComponent<Animator>();
-        if (_anim.runtimeAnimatorController != null)
-        {
-            _animOverrideController = new AnimatorOverrideController(_anim.runtimeAnimatorController);
-            _anim.runtimeAnimatorController = _animOverrideController;
-        }
-        else
-        {
-            Debug.LogError($"Animator on {gameObject.name} does not have a Runtime Animator Controller!");
-        }
-    }
-
     public override async void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -248,14 +234,14 @@ public abstract class CombatManager: NetworkBehaviour
         currentHitboxGroupIndex = 0;
     }
 
-    protected void AnimationEvent_EnableHitBoxes()
+    public void AnimationEvent_EnableHitBoxes()
     {
         if (ChosenAttack == null || !IsServer) return;
  
         ChosenAttack.EnableHitBoxes(damageColliderDict, currentHitboxGroupIndex);
     }
 
-    protected void AnimationEvent_DisableHitBoxes()
+    public void AnimationEvent_DisableHitBoxes()
     {
         if (ChosenAttack == null || !IsServer) return;
         
@@ -267,15 +253,15 @@ public abstract class CombatManager: NetworkBehaviour
         }
     }
 
-    protected virtual void AnimationEvent_Trigger(int numEvent)
+    public virtual void AnimationEvent_Trigger(int numEvent)
     {
         ChosenAttack?.OnAnimationEvent(numEvent, this);
     }
 
-    protected virtual void AnimationEvent_ComboTransfer()
+    public virtual void AnimationEvent_ComboTransfer()
     {
         // no implementation, keep it this way for ai.
     }
 
-    protected abstract void AnimationEvent_AttackFinished();
+    public abstract void AnimationEvent_AttackFinished();
 }

@@ -15,14 +15,21 @@ public class EnemyCombat: CombatManager
     public bool StopRotate => stopRotate;
 
     private BehaviorManager _behaviorManager;
-    private NavMeshAgent _agent;
 
-    protected override void Awake()
+    private void Awake()
     {
-        base.Awake();
+        _anim = GetComponent<Animator>();
+        if (_anim.runtimeAnimatorController != null)
+        {
+            _animOverrideController = new AnimatorOverrideController(_anim.runtimeAnimatorController);
+            _anim.runtimeAnimatorController = _animOverrideController;
+        }
+        else
+        {
+            Debug.LogError($"Animator on {gameObject.name} does not have a Runtime Animator Controller!");
+        }
 
         _behaviorManager = GetComponent<BehaviorManager>();
-        _agent = GetComponent<NavMeshAgent>();
     }
 
     public void StartChosenAttack()
@@ -48,7 +55,7 @@ public class EnemyCombat: CombatManager
         ChosenAttack.ExecuteAttack(this);
     }
 
-    protected override void AnimationEvent_Trigger(int numEvent)
+    public override void AnimationEvent_Trigger(int numEvent)
     {
         if (ChosenAttack != null && inAttack)
         {
@@ -59,7 +66,7 @@ public class EnemyCombat: CombatManager
     /// <summary>
     /// This function is called by an Animation Event at the end of the attack.
     /// </summary>
-    protected override void AnimationEvent_AttackFinished()
+    public override void AnimationEvent_AttackFinished()
     {
         inAttack = false;
         stopRotate = false;
