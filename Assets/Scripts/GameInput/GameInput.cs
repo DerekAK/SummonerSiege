@@ -75,8 +75,7 @@ public class GameInput : MonoBehaviour
 
     public float GetMouseScrollValue() { return gameInputScript.Player.MouseScroll.ReadValue<Vector2>().normalized.y; }
 
-    public bool JumpPressed()
-    { return gameInputScript.Player.Jump.triggered; }
+    public bool JumpPressed() { return gameInputScript.Player.Jump.triggered; }
 
     public bool SprintingPressed(){return gameInputScript.Player.Sprint.IsPressed();}
 

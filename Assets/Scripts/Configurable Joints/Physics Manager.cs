@@ -12,6 +12,7 @@ public class PhysicsManager : MonoBehaviour
     [SerializeField] private float springRestoreTime = 0.2f; // Time to restore springs
     private Coroutine springRestoreCoroutine;
     
+    
     private SkinnedMeshRenderer[] ragdollRenderers;
     private SkinnedMeshRenderer[] animatedRenderers;
     private SynchronizedJoint[] synchronizedJoints;

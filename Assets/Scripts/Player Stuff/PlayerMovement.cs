@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using Cinemachine;
 using Unity.Netcode;
+using UnityEditor.Callbacks;
 using UnityEngine;
 
 public class PlayerMovement : NetworkBehaviour
@@ -32,6 +33,7 @@ public class PlayerMovement : NetworkBehaviour
     [Range(0, 1)] [SerializeField] private float walkSpeedFactor = 0.5f;
     [SerializeField] private float fastFallFactor = 1.5f;
     [SerializeField] private float jumpHeight = 10;
+    [SerializeField] private float rollForce = 10;
     [SerializeField] private float rotationSpeed = 3f;
     [SerializeField] private float crouch_lockOn_Factor;
     [SerializeField] private float movementSmoothSpeed = 10f;
@@ -204,6 +206,7 @@ public class PlayerMovement : NetworkBehaviour
             {
                 rb.linearVelocity = new Vector3(rb.linearVelocity.x, jumpVelocity, rb.linearVelocity.z);
             }
+            _rb.linearVelocity = new Vector3(_rb.linearVelocity.x, jumpVelocity, _rb.linearVelocity.z);
             jumpRequested = false;
         }
 
@@ -301,7 +304,6 @@ public class PlayerMovement : NetworkBehaviour
             inAir = false;
             if (rollTriggered)
             {
-                Roll();
                 currentMovementState = MovementState.Rolling;
                 if (isLockedOn && moveDir != Vector2.zero)
                 {
@@ -322,13 +324,27 @@ public class PlayerMovement : NetworkBehaviour
 
         _anim.SetFloat(moveXParam, newX);
         _anim.SetFloat(moveYParam, newY);
-        _anim.SetInteger(animMovementStateParam, (int)currentMovementState);
+        _anim.SetInteger(animMovementStateParam, (int)currentMovementState);        
         _anim.SetLayerWeight(crouchLayerIndex, newCrouchWeight);
         _anim.SetLayerWeight(strafeLayerIndex, newStrafeWeight);
 
+        if (newCrouchWeight > 0.1 && !_physicsManager.IsInAnimationMode)
+        {
+            _physicsManager.EnableAnimationMode();
+        }
+        else if (newCrouchWeight < 0.1 && _physicsManager.IsInAnimationMode)
+        {
+            _physicsManager.EnablePhysicsMode();
+        }
+
 
         // Calculate movement direction
-        Vector3 playerTargetDirection = CalculateMovementDirection(isLockedOn, moveDir, isMoving);
+        Vector3 playerTargetDirectionNormalized = CalculateMovementDirection(isLockedOn, moveDir, isMoving).normalized;
+
+        if (rollTriggered && isGrounded)
+        {
+            Roll(playerTargetDirectionNormalized);
+        }
 
         if (_playerCombat.InAttack)
         {
@@ -340,7 +356,7 @@ public class PlayerMovement : NetworkBehaviour
             moveSpeed = 0;
         }
 
-        moveForce = playerTargetDirection.normalized * moveSpeed;
+        moveForce = playerTargetDirectionNormalized * moveSpeed;
         if (moveForce.sqrMagnitude > moveThreshold)
         {
             moveRequested = true;
@@ -471,12 +487,18 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
-    private void Roll()
+    private void Roll(Vector3 moveDir)
     {
         _physicsManager.EnableAnimationMode();
         isRolling = true;
 
-        //_rb.AddForce()
+        Vector2 jumpForceXY = new Vector2(moveDir.x, moveDir.z) * rollForce;
+
+        foreach (var rb in ragdollRigidbodies)
+        {
+            rb.linearVelocity = new Vector3(jumpForceXY.x, rb.linearVelocity.y, jumpForceXY.y);
+        }
+        _rb.linearVelocity = new Vector3(jumpForceXY.x, _rb.linearVelocity.y, jumpForceXY.y);
     }
     
     public void AnimationEvent_EndRoll()
