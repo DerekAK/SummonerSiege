@@ -53,12 +53,10 @@ public class NetworkObjectPool : MonoBehaviour
 
     private void OnServerStarted()
     {
-        // Initialize pools after the server has fully started and completed scene sweep
         if (!isInitialized)
         {
             InitializePools();
             isInitialized = true;
-            // Debug.Log("NetworkPoolManager: Initialized pools after server started.");
         }
     }
 

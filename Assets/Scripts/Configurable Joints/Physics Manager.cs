@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class PhysicsManager : MonoBehaviour
@@ -7,12 +8,11 @@ public class PhysicsManager : MonoBehaviour
     [Header("Model References")]
     [SerializeField] private GameObject ragdollGO;
     [SerializeField] private GameObject animatedGO;
+    [SerializeField] private SkinnedMeshRenderer[] ragdollHeadRenderers;
+    [SerializeField] private SkinnedMeshRenderer[] animatedHeadRenderers;
+    private SkinnedMeshRenderer[] currentHeadSkinnedMeshRenderers;
+    public SkinnedMeshRenderer[] CurrHeadRenderers => currentHeadSkinnedMeshRenderers;
 
-    [Header("Spring Transition Settings")]
-    [SerializeField] private float springRestoreTime = 0.2f; // Time to restore springs
-    private Coroutine springRestoreCoroutine;
-    
-    
     private SkinnedMeshRenderer[] ragdollRenderers;
     private SkinnedMeshRenderer[] animatedRenderers;
     private SynchronizedJoint[] synchronizedJoints;
@@ -21,9 +21,8 @@ public class PhysicsManager : MonoBehaviour
     private Vector3 animatedRigStartPosition;
     private Quaternion animatedRigStartRotation;
     
-    private bool isInAnimationMode = false;
+    private bool isInAnimationMode = true; // set to true so first call to enablephysicsmode will go through
     public bool IsInAnimationMode => isInAnimationMode;
-    private bool firstTimeEnabling = true;
 
     private void Awake()
     {
@@ -34,20 +33,33 @@ public class PhysicsManager : MonoBehaviour
     {
         animatedRigStartPosition = animatedGO.transform.localPosition;
         animatedRigStartRotation = animatedGO.transform.localRotation;
-        // start in physics mode
+        
+        // Start in physics mode
         EnablePhysicsMode();
-        firstTimeEnabling = false;
     }
-    
+
+    private void FixedUpdate()
+    {
+       SyncJointsWithAnimation(); 
+    }
+
+    private void SyncJointsWithAnimation()
+    {
+        foreach (SynchronizedJoint joint in synchronizedJoints)
+        {       
+            joint.SyncJoint();
+        }
+    }
+
     private void CacheComponents()
     {
         // Cache renderers
         ragdollRenderers = ragdollGO.GetComponentsInChildren<SkinnedMeshRenderer>();
         animatedRenderers = animatedGO.GetComponentsInChildren<SkinnedMeshRenderer>();
-        
+
         // Cache synchronized joints
         synchronizedJoints = ragdollGO.GetComponentsInChildren<SynchronizedJoint>();
-        
+
         // Store original joint drives
         originalSlerpDrives = new Dictionary<SynchronizedJoint, JointDrive>();
         foreach (var syncJoint in synchronizedJoints)
@@ -58,60 +70,75 @@ public class PhysicsManager : MonoBehaviour
                 originalSlerpDrives[syncJoint] = joint.slerpDrive;
             }
         }
-        
+
         Debug.Log($"PhysicsManager cached {ragdollRenderers.Length} ragdoll renderers, " +
                   $"{animatedRenderers.Length} animated renderers, " +
                   $"{synchronizedJoints.Length} synchronized joints");
     }
     
-    public void EnableAnimationMode()
-    {
-        if (isInAnimationMode) return;
-        
-        // 1. Store the animated rig's current local position/rotation
-        animatedRigStartPosition = animatedGO.transform.localPosition;
-        animatedRigStartRotation = animatedGO.transform.localRotation;
-        
-        // 2. Sync physics rig to animated rig's current pose
-        SyncPhysicsToAnimated();
-        
-        // 3. Disable physics influence
-        DisableJointSprings();
-        
-        // 4. Switch renderers
-        SetRenderersActive(ragdollRenderers, false);
-        SetRenderersActive(animatedRenderers, true);
-        
-        isInAnimationMode = true;
-        Debug.Log("Switched to Animation Mode");
-    }
-
     public void EnablePhysicsMode()
     {
-        if (!isInAnimationMode && synchronizedJoints != null && !firstTimeEnabling) return;
-
-        if (springRestoreCoroutine != null)
+        // Early return if already in physics mode
+        if (!isInAnimationMode)
         {
-            StopCoroutine(springRestoreCoroutine);
+            Debug.Log("Already in physics mode, ignoring EnablePhysicsMode call");
+            return;
         }
+        
+        Debug.Log("Switching to Physics Mode");
 
-        // 1. Calculate how much the animated rig moved (root motion delta)
+        currentHeadSkinnedMeshRenderers = ragdollHeadRenderers;
+
+        // Calculate how much the animated rig moved (root motion delta)
         Vector3 positionDelta = animatedGO.transform.localPosition - animatedRigStartPosition;
         Quaternion rotationDelta = animatedGO.transform.localRotation * Quaternion.Inverse(animatedRigStartRotation);
 
-        // 2. Apply that movement to the parent GameObject
+        // Apply that movement to the parent GameObject (transfer root motion)
         transform.position += transform.TransformDirection(positionDelta);
         transform.rotation = rotationDelta * transform.rotation;
 
-        // 3. Reset animated rig back to its starting local position
+        // Reset animated rig back to its starting local position
         animatedGO.transform.localPosition = animatedRigStartPosition;
         animatedGO.transform.localRotation = animatedRigStartRotation;
 
-        // 4. Sync physics rig to animated rig's final pose
-        StartCoroutine(SwapRenderersAtEndOfFrame());
-
+        // Sync physics rig to animated rig's final pose and swap renderers
+        StartCoroutine(TransitionToPhysicsMode());
+        
+        // Set flag FIRST to prevent re-entry during coroutine
         isInAnimationMode = false;
     }
+    
+    public void EnableAnimationMode()
+    {
+        // Early return if already in animation mode
+        if (isInAnimationMode)
+        {
+            Debug.Log("Already in animation mode, ignoring EnableAnimationMode call");
+            return;
+        }
+        
+        Debug.Log("Switching to Animation Mode");
+        
+        currentHeadSkinnedMeshRenderers = animatedHeadRenderers;
+
+        // Store the animated rig's current local position/rotation as reference point
+        animatedRigStartPosition = animatedGO.transform.localPosition;
+        animatedRigStartRotation = animatedGO.transform.localRotation;
+        
+        // Sync physics rig to animated rig's current pose to prevent popping
+        SyncPhysicsToAnimated();
+        
+        // Disable physics influence on the ragdoll
+        DisableJointSprings();
+        
+        // Switch renderers to show animated model
+        SetRenderersActive(ragdollRenderers, false);
+        SetRenderersActive(animatedRenderers, true);
+        
+        // Set flag LAST to prevent re-entry
+        isInAnimationMode = true;
+    }
+
 
     /// <summary>
     /// Disables all joint springs so they don't influence the physics rig during animation
@@ -134,7 +161,6 @@ public class PhysicsManager : MonoBehaviour
             }
         }
     }
-    
     
     /// <summary>
     /// Restores original joint spring values for physics mode
@@ -184,33 +210,40 @@ public class PhysicsManager : MonoBehaviour
         }
     }
 
-    private IEnumerator SwapRenderersAtEndOfFrame()
+    /// <summary>
+    /// Coroutine to handle the transition back to physics mode
+    /// </summary>
+    private IEnumerator TransitionToPhysicsMode()
     {
-        // 1. Sync physics to animated
+        // Sync physics rig to match animated rig's final pose
         SyncPhysicsToAnimated();
 
-        // 2. UPDATE JOINT TARGETS to match the animated rig's pose
+        // Update joint targets to match the animated rig's pose
         UpdateJointTargets();
 
-        // 3. Force physics update
+        // Force physics update
         Physics.SyncTransforms();
 
-        // 4. Restore springs immediately
+        // Restore springs immediately
         RestoreJointSprings();
 
-        // 5. Wait one fixed update
+        // Wait one fixed update for physics to stabilize
         yield return new WaitForFixedUpdate();
 
-        // 6. Swap renderers
+        // Swap renderers to show ragdoll
         SetRenderersActive(animatedRenderers, false);
         SetRenderersActive(ragdollRenderers, true);
+        
+        Debug.Log("Physics mode transition complete");
     }
     
+    /// <summary>
+    /// Updates all joint targets to match their corresponding animated bones
+    /// </summary>
     private void UpdateJointTargets()
     {
         foreach (var syncJoint in synchronizedJoints)
         {
-            // This calls your existing SyncJoint method which sets the targetRotation
             syncJoint.SyncJoint();
         }
     }

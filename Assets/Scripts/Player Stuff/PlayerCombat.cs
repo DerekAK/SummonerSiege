@@ -114,7 +114,7 @@ public class PlayerCombat : CombatManager
             return;
         }
 
-        _physicsManager.EnableAnimationMode();
+        if (_physicsManager) _physicsManager.EnableAnimationMode();
 
         inAttack = true;
         
@@ -318,7 +318,7 @@ public class PlayerCombat : CombatManager
             currentCombo.ResetComboStep();
         }
 
-        _physicsManager.EnablePhysicsMode();
+        if (_physicsManager) _physicsManager.EnablePhysicsMode();
     }
 
     // --- Animation Events ---
