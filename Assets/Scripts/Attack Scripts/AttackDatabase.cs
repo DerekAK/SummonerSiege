@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks; // <-- Added
 using UnityEngine;
 using UnityEngine.AddressableAssets;
-using UnityEngine.ResourceManagement.AsyncOperations;
 
 public static class AttackDatabase
 {

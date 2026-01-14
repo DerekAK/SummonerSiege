@@ -1,7 +1,5 @@
-using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
-using UnityEditor.Build.Pipeline;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -249,7 +247,7 @@ public class BehaviorManager : NetworkBehaviour
     {
         if (!CanMove()) _agent.isStopped = true;
 
-        else
+        else if (!_jumpManager.InJump)
         {
             _agent.isStopped = false;
             _agent.SetDestination(GetClosestNavMeshPosition(targetPosition, 100, _agent.agentTypeID).Value);

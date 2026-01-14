@@ -2,6 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Pool;
 using System.Collections.Generic;
+using UnityEngine.AI;
 
 /// <summary>
 /// Centralized pool manager for Unity Netcode NetworkObjects using UnityEngine.Pool
@@ -160,6 +161,11 @@ public class NetworkObjectPool : MonoBehaviour
     private void OnReleaseToPool(NetworkObject obj, NetworkObject prefab)
     {
         activeCounts.Remove(obj);
+
+        if (obj.TryGetComponent<NavMeshAgent>(out var agent))
+        {
+            agent.enabled = false;
+        }
         
         // Only despawn if it's currently spawned (must happen before reparenting)
         if (obj.IsSpawned)
@@ -251,6 +257,11 @@ public class NetworkObjectPool : MonoBehaviour
         // Set position and rotation after activation
         obj.transform.position = position;
         obj.transform.rotation = rotation;
+
+        if (obj.TryGetComponent<NavMeshAgent>(out var agent))
+        {
+            agent.enabled = true;
+        }
         
         // Now spawn the network object (GameObject is already active)
         obj.Spawn(destroyWithScene);
@@ -288,6 +299,11 @@ public class NetworkObjectPool : MonoBehaviour
         // Set position and rotation (but NOT parent yet)
         obj.transform.position = position;
         obj.transform.rotation = rotation;
+
+        if (obj.TryGetComponent<NavMeshAgent>(out var agent))
+        {
+            agent.enabled = true;
+        }
         
         // Spawn the network object FIRST (GameObject is already active)
         obj.Spawn(destroyWithScene);
