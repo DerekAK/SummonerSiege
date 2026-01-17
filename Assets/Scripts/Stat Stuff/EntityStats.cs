@@ -10,7 +10,6 @@ public class EntityStats : NetworkBehaviour, IPersistable
 
     // A dictionary to hold all stats for this entity, easily accessible by their type
     private NetworkList<NetStat> Stats = new NetworkList<NetStat>();
-    private NetworkVariable<bool> AreStatsConfigured = new(false);
     public event Action<StatType, float> OnStatValueChanged;
     public event Action OnStatsConfigured;
         

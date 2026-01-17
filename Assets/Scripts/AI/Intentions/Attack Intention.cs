@@ -35,28 +35,34 @@ public class AttackIntention : Intention
         return highestScore;
     }
 
-    public override void Execute(BehaviorManager ai)
+    public override void Execute(BehaviorManager behaviorManager)
     {
-        float distance = Vector3.Distance(ai.transform.position, ai.CurrentTarget.transform.position);
+        float distance = Vector3.Distance(behaviorManager.transform.position, behaviorManager.CurrentTarget.transform.position);
         //Debug.Log(distance);
 
-        EnemyAttackSO chosenAttack = (EnemyAttackSO)ai.GetComponent<EnemyCombat>().ChosenAttack;
+        EnemyAttackSO chosenAttack = (EnemyAttackSO)behaviorManager.GetComponent<EnemyCombat>().ChosenAttack;
 
         if (chosenAttack)
         {
-           if (distance >= chosenAttack.MinRange && distance <= chosenAttack.MaxRange && ai.GetComponent<BehaviorManager>().CanAttack())
+           if (distance >= chosenAttack.MinRange && distance <= chosenAttack.MaxRange && behaviorManager.GetComponent<BehaviorManager>().CanAttack())
             {
-                ai.SwitchState(ai.AttackState);
+                behaviorManager.SwitchState(behaviorManager.AttackState);
             }
-            // 2. If we are too far, execute the ChasingState to close the distance
+            // 2. If we are not in correct distance, execute the ChasingState to close the distance
             else if (distance > chosenAttack.MaxRange)
             {
-                if (ai.CurrentState is BaseChasingState)
+                if (behaviorManager.CurrentState is BaseChasingState)
                 {
                     return; // We're already doing the right thing. Do nothing.
                 }
-                ai.SwitchState(ai.ChasingState);
-            } 
+                behaviorManager.SwitchState(behaviorManager.ChasingState);
+            }
+
+            else
+            {
+                behaviorManager.DecideNextIntention();
+                Debug.LogWarning("Enemy did not successfully attack on an attack intention!");
+            }
         }
     }
 }

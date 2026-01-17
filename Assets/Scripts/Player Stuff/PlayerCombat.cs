@@ -331,8 +331,7 @@ public class PlayerCombat : CombatManager
         {
             return;
         }
-        // This is called at the end of an animation if no combo was performed.
-        // It cleans up the state. This fixes your original bug.
+       
         AttackFinish();
     }
     

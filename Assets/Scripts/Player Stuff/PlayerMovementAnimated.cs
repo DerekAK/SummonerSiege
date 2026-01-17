@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using Cinemachine;
 using Unity.Netcode;
-using Unity.VisualScripting;
 using UnityEngine;
 
 // used for single mesh models, not for the 2-skeleton active ragdoll models
@@ -10,63 +9,13 @@ public class PlayerMovementAnimated : PlayerMovement
 {  
 
     // Core Settings
-    private Animator _anim;
-    private EntityStats _playerStats;
-    private PlayerCombat _playerCombat;
     private CharacterController _characterController;
-    
-
-    [Header("Camera Settings")]
-    [SerializeField] private GameObject cinemachineCameraTarget;
-    [SerializeField] private GameObject playerFollowCamera;
-    private Camera mainCamera;
-    [SerializeField] private float topClamp = 70.0f;
-    [SerializeField] private float bottomClamp = -30.0f;
-    [SerializeField] private float minCameraDistance = -1f;  // First person
-    [SerializeField] private float maxCameraDistance = 8.0f;  // Third person far
-    [Tooltip("How far camera is before head renderer is enabled/disabled")]
-    [SerializeField] private float zoomSpeed = 1.0f;
-    [SerializeField] private float currentCameraDistance = 5.0f;
-    [SerializeField] private float firstPersonCameraDistanceThreshold = 0.5f; // Hide body below this distance
-    private Cinemachine3rdPersonFollow thirdPersonFollow;
-    private float _cinemachineTargetYaw;
-    private float _cinemachineTargetPitch;
-
-
-    [Header("Animator Settings")]
-    private int moveXParam = Animator.StringToHash("InputX");
-    private int moveYParam = Animator.StringToHash("InputY");
-    private int rollXParam = Animator.StringToHash("RollX");
-    private int rollYParam = Animator.StringToHash("RollY");
-    private int animMovementStateParam = Animator.StringToHash("Movement State");
-    private int crouchLayerIndex = 1;
-    private int strafeLayerIndex = 2;
-    
-    
-    [Header("Grounded Settings")]
-    [SerializeField] private LayerMask groundLayers;
-
-    [SerializeField] private bool isGrounded = true;
-    [SerializeField, Tooltip("Useful for rough ground")]
-    private float groundedOffset = -0.14f;
-    [SerializeField, Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
-    private float groundedRadius;
 
 
     [Header("Movement Settings")]
     private float _verticalVelocity;
     private float gravity = Physics.gravity.y;
-    [SerializeField] private float fastFallFactor = 100f;
-    [SerializeField] private float jumpHeight = 100f;
-    [SerializeField] private float rotationSpeed = 3f;
-    [SerializeField] private float animationSmoothSpeed = 10f;
-    [SerializeField] private float lockOnFactor = 0.5f;
-    [SerializeField] private float sprintFactor = 3f;
-    [SerializeField] private float crouchFactor = 0.5f;
-    public enum MovementState { Locomotion = 0, Jumping = 1, Falling = 2, Rolling = 3 }
-    private MovementState currentMovementState;
     private float currentMoveSpeed = 0f;
-
 
 
     [Header("Physics Settings")]
@@ -82,10 +31,7 @@ public class PlayerMovementAnimated : PlayerMovement
     
 
     [Header("Miscellaneous")]
-    [SerializeField] private string billBoardTag;
     [SerializeField] private SkinnedMeshRenderer headRenderer;
-    private bool statsConfigured = false;
-    private int playerTargetIndex = 0;
 
 
 
@@ -99,8 +45,7 @@ public class PlayerMovementAnimated : PlayerMovement
 
     private void Start()
     {
-        mainCamera = Camera.main;
-        _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
+        cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
         SetCursorState(cursorLocked);
     }
 
@@ -213,11 +158,12 @@ public class PlayerMovementAnimated : PlayerMovement
         bool crouchPressed = GameInput.Instance.CrouchPressed();
 
         float targetMoveSpeed, targetX, targetY, targetCrouchWeight, targetStrafeWeight;
-        float speed;
+        float speed, sprintFactor;
 
         if (_playerStats.TryGetStat(StatType.Speed, out NetStat speedStat))
         {
             speed = speedStat.CurrentValue;
+            sprintFactor = speedStat.MaxValue;
         }
         else
         {
@@ -248,7 +194,7 @@ public class PlayerMovementAnimated : PlayerMovement
 
         if (isLockedOn)
         {
-            targetMoveSpeed = speed * lockOnFactor;
+            targetMoveSpeed = speed * crouch_lockOn_Factor;
             targetX = moveDir.x;
             targetY = moveDir.y;
             targetStrafeWeight = 1;
@@ -261,7 +207,7 @@ public class PlayerMovementAnimated : PlayerMovement
         if (crouchPressed)
         {
             if (!isLockedOn)
-                targetMoveSpeed *= crouchFactor;
+                targetMoveSpeed *= crouch_lockOn_Factor;;
             targetCrouchWeight = 1;
         }
         else
@@ -432,14 +378,14 @@ public class PlayerMovementAnimated : PlayerMovement
     private void CameraRotation() {
         if (GameInput.Instance.GetPlayerLookVectorNormalized().sqrMagnitude >= _threshold)
         {
-            _cinemachineTargetYaw += GameInput.Instance.GetPlayerLookVectorNormalized().x * 1.2f;
-            _cinemachineTargetPitch += GameInput.Instance.GetPlayerLookVectorNormalized().y * 1.2f;
+            cinemachineTargetYaw += GameInput.Instance.GetPlayerLookVectorNormalized().x * 1.2f;
+            cinemachineTargetPitch += GameInput.Instance.GetPlayerLookVectorNormalized().y * 1.2f;
         }
 
-        _cinemachineTargetYaw = ClampAngle(_cinemachineTargetYaw, float.MinValue, float.MaxValue);
-        _cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, bottomClamp, topClamp);
+        cinemachineTargetYaw = ClampAngle(cinemachineTargetYaw, float.MinValue, float.MaxValue);
+        cinemachineTargetPitch = ClampAngle(cinemachineTargetPitch, bottomClamp, topClamp);
 
-        cinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch, _cinemachineTargetYaw, 0.0f);
+        cinemachineCameraTarget.transform.rotation = Quaternion.Euler(cinemachineTargetPitch, cinemachineTargetYaw, 0.0f);
     }
 
     private static float ClampAngle(float lfAngle, float lfMin, float lfMax) {

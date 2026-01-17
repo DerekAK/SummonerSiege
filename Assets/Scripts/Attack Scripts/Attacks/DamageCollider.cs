@@ -116,6 +116,7 @@ public class DamageCollider : MonoBehaviour
         }
     }
     
+    // this is important to have because if the hitboxes are disabled but the list isn't cleared, they will continue to take damage i think
     public void ManualDisable()
     {
         healthComponentsToDamage.Clear();

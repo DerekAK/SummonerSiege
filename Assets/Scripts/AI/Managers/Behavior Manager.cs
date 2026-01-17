@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -21,9 +22,6 @@ public class BehaviorManager : NetworkBehaviour
     private static int animSpeedX = Animator.StringToHash("SpeedX");
     private static int animSpeedY = Animator.StringToHash("SpeedY");
 
-    [Header("Chunk Border Crossing")]
-    [SerializeField] private float boundaryProximityThreshold = 5f;
-    private bool isManuallyMovingAcrossBoundary = false;
     private EndlessTerrain endlessTerrain;
 
 
@@ -56,10 +54,6 @@ public class BehaviorManager : NetworkBehaviour
     public GameObject CurrentTarget => currentTarget;
     public string TargetTag;
     public Coroutine IdleCoroutine;
-
-    private float cachedSpeed;
-    [SerializeField] private float manualStoppingDistance;
-    private bool agentWasStoppedManually = false;
 
     private void Awake()
     {
@@ -143,8 +137,11 @@ public class BehaviorManager : NetworkBehaviour
         HandleRotation();
         HandleJumping();
         
+        // Dont' want to make a new decision if in a current attack, 
+        // need to wait till the attack is finished, which will call this manually
+        // also don't want to set current target during an attack because could cause a null target exception
+        if (_combatManager.InAttack) return; 
 
-        if (_combatManager.InAttack) return; // needs to come before deciding an intention and setting a target
         if (Time.time > lastIntentionDecisionTime + intentionDecisionFrequency) DecideNextIntention();
         SetCurrentTarget();
     }
@@ -255,6 +252,24 @@ public class BehaviorManager : NetworkBehaviour
         
     }
 
+    public IEnumerator LerpSpeed(float startSpeed, float endSpeed, float lerpTime)
+    {
+        if (!GetComponent<EntityStats>().TryGetStat(StatType.Speed, out NetStat speedStat)) yield break;
+
+        float timeElapsed = 0f;
+        float t, newSpeed;
+
+        while (timeElapsed < lerpTime)
+        {
+            t = timeElapsed / lerpTime;
+            newSpeed = Mathf.Lerp(startSpeed, endSpeed, t);
+
+            HandleSpeedChangeWithValue(newSpeed);
+            timeElapsed += Time.deltaTime;
+            yield return null;
+        }
+        
+    } 
 
     private bool CanDetect(GameObject target)
     {
@@ -269,13 +284,13 @@ public class BehaviorManager : NetworkBehaviour
 
     public bool CanAttack()
     {
-        if (!isManuallyMovingAcrossBoundary && !agentWasStoppedManually && !_agent.enabled) return false;
+        if (!_agent.enabled) return false;
         return true;
     }
     
     public void HandleSpeedChangeWithValue(float speedValue)
     {
-        _entityStats.TryGetStat(StatType.Speed, out NetStat speedNetStat);
+        if (!_entityStats.TryGetStat(StatType.Speed, out NetStat speedNetStat)) return;
         float animSpeedValue = speedValue / speedNetStat.MaxValue;
 
         // 1.
@@ -289,7 +304,7 @@ public class BehaviorManager : NetworkBehaviour
     public void HandleSpeedChangeWithFactor(float speedFactor)
     {
 
-        _entityStats.TryGetStat(StatType.Speed, out NetStat speedNetStat);
+        if (!_entityStats.TryGetStat(StatType.Speed, out NetStat speedNetStat)) return;        
         float newSpeedValue = speedFactor * speedNetStat.MaxValue;
 
         // 1.

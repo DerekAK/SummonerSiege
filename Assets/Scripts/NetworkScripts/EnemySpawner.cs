@@ -1,11 +1,12 @@
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 public class EnemySpawner : NetworkBehaviour
 {
     [SerializeField] private float spawnInterval = 10f;
     [SerializeField] private float spawnRadius = 20f;
-    [SerializeField] private GameObject pfEnemy;
+    [SerializeField] private List<GameObject> pfEnemyList;
 
 
     public override void OnNetworkSpawn()
@@ -20,8 +21,13 @@ public class EnemySpawner : NetworkBehaviour
     {
         if (Input.GetKeyDown(KeyCode.T) && IsServer)
         {
-            Vector3 serverPlayerObjecPos = NetworkManager.Singleton.SpawnManager.GetPlayerNetworkObject(0).transform.position;
-            SpawnNetworkObject(pfEnemy, serverPlayerObjecPos);
+            Vector3 serverPlayerObjectPos = NetworkManager.Singleton.SpawnManager.GetPlayerNetworkObject(0).transform.position;
+
+            int randomIndex = Random.Range(0, pfEnemyList.Count);
+            Debug.Log(randomIndex);
+            GameObject pfEnemy = pfEnemyList[randomIndex];
+
+            SpawnNetworkObject(pfEnemy, serverPlayerObjectPos);
         }
     }
 
@@ -72,21 +78,21 @@ public class EnemySpawner : NetworkBehaviour
 
         // Debug.Log($"<color=orange>[EnemySpawner] Attempting to Instantiate/Spawn '{pfEnemy.name}'...</color>");
 
-        NetworkObject enemy = NetworkObjectPool.Singleton.GetObject(
+        NetworkObject enemyInstance = NetworkObjectPool.Singleton.GetObject(
             pfEnemy.GetComponent<NetworkObject>(),
             position,
             Quaternion.identity,
             destroyWithScene: false
         );
 
-        StartCoroutine(ReturnToObjectPoolAfterTime(100, enemy));
+        StartCoroutine(ReturnToObjectPoolAfterTime(100, enemyInstance, pfEnemy));
     }
 
-    private IEnumerator ReturnToObjectPoolAfterTime(float time, NetworkObject enemyInstance)
+    private IEnumerator ReturnToObjectPoolAfterTime(float time, NetworkObject enemyInstance, GameObject prefab)
     {
         yield return new WaitForSeconds(time);
         // Debug.Log("Returning Enemy to network pool!");
 
-        NetworkObjectPool.Singleton.ReturnObject(enemyInstance, pfEnemy.GetComponent<NetworkObject>());
+        NetworkObjectPool.Singleton.ReturnObject(enemyInstance, prefab.GetComponent<NetworkObject>());
     }
 }

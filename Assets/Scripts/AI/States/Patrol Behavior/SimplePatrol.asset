@@ -12,5 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 17889dbb0ae5e43ccbaa179d3700b46f, type: 3}
   m_Name: SimplePatrol
   m_EditorClassIdentifier: Assembly-CSharp::SimplePatrolState
-  patrolSpeedFactor: 1
+  patrolSpeedFactor: 0.2
   patrolRange: 60
+  lerpTime: 0.66

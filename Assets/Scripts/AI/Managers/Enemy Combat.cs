@@ -1,8 +1,6 @@
-// In CombatManager.cs
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.AI;
 
 public class EnemyCombat: CombatManager
 {
@@ -50,7 +48,6 @@ public class EnemyCombat: CombatManager
 
         inAttack = true;
         _anim.SetTrigger(animAttack);
-        _behaviorManager.HandleSpeedChangeWithValue(0);
 
         ChosenAttack.ExecuteAttack(this);
     }
@@ -76,12 +73,12 @@ public class EnemyCombat: CombatManager
         
     }
 
-    private void StopRotation()
+    private void AnimationEvent_StopRotation()
     {
         stopRotate = true;
     }
 
-    private void ResumeRotation()
+    private void AnimationEvent_ResumeRotation()
     {
         stopRotate = false;
     }
@@ -113,7 +110,5 @@ public class EnemyCombat: CombatManager
             return;
         }
         _animOverrideController[animAttackStringPlaceholder] = clip;
-        
     }
-
 }

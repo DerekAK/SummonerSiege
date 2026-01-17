@@ -6,11 +6,8 @@ using UnityEngine;
 public class PlayerMovementRagdoll : PlayerMovement
 {
     // Core Settings
-    private Animator _anim;
     private Rigidbody _rb;
     private ConfigurableJoint _configJoint;
-    private EntityStats _playerStats;
-    private PlayerCombat _playerCombat;
     private PhysicsManager _physicsManager;
     private Rigidbody[] ragdollRigidbodies;
     
@@ -20,71 +17,20 @@ public class PlayerMovementRagdoll : PlayerMovement
     [SerializeField] private GameObject animatedGO;
 
 
-    [Header("Grounded Settings")]
-    [SerializeField] private float groundedOffset;
-    [SerializeField] private float groundedRadius;
-    [SerializeField] private LayerMask groundLayers;
-    private bool isGrounded = true;
-
     [Header("Movement Settings")]
-    [Range(0, 1)] [SerializeField] private float walkSpeedFactor = 0.5f;
-    [SerializeField] private float fastFallFactor = 1.5f;
-    [SerializeField] private float jumpHeight = 10;
-    [SerializeField] private float rollForce = 10;
-    [SerializeField] private float rotationSpeed = 3f;
-    [SerializeField] private float crouch_lockOn_Factor;
-    [SerializeField] private float movementSmoothSpeed = 10f;
     private float walkTargetSpeed;
     private float sprintTargetSpeed;
     private float currentSpeed;
     private const float moveThreshold = 0.01f;
-    
-    // settings to decouple input processing in update() and actual movement in fixedupdate()
     private bool moveRequested;
     private Vector3 moveForce;
     private bool jumpRequested;
-
-
-    [Header("Animator settings")]
-    [SerializeField] private float animationSmoothSpeed = 10f;
-    private int moveXParam = Animator.StringToHash("InputX");
-    private int moveYParam = Animator.StringToHash("InputY");
-    private int rollXParam = Animator.StringToHash("RollX");
-    private int rollYParam = Animator.StringToHash("RollY");
-    private int animMovementStateParam = Animator.StringToHash("Movement State");
-    private int crouchLayerIndex = 1;
-    private int strafeLayerIndex = 2;
-
-    [Header("Miscellaneous")]
-    [SerializeField] private string billBoardTag = "BillBoard";
-    private enum MovementState { Locomotion = 0, Jumping = 1, Falling = 2, Rolling = 3 }
-    private MovementState currentMovementState;
-    private bool statsConfigured = false;
-    private int playerTargetIndex = 0;
 
 
     [Header ("Mouse Settings")]
     [SerializeField] private float mouseSensitivity;
     private bool cursorLocked = true;
     private bool cursorInputForLook = true;
-
-
-    [Header("Camera Settings")]
-    [SerializeField] private GameObject cinemachineCameraTarget;
-    [SerializeField] private GameObject playerFollowCamera;
-    private Camera mainCamera;
-    [SerializeField] private float topClamp = 70.0f;
-    [SerializeField] private float bottomClamp = -30.0f;
-    [SerializeField] private float minCameraDistance = -1f;  // First person
-    [SerializeField] private float maxCameraDistance = 8.0f;  // Third person far
-    [Tooltip("How far camera is before head renderer is enabled/disabled")]
-    [SerializeField] private float firstPersonCameraDistanceThreshold = 0.0f; 
-    [SerializeField] private float zoomSpeed = 1.0f;
-    [SerializeField] private float currentCameraDistance = 5.0f;
-    [SerializeField] private float firstPersonThreshold = 0.5f; // Hide body below this distance
-    private Cinemachine3rdPersonFollow thirdPersonFollow;
-    private float _cinemachineTargetYaw;
-    private float _cinemachineTargetPitch;
 
 
     private void Awake()
@@ -100,8 +46,7 @@ public class PlayerMovementRagdoll : PlayerMovement
 
     private void Start()
     {
-        mainCamera = Camera.main;
-        _cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
+        cinemachineTargetYaw = cinemachineCameraTarget.transform.rotation.eulerAngles.y;
         SetCursorState(cursorLocked);
     }
 
@@ -498,14 +443,14 @@ public class PlayerMovementRagdoll : PlayerMovement
     private void CameraRotation() {
         if (GameInput.Instance.GetPlayerLookVectorNormalized().sqrMagnitude >= moveThreshold)
         {
-            _cinemachineTargetYaw += GameInput.Instance.GetPlayerLookVectorNormalized().x * mouseSensitivity;
-            _cinemachineTargetPitch += GameInput.Instance.GetPlayerLookVectorNormalized().y * mouseSensitivity;
+            cinemachineTargetYaw += GameInput.Instance.GetPlayerLookVectorNormalized().x * mouseSensitivity;
+            cinemachineTargetPitch += GameInput.Instance.GetPlayerLookVectorNormalized().y * mouseSensitivity;
         }
 
-        _cinemachineTargetYaw = ClampAngle(_cinemachineTargetYaw, float.MinValue, float.MaxValue);
-        _cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, bottomClamp, topClamp);
+        cinemachineTargetYaw = ClampAngle(cinemachineTargetYaw, float.MinValue, float.MaxValue);
+        cinemachineTargetPitch = ClampAngle(cinemachineTargetPitch, bottomClamp, topClamp);
 
-        cinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch, _cinemachineTargetYaw, 0.0f);
+        cinemachineCameraTarget.transform.rotation = Quaternion.Euler(cinemachineTargetPitch, cinemachineTargetYaw, 0.0f);
     }
 
     private static float ClampAngle(float lfAngle, float lfMin, float lfMax) {

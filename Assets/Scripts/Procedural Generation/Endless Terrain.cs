@@ -71,7 +71,6 @@ public class EndlessTerrain : MonoBehaviour
 
     private void Start()
     {
-        Physics.autoSyncTransforms = false;
         int numChunks = InitializeChunkPool();
         InitializePlacementPools(numChunks);
         viewerPosition = viewer ? viewer.position : Vector3.zero;

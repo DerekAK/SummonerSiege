@@ -1,7 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "SimpleIdle", menuName = "Scriptable Objects/AI Behavior/States/Idle/SimpleIdle")]
+[CreateAssetMenu(fileName = "SimpleIdle", menuName = "Scriptable Objects/AI Behavior/States/Idle/SimpleIdleState")]
 public class SimpleIdleState : BaseIdleState
 {
     public override void EnterState(BehaviorManager behaviorManager)

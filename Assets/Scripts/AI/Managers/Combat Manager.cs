@@ -116,7 +116,7 @@ public abstract class CombatManager: NetworkBehaviour
         // Load using Addressables directly with the RuntimeKey - this creates a new handle each time
         AsyncOperationHandle<AnimationClip> handle = Addressables.LoadAssetAsync<AnimationClip>(attackData.AnimationClipRef.RuntimeKey);
         
-        AnimationClip clip = null;
+        AnimationClip clip;
         try
         {
             clip = await handle.Task;
@@ -209,7 +209,6 @@ public abstract class CombatManager: NetworkBehaviour
     {
         nvChosenAttackId.Value = newId;
     }
-
 
     protected abstract Task LoadDefaultAttackAnimations();
 
