@@ -12,7 +12,6 @@ public abstract class BaseAttackSO : ScriptableObject
         RightFoot,
         LeftFoot,
         MeleeWeapon,
-
     }
 
     public enum eElement
@@ -33,12 +32,15 @@ public abstract class BaseAttackSO : ScriptableObject
 
     [Header("General Settings")]
     public int UniqueID = 0; // set this to default because editor script will set this based on GUID
-    public AssetReference AnimationClipRef;
+    //public AssetReference AnimationClipRef;
+    
+    [Tooltip("Base attack damage for all hitboxes of this attack")]
     public float AttackDamage;
     public bool AirAttack;
     public float MovementSpeedFactor = 1f;
     public float RotationSpeedFactor = 1f;
     public float Cooldown;
+    public bool IsWeaponAttack; 
 
 
     [Header("2d list of hitboxes, each row is hitboxes activated at one animation event")]
@@ -121,6 +123,12 @@ public abstract class BaseAttackSO : ScriptableObject
         }
     }
 
-    public abstract void ExecuteAttack(CombatManager combatManager);
-    public abstract void OnAnimationEvent(int numEvent, CombatManager combatManager);
+    public virtual void ExecuteAttack(CombatManager combatManager)
+    {
+        
+    }
+    public virtual void OnAnimationEvent(int numEvent, CombatManager combatManager)
+    {
+        
+    }
 }

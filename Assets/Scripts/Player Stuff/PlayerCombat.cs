@@ -107,10 +107,9 @@ public class PlayerCombat : CombatManager
             return; // Invalid state, do nothing.
         }
 
-        if (!loadedClips.ContainsKey(ChosenAttack.UniqueID))
+        if (!LoadedClips.ContainsKey(ChosenAttack.UniqueID))
         {
             Debug.LogWarning($"Attack {ChosenAttack.UniqueID} not loaded yet!");
-            AttackFinish();
             return;
         }
 
@@ -367,8 +366,7 @@ public class PlayerCombat : CombatManager
         {
             foreach (ComboSystem.ComboStep comboStep in combo.comboSteps)
             {
-                if(comboStep.attack != null)
-                    uniqueIDs.Add(comboStep.attack.UniqueID);
+                if(comboStep.attack != null && comboStep.attack is SpecialPlayerAttackSO) uniqueIDs.Add(comboStep.attack.UniqueID);
             }
         }
 

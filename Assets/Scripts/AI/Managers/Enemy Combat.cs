@@ -37,7 +37,7 @@ public class EnemyCombat: CombatManager
             Debug.LogError("Chosen Attack NULL!");
             return;
         }
-        if (!loadedClips.ContainsKey(ChosenAttack.UniqueID))
+        if (!LoadedClips.ContainsKey(ChosenAttack.UniqueID))
         {
             Debug.LogWarning($"Attack {ChosenAttack.UniqueID} not loaded yet!");
             inAttack = false;
@@ -90,7 +90,7 @@ public class EnemyCombat: CombatManager
 
         foreach (BaseAttackSO attackSO in availableAttacks)
         {
-            if(attackSO != null) uniqueIDs.Add(attackSO.UniqueID);
+            if(attackSO != null && attackSO is SpecialEnemyAttackSO) uniqueIDs.Add(attackSO.UniqueID);
         }
         
         foreach (int id in uniqueIDs)

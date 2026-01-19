@@ -12,10 +12,14 @@ public abstract class CombatManager: NetworkBehaviour
     protected Animator _anim;
     protected AnimatorOverrideController _animOverrideController;
     private NetworkVariable<int> nvChosenAttackId = new NetworkVariable<int>(0);
-    protected Dictionary<int, AnimationClip> loadedClips = new Dictionary<int, AnimationClip>();
+    public Dictionary<int, AnimationClip> LoadedClips = new Dictionary<int, AnimationClip>();
     private Dictionary<int, Task<AnimationClip>> loadingTasks = new Dictionary<int, Task<AnimationClip>>();    
     private Queue<int> clipLoadOrder = new Queue<int>();
-    [SerializeField] private int cacheCapacity = 10;
+    [SerializeField] private int clipCacheCapacity = 10;
+
+    // temporary solution to this, but need to test for prototype
+    [SerializeField] private BaseWeapon weaponEquipped;
+    [SerializeField] private BaseWeapon shieldEquipped;
 
     protected bool inAttack = false;
     public bool InAttack => inAttack;
@@ -45,8 +49,18 @@ public abstract class CombatManager: NetworkBehaviour
         // This just wraps our new safe loading function
         if (newID == 0) return;
 
+        // this is necessary to set again, seems redundant, but for late joiners who don't have the updated chosenattack
         ChosenAttack = AttackDatabase.GetAttack(newID);
-        await LoadAndApplyClip(newID);
+
+        if (ChosenAttack is SpecialEnemyAttackSO || ChosenAttack is SpecialPlayerAttackSO)
+        {
+            await LoadAndApplyClip(newID);
+        }
+        else
+        {
+            await LoadAndApplyBasicAttackClips(newID);
+        }
+        
     }
 
     /// <summary>
@@ -69,7 +83,52 @@ public abstract class CombatManager: NetworkBehaviour
         }
     }
 
-    // --- FIX: This is the new, robust loading function ---
+    private async Task LoadAndApplyBasicAttackClips(int attackID)
+    {
+        BaseAttackSO attack = AttackDatabase.GetAttack(attackID);
+        WeaponCategorySO category;
+        
+        if (attack is BasicEnemyAttackSO)
+        {
+            BasicEnemyAttackSO basicEnemyAttackSO = (BasicEnemyAttackSO)attack;
+            category = basicEnemyAttackSO.WeaponCategorySO;
+        }
+        else 
+        {
+            BasicPlayerAttackSO basicPlayerAttackSO = (BasicPlayerAttackSO)attack;
+            category = basicPlayerAttackSO.WeaponCategorySO;
+        }        
+        
+        // Load all 8 clips
+        var loadTasks = new List<Task<AnimationClip>>
+        {
+            LoadClipFromAssetReference(category.anim_1H_Up),
+            LoadClipFromAssetReference(category.anim_1H_Down),
+            LoadClipFromAssetReference(category.anim_1H_Left),
+            LoadClipFromAssetReference(category.anim_1H_Right),
+            LoadClipFromAssetReference(category.anim_2H_Up),
+            LoadClipFromAssetReference(category.anim_2H_Down),
+            LoadClipFromAssetReference(category.anim_2H_Left),
+            LoadClipFromAssetReference(category.anim_2H_Right)
+        };
+        
+        AnimationClip[] clips = await Task.WhenAll(loadTasks);
+        
+        // Apply all 8 to override controller blend tree slots
+        ApplyBasicAttackClipsToAnimator(clips);
+    }
+
+    // New helper that loads from AssetReference (not from AttackDatabase)
+    private async Task<AnimationClip> LoadClipFromAssetReference(AssetReference assetRef)
+    {
+        if (!assetRef.RuntimeKeyIsValid()) return null;
+        
+        var handle = Addressables.LoadAssetAsync<AnimationClip>(assetRef.RuntimeKey);
+        AnimationClip clip = await handle.Task;
+        
+        return clip;
+    }
+
     /// <summary>
     /// Gets an AnimationClip, either from the cache or by loading it from Addressables.
     /// This is safe to call multiple times for the same ID.
@@ -78,7 +137,7 @@ public abstract class CombatManager: NetworkBehaviour
     protected Task<AnimationClip> LoadClipFromReference(int attackID)
     {
         // 1. Check if it's already loaded
-        if (loadedClips.TryGetValue(attackID, out AnimationClip clip))
+        if (LoadedClips.TryGetValue(attackID, out AnimationClip clip))
         {
             return Task.FromResult(clip);
         }
@@ -105,8 +164,23 @@ public abstract class CombatManager: NetworkBehaviour
     private async Task<AnimationClip> DoLoadClip(int attackID)
     {
         BaseAttackSO attackData = AttackDatabase.GetAttack(attackID);
+
+        AssetReference animationClipRef;
+
+        if (attackData is SpecialEnemyAttackSO)
+        {
+            SpecialEnemyAttackSO specialEnemyAttackSO = (SpecialEnemyAttackSO)attackData;
+            animationClipRef = specialEnemyAttackSO.AnimationClipRef;
+        }
+        else
+        {
+            SpecialPlayerAttackSO specialPlayerAttackSO = (SpecialPlayerAttackSO)attackData;
+            animationClipRef = specialPlayerAttackSO.AnimationClipRef;
+            
+        }
         
-        if (attackData == null || !attackData.AnimationClipRef.RuntimeKeyIsValid())
+        
+        if (attackData == null || !animationClipRef.RuntimeKeyIsValid())
         {
             Debug.LogWarning($"No attack data or invalid AssetRef for ID {attackID}");
             loadingTasks.Remove(attackID);
@@ -114,7 +188,7 @@ public abstract class CombatManager: NetworkBehaviour
         }
 
         // Load using Addressables directly with the RuntimeKey - this creates a new handle each time
-        AsyncOperationHandle<AnimationClip> handle = Addressables.LoadAssetAsync<AnimationClip>(attackData.AnimationClipRef.RuntimeKey);
+        AsyncOperationHandle<AnimationClip> handle = Addressables.LoadAssetAsync<AnimationClip>(animationClipRef.RuntimeKey);
         
         AnimationClip clip;
         try
@@ -133,14 +207,14 @@ public abstract class CombatManager: NetworkBehaviour
 
         if (handle.Status == AsyncOperationStatus.Succeeded && clip != null)
         {
-            if (loadedClips.Count >= cacheCapacity)
+            if (LoadedClips.Count >= clipCacheCapacity)
             {
                 EvictOldestClip(); 
             }
 
-            if (!loadedClips.ContainsKey(attackID))
+            if (!LoadedClips.ContainsKey(attackID))
             {
-                loadedClips.Add(attackID, clip);
+                LoadedClips.Add(attackID, clip);
                 clipLoadOrder.Enqueue(attackID);
             }
             
@@ -176,10 +250,10 @@ public abstract class CombatManager: NetworkBehaviour
             else
             {
                 // Found one we can evict.
-                if (loadedClips.TryGetValue(idToEvict, out AnimationClip clipToRelease))
+                if (LoadedClips.TryGetValue(idToEvict, out AnimationClip clipToRelease))
                 {
                     Addressables.Release(clipToRelease);
-                    loadedClips.Remove(idToEvict);
+                    LoadedClips.Remove(idToEvict);
                 }
                 return; // Eviction complete.
             }
@@ -213,6 +287,18 @@ public abstract class CombatManager: NetworkBehaviour
     protected abstract Task LoadDefaultAttackAnimations();
 
     protected abstract void ApplyClipToAnimator(AnimationClip clip);
+
+    private void ApplyBasicAttackClipsToAnimator(AnimationClip[] clips)
+    {
+        _animOverrideController["BasicAttack_1H_Up_Placeholder"] = clips[0];
+        _animOverrideController["BasicAttack_1H_Down_Placeholder"] = clips[1];
+        _animOverrideController["BasicAttack_1H_Left_Placeholder"] = clips[2];
+        _animOverrideController["BasicAttack_1H_Right_Placeholder"] = clips[3];
+        _animOverrideController["BasicAttack_2H_Up_Placeholder"] = clips[4];
+        _animOverrideController["BasicAttack_2H_Down_Placeholder"] = clips[5];
+        _animOverrideController["BasicAttack_2H_Left_Placeholder"] = clips[6];
+        _animOverrideController["BasicAttack_2H_Right_Placeholder"] = clips[7];
+    }
    
     private int currentHitboxGroupIndex = 0;
 

@@ -1,0 +1,36 @@
+Enemy Melee Combat System
+Core Structure:
+
+Reuses player's 3 weapon categories (Heavy, Medium, Light) and 36 core animations
+Two attack types: Basic attacks (variable/common) and Special attacks (fixed/rare)
+
+Basic Attacks:
+
+8 animations (4 directions × 2 grips) in blend tree, same as player
+EnemyBasicAttackSO scores attack viability, then internally decides direction, torso rotation angle, animation speed via considerations or randomness
+Variables can be influenced by enemy intelligence, player positioning, player defense state, environmental conditions
+Most common attack type (high AI scoring priority)
+Forces player to read each attack's direction/speed/height in real-time for successful parrying
+
+Special Attacks:
+
+Discrete fixed animations (current system), 1-3 per enemy type
+Fixed direction baked into animation, more damaging/punishing
+Lower AI scoring priority, but rewards player pattern recognition
+
+Defense:
+
+4 directional parries (can be enabled for elite/complex enemies as modular feature)
+Block with shield if equipped (same system as player)
+Enemy AI must detect player attacks, read direction, and time parry correctly
+
+Stat Scaling:
+
+Enemy strength affects damage output and force
+Enemy intelligence affects basic attack decision quality (low INT = random, high INT = tactical adaptation to player behavior)
+
+Implementation:
+
+EnemyBasicAttackSO: New SO type for variable basic attacks (two-stage: score viability, then decide specifics)
+DiscreteAttackSO: Existing system for special attacks
+Both compete in AI intention scoring system

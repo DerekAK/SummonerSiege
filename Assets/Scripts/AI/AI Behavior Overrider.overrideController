@@ -9,11 +9,6 @@ AnimatorOverrideController:
   m_Name: AI Behavior Overrider
   m_Controller: {fileID: 9100000, guid: 9f29ee82e50e24e7a9832c4602ecda4b, type: 2}
   m_Clips:
-  - m_OriginalClip: {fileID: 7400000, guid: fc54fb517e0544a4997e601544beb838, type: 2}
-    m_OverrideClip: {fileID: 7400000, guid: 2fdac11f96c4a417ca0b1c06b3e8c3d9, type: 2}
-  - m_OriginalClip: {fileID: 7400000, guid: 2ab53374a364e48d28f4e671a158437b, type: 2}
-    m_OverrideClip: {fileID: 7400000, guid: 279f0dbb7ce5f488298ef031361cde1a, type: 2}
-  - m_OriginalClip: {fileID: 7400000, guid: cc1995af64ead450b81afe877e484ad5, type: 2}
-    m_OverrideClip: {fileID: 7400000, guid: 48937cfe236a6418ba1ddce46159bb0d, type: 2}
   - m_OriginalClip: {fileID: 7400000, guid: 963f717d46dbe433f94557c42170822f, type: 2}
-    m_OverrideClip: {fileID: 7400000, guid: 58d880ed421834f8eb669381312cb982, type: 2}
+    m_OverrideClip: {fileID: -6633077001092557518, guid: 1eaae4c4a9580854495d840417bacbe8,
+      type: 3}

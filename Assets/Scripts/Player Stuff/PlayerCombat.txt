@@ -1,0 +1,35 @@
+Player Melee Combat System
+Core Structure:
+
+3 weapon categories (Heavy, Medium, Light) sharing animations within category
+12 base animations per category: 4 free-flow 1H, 4 free-flow 2H, 4 parries (work for both grips)
+Total: 36 core animations + 1-3 special attacks per individual weapon
+
+Free-Flow Combat:
+
+4 directional attacks (Up/Down/Left/Right) via blend tree + spine rotation for height/angle aiming
+Mouse-driven during combat, animation override controller swaps per weapon
+Stats (strength/weapon weight) affect animation speed, force output, damage, stamina cost, mobility
+Mouse drag velocity modulates swing commitment: fast drag = faster swing + more damage/force + longer recovery before next attack; slow drag = normal speed + less damage/force + shorter recovery
+Animation events reset speed after active swing frames (~30%), creating burst damage vs sustained DPS trade-off
+
+Special Attacks:
+
+Fixed combo animations (not mouse-driven), 0-1 for starter weapons, 2-3 for rare/unique weapons
+Used for high-commitment punish opportunities
+
+Parrying:
+
+4 directional parries per category, mouse input determines direction
+Must match enemy attack direction for success (stagger enemy) vs failure (take damage)
+
+Blocking:
+
+Shield toggle system, blocking power rating determines what attacks can be blocked
+Drains stamina, provides defense without stagger
+
+Progression:
+
+Strength/weight ratio determines 1H vs 2H grip (get stronger → free shield hand)
+Weapon durability system (Minecraft-style resource management)
+Force-based weapon clashes (stronger attacks overpower weaker defenses)
