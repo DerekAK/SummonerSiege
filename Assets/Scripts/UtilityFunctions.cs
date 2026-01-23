@@ -109,39 +109,37 @@ public static class UtilityFunctions{
 
 
     public static Vector3 FindNavMeshPosition(Vector3 position, Vector3 defaultPosition){
-        RaycastHit hit; //this is to determine the exact y coordinate of the xz coordinate determined by newpos
-        if (Physics.Raycast(new Vector3(position.x, 1000f, position.z), Vector3.down, out hit, Mathf.Infinity)){   
+
+        if (Physics.Raycast(new Vector3(position.x, 1000f, position.z), Vector3.down, out RaycastHit hit, Mathf.Infinity)){   
             Debug.DrawRay(new Vector3(position.x, 1000f, position.z), Vector3.down, Color.red, 3f);
             NavMeshHit navHit;
             if (NavMesh.SamplePosition(hit.point, out navHit, 1000f, NavMesh.AllAreas)){
+                //Debug.DrawLine(hit.point, navHit.position, Color.green, 10f);
                 return navHit.position;
-            } // Return the valid NavMesh position
+            }
         }
-        Debug.Log("RETURNING DEFAULT POSITION!");
+        //Debug.Log("RETURNING DEFAULT POSITION!");
         return defaultPosition;
     }
 
-    public static Vector3 FindNavMeshPosition(Vector3 position, NavMeshAgent agent)
+    public static Vector3 FindNavMeshPosition(Vector3 position, Vector3 defaultPosition, NavMeshAgent agent)
     {
         if (Physics.Raycast(new Vector3(position.x, 1000f, position.z), Vector3.down, out RaycastHit hit, Mathf.Infinity))
         {
-            if (NavMesh.SamplePosition(hit.point, out NavMeshHit navHit, 1000f, NavMesh.AllAreas))
-            {
-                // If this works, draw a green line to visualize the successful point
-                Debug.DrawLine(hit.point, navHit.position, Color.green, 10f);
+            NavMeshQueryFilter filter = new NavMeshQueryFilter{
+                agentTypeID = agent.agentTypeID,
+                areaMask = NavMesh.AllAreas
+            };
+
+            if (NavMesh.SamplePosition(hit.point, out NavMeshHit navHit, 1000f, filter)){
+                //Debug.DrawLine(hit.point, navHit.position, Color.green, 10f);
                 return navHit.position;
             }
-            else
-            {
-                // DEBUG: This part is failing. Let's draw a red sphere to see where we are searching from.
-                // This sphere will be HUGE, but it confirms the start point.
-                Debug.LogError("NavMesh.SamplePosition failed! Searching from: " + hit.point);
-            }
         }
-        
-        Debug.Log("Returning ZERO!");
-        return Vector3.zero;
+        //Debug.Log("RETURNING DEFAULT POSITION!");
+        return defaultPosition;
     }
+
     
     public static IEnumerator MoveWithGravityRigidbody(Rigidbody rigidbody, Vector3 destination, float timeframe)
     {

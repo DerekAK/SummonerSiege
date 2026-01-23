@@ -59,7 +59,7 @@ public class SimplePatrolState : BasePatrolState
         float roamingRange = Random.Range(10, patrolRange);
         Vector3 newPos = behaviorManager.StartPosition + (randDir * roamingRange);
 
-        return UtilityFunctions.FindNavMeshPosition(newPos, behaviorManager.GetComponent<NavMeshAgent>());
+        return UtilityFunctions.FindNavMeshPosition(newPos, newPos, behaviorManager.GetComponent<NavMeshAgent>());
     }
 
 }

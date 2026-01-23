@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AI;
 public class EnemySpawner : NetworkBehaviour
 {
     [SerializeField] private float spawnInterval = 10f;
@@ -21,13 +22,19 @@ public class EnemySpawner : NetworkBehaviour
     {
         if (Input.GetKeyDown(KeyCode.T) && IsServer)
         {
-            Vector3 serverPlayerObjectPos = NetworkManager.Singleton.SpawnManager.GetPlayerNetworkObject(0).transform.position;
 
             int randomIndex = Random.Range(0, pfEnemyList.Count);
             Debug.Log(randomIndex);
             GameObject pfEnemy = pfEnemyList[randomIndex];
 
-            SpawnNetworkObject(pfEnemy, serverPlayerObjectPos);
+            Vector3 spawnSamplePos = (
+                NetworkManager.Singleton.SpawnManager.GetPlayerNetworkObject(0).transform.position + 
+                new Vector3(Random.Range(2,4), 0, Random.Range(2,4))
+            );
+
+            Vector3 spawnPos = UtilityFunctions.FindNavMeshPosition(spawnSamplePos, spawnSamplePos, pfEnemy.GetComponent<NavMeshAgent>());
+
+            SpawnNetworkObject(pfEnemy, spawnPos);
         }
     }
 

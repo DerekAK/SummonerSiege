@@ -107,7 +107,7 @@ public class PlayerCombat : CombatManager
             return; // Invalid state, do nothing.
         }
 
-        if (!LoadedClips.ContainsKey(ChosenAttack.UniqueID))
+        if (!IsAttackLoaded(ChosenAttack))
         {
             Debug.LogWarning($"Attack {ChosenAttack.UniqueID} not loaded yet!");
             return;
@@ -324,8 +324,6 @@ public class PlayerCombat : CombatManager
     
     public override void AnimationEvent_AttackFinished()
     {
-        Debug.Log("Attack finished!");
-
         if (inHoldCombo)
         {
             return;
@@ -372,14 +370,14 @@ public class PlayerCombat : CombatManager
 
         foreach (int id in uniqueIDs)
         {
-            tasks.Add(LoadClipFromReference(id)); // Add the awaitable Task
+            tasks.Add(LoadAndApplyAttack(id)); // Add the awaitable Task
         }
 
         // Wait for all clips to finish loading in parallel
         await Task.WhenAll(tasks);
     }
 
-    protected override void ApplyClipToAnimator(AnimationClip clip)
+    protected override void ApplySpecialAttackClipToAnimator(AnimationClip clip)
     {
         if (clip == null)
         {

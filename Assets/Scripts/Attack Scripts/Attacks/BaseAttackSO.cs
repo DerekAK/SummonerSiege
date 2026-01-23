@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.AddressableAssets;
 
 public abstract class BaseAttackSO : ScriptableObject
 {
@@ -40,7 +39,6 @@ public abstract class BaseAttackSO : ScriptableObject
     public float MovementSpeedFactor = 1f;
     public float RotationSpeedFactor = 1f;
     public float Cooldown;
-    public bool IsWeaponAttack; 
 
 
     [Header("2d list of hitboxes, each row is hitboxes activated at one animation event")]
@@ -71,11 +69,12 @@ public abstract class BaseAttackSO : ScriptableObject
     {
         if (!NetworkManager.Singleton.IsServer) return;
         if (groupIndex < 0 || groupIndex >= HitboxGroups.Count) return;
-
         foreach (Hitbox hitbox in HitboxGroups[groupIndex].hitboxes)
         {
+            Debug.Log("HERE!!");
             if (damageColliderDict.ContainsKey(hitbox.bodyPart))
             {
+                Debug.Log("ENABLING COLLIDER!");
                 DamageCollider damageCollider = damageColliderDict[hitbox.bodyPart];
                 Collider collider = damageCollider.GetComponent<Collider>();
 

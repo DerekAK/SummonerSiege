@@ -1,7 +1,4 @@
-// In a new file: AttackIntention.cs
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.AI;
 
 [CreateAssetMenu(fileName = "AttackIntention", menuName = "Scriptable Objects/AI Behavior/Intentions/Attack")]
 public class AttackIntention : Intention
