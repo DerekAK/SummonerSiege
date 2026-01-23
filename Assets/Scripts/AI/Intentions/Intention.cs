@@ -19,6 +19,6 @@ public abstract class Intention : ScriptableObject
         return totalScore;
     }
 
-    // This is the key change: This method tells the FSM what to do.
+    public abstract bool CanExecute(BehaviorManager ai);
     public abstract void Execute(BehaviorManager ai);
 }

@@ -1,3 +1,5 @@
+using Unity.Entities.UniversalDelegates;
+using Unity.VisualScripting;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "AttackIntention", menuName = "Scriptable Objects/AI Behavior/Intentions/Attack")]
@@ -32,10 +34,22 @@ public class AttackIntention : Intention
         return highestScore;
     }
 
+    public override bool CanExecute(BehaviorManager ai)
+    {
+        if (ai.CurrentTarget == null) return false;
+
+        // we have to check if inattack here rather than if the state is in attacking, because 
+        // we can be in an attack state and still want to trigger a new attack. 
+        // we can attack multiple times and still be in the attacking state the entire time,
+        // but the InAttack bool will be false for a slight moment (within the same frame)
+        if (ai.GetComponent<EnemyCombat>().InAttack) return false;
+
+        return true;
+    }
+
     public override void Execute(BehaviorManager behaviorManager)
     {
         float distance = Vector3.Distance(behaviorManager.transform.position, behaviorManager.CurrentTarget.transform.position);
-        //Debug.Log(distance);
 
         EnemyAttackSO chosenAttack = (EnemyAttackSO)behaviorManager.GetComponent<EnemyCombat>().ChosenAttack;
 

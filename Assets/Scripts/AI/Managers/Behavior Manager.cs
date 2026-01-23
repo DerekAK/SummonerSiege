@@ -136,14 +136,16 @@ public class BehaviorManager : NetworkBehaviour
         
         HandleRotation();
         HandleJumping();
-        
-        // Dont' want to make a new decision if in a current attack, 
-        // need to wait till the attack is finished, which will call this manually
-        // also don't want to set current target during an attack because could cause a null target exception
-        if (_combatManager.InAttack) return; 
-
-        if (Time.time > lastIntentionDecisionTime + intentionDecisionFrequency) DecideNextIntention();
         SetCurrentTarget();
+
+
+        /* 
+            this is just to ensure that an enemy has a new "thought" and refreshes it's decision every once in a while
+            to mimic an active brain. however, for states that have an clear end, it should call this function to manually
+            trigger a new decision immediately
+        */
+        if (Time.time > lastIntentionDecisionTime + intentionDecisionFrequency) DecideNextIntention();
+        
     }
 
     public void DecideNextIntention()
@@ -156,7 +158,7 @@ public class BehaviorManager : NetworkBehaviour
         foreach (var intention in availableIntentions)
         {
             float score = intention.ScoreIntention(this);
-            if (score > bestScore)
+            if (score > bestScore && intention.CanExecute(this))
             {
                 bestScore = score;
                 bestIntention = intention;
@@ -167,6 +169,11 @@ public class BehaviorManager : NetworkBehaviour
         {
             currentIntention = bestIntention;
             currentIntention.Execute(this);
+        }
+
+        else
+        {
+            Debug.Log("No intention was able to be executed!");
         }
     }
 
