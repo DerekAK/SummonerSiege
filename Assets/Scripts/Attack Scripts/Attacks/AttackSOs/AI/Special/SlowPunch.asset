@@ -17,7 +17,8 @@ MonoBehaviour:
   AirAttack: 0
   MovementSpeedFactor: 1
   RotationSpeedFactor: 1
-  Cooldown: 0
+  StaminaRequired: 5
+  Cooldown: 10
   HitboxGroups:
   - hitboxes:
     - bodyPart: 1
@@ -32,7 +33,6 @@ MonoBehaviour:
   MinRange: 0
   MaxRange: 6
   considerations:
-  - {fileID: 11400000, guid: a8d5ef5c7a137486f8ee257b26942708, type: 2}
   - {fileID: 11400000, guid: b7ad63f553fd74fb1afab97345cb8730, type: 2}
   AnimationClipRef:
     m_AssetGUID: 2dc48c7bc3b5445dea808dbe646a5f2d

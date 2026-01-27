@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 13cc5d85993d949c28595d349326da44, type: 3}
-  m_Name: NeedsTarget
-  m_EditorClassIdentifier: Assembly-CSharp::HasTargetConsideration
-  desiredResult: 1
+  m_Script: {fileID: 11500000, guid: de5dcda5538f145bd84c57eebc8716d9, type: 3}
+  m_Name: ChaseIntention
+  m_EditorClassIdentifier: Assembly-CSharp::ChaseIntention
+  considerations: []

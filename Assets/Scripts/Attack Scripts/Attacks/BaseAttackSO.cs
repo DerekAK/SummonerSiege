@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -38,7 +39,9 @@ public abstract class BaseAttackSO : ScriptableObject
     public bool AirAttack;
     public float MovementSpeedFactor = 1f;
     public float RotationSpeedFactor = 1f;
+    public float StaminaRequired;
     public float Cooldown;
+    private bool isOnCooldown = false;
 
 
     [Header("2d list of hitboxes, each row is hitboxes activated at one animation event")]
@@ -71,10 +74,8 @@ public abstract class BaseAttackSO : ScriptableObject
         if (groupIndex < 0 || groupIndex >= HitboxGroups.Count) return;
         foreach (Hitbox hitbox in HitboxGroups[groupIndex].hitboxes)
         {
-            Debug.Log("HERE!!");
             if (damageColliderDict.ContainsKey(hitbox.bodyPart))
             {
-                Debug.Log("ENABLING COLLIDER!");
                 DamageCollider damageCollider = damageColliderDict[hitbox.bodyPart];
                 Collider collider = damageCollider.GetComponent<Collider>();
 
@@ -122,10 +123,37 @@ public abstract class BaseAttackSO : ScriptableObject
         }
     }
 
+    // shared logic for players and enemies
+    public virtual bool CanExecuteAttack(CombatManager combatManager)
+    {
+        // stamina check
+        EntityStats entityStats = combatManager.GetComponent<EntityStats>();
+        //if (!entityStats.TryGetStat(StatType.Stamina, out NetStat staminaStat)) return false;
+        //if (staminaStat.CurrentValue < StaminaRequired) return false;
+
+        // cooldown check
+        if (isOnCooldown) return false;
+
+        return true;
+    }
+
     public virtual void ExecuteAttack(CombatManager combatManager)
     {
-        
+        combatManager.StartCoroutine(StartCooldownCoroutine());
     }
+
+    private IEnumerator StartCooldownCoroutine()
+    {
+        isOnCooldown = true;
+        float elapsedTime = 0;
+        while (elapsedTime < Cooldown)
+        {
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+        isOnCooldown = false;
+    }
+
     public virtual void OnAnimationEvent(int numEvent, CombatManager combatManager)
     {
         

@@ -17,10 +17,10 @@ public class AttackIntention : Intention
         EnemyAttackSO bestAttack = null;
         float highestScore = 0f;
 
-        foreach (var attack in combatManager.AvailableAttacks)
+        foreach (EnemyAttackSO attack in combatManager.AvailableAttacks)
         {
-            float score = attack.ScoreAction(ai);
-            if (score > highestScore)
+            float score = attack.ScoreAttack(ai);
+            if (score > highestScore && attack.CanExecuteAttack(ai.GetComponent<CombatManager>()))
             {
                 highestScore = score;
                 bestAttack = attack;
@@ -49,31 +49,6 @@ public class AttackIntention : Intention
 
     public override void Execute(BehaviorManager behaviorManager)
     {
-        float distance = Vector3.Distance(behaviorManager.transform.position, behaviorManager.CurrentTarget.transform.position);
-
-        EnemyAttackSO chosenAttack = (EnemyAttackSO)behaviorManager.GetComponent<EnemyCombat>().ChosenAttack;
-
-        if (chosenAttack)
-        {
-           if (distance >= chosenAttack.MinRange && distance <= chosenAttack.MaxRange && behaviorManager.GetComponent<BehaviorManager>().CanAttack())
-            {
-                behaviorManager.SwitchState(behaviorManager.AttackState);
-            }
-            // 2. If we are not in correct distance, execute the ChasingState to close the distance
-            else if (distance > chosenAttack.MaxRange)
-            {
-                if (behaviorManager.CurrentState is BaseChasingState)
-                {
-                    return; // We're already doing the right thing. Do nothing.
-                }
-                behaviorManager.SwitchState(behaviorManager.ChasingState);
-            }
-
-            else
-            {
-                behaviorManager.DecideNextIntention();
-                Debug.LogWarning("Enemy did not successfully attack on an attack intention!");
-            }
-        }
+        behaviorManager.SwitchState(behaviorManager.AttackState);
     }
 }

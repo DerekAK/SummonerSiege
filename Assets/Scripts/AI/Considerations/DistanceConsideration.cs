@@ -9,10 +9,6 @@ public class DistanceConsideration : Consideration
 
     public override float Evaluate(BehaviorManager ai)
     {
-        // you would want this to normalize from 0 to the agent's max range, its max range being the range of its furthest range attack, 
-        // which is not implemented at this point in time. 
-        if (ai.CurrentTarget == null) return 0;
-
         SphereCollider maxDetectionCollider = ai.GetComponentInChildren<ColliderManager>().TargetExitColliderGO.GetComponent<SphereCollider>();
 
         Vector3 worldScaleDistance = maxDetectionCollider.transform.lossyScale * maxDetectionCollider.radius;

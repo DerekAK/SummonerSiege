@@ -17,9 +17,11 @@ MonoBehaviour:
   AirAttack: 0
   MovementSpeedFactor: 1
   RotationSpeedFactor: 1
+  StaminaRequired: 1
   Cooldown: 0
   HitboxGroups: []
   MinRange: 0
-  MaxRange: 0
-  considerations: []
-  WeaponCategorySO: {fileID: 0}
+  MaxRange: 6
+  considerations:
+  - {fileID: 11400000, guid: b7ad63f553fd74fb1afab97345cb8730, type: 2}
+  WeaponCategorySO: {fileID: 11400000, guid: b3a257498e10b4baa915c7b1ac962b36, type: 2}

@@ -11,5 +11,6 @@ public class EntityStatsConfigurationSO : ScriptableObject
 public class StatDefinition
 {
     public StatType type;
+    [Tooltip("The following values need to be capped: Intelligence (0-1)")]
     public float baseValue;
 }

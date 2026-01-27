@@ -5,10 +5,10 @@ public class WanderIntention : Intention
 {
     public override bool CanExecute(BehaviorManager ai)
     {
-        if (ai.CurrentState == ai.PatrolState || ai.CurrentState == ai.IdleState)
-        {
-            return false;
-        }
+        if (ai.CurrentState == ai.PatrolState || ai.CurrentState == ai.IdleState) return false;
+        
+        if (ai.CurrentTarget != null) return false;
+
         return true;
     }
 

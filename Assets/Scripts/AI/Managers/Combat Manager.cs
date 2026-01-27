@@ -4,6 +4,7 @@ using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.AddressableAssets;
+using NUnit.Framework;
 
 public abstract class CombatManager: NetworkBehaviour
 {   
@@ -333,6 +334,8 @@ public abstract class CombatManager: NetworkBehaviour
     
     public void SetChosenAttack(BaseAttackSO newAttack)
     {
+        if (newAttack is null) Debug.Log("Setting Chosen Attack to null");
+        if(newAttack is BasicEnemyAttackSO || newAttack is SpecialEnemyAttackSO) Debug.Log($"Setting Chosen Attack to {newAttack}!");
         int newId = (newAttack != null) ? newAttack.UniqueID : 0;
         ChosenAttack = newAttack;
 

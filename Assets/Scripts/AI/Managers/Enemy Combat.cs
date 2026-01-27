@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class EnemyCombat: CombatManager
@@ -46,14 +47,10 @@ public class EnemyCombat: CombatManager
 
     public void StartChosenAttack()
     {
-        if (!ChosenAttack)
+        if(!ChosenAttack) Debug.Log("ATTACK IS NULL!!");
+        if (!IsAttackLoaded(ChosenAttack) || !ChosenAttack)
         {
-            Debug.LogError("Chosen Attack NULL!");
-            return;
-        }
-        if (!IsAttackLoaded(ChosenAttack))
-        {
-            Debug.LogWarning($"Attack {ChosenAttack.UniqueID} not loaded yet!");
+            Debug.LogWarning($"Attack {ChosenAttack} is null or its id: {ChosenAttack.UniqueID} not loaded yet!");
             inAttack = false;
             SetChosenAttack(null);
             _behaviorManager.DecideNextIntention();

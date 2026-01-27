@@ -1,6 +1,7 @@
 // In a new file: AttackAction.cs
 using UnityEngine;
 using System.Collections.Generic;
+using NUnit.Framework;
 
 public abstract class EnemyAttackSO : BaseAttackSO
 {
@@ -13,9 +14,9 @@ public abstract class EnemyAttackSO : BaseAttackSO
     public List<Consideration> considerations;
 
     // This method scores ONLY this specific attack.
-    public float ScoreAction(BehaviorManager ai)
+    public float ScoreAttack(BehaviorManager ai)
     {
-        float totalScore = 1f;
+        float totalScore = 0.5f;
         foreach (var consideration in considerations)
         {
             float score = consideration.Evaluate(ai);
@@ -23,5 +24,19 @@ public abstract class EnemyAttackSO : BaseAttackSO
             totalScore *= score;
         }
         return totalScore;
+    }
+
+    // specifically for this attack
+    public override bool CanExecuteAttack(CombatManager combatManager)
+    {
+        // check shared parent cases first
+        if (!base.CanExecuteAttack(combatManager)) return false;
+        
+        // distance check
+        BehaviorManager ai = combatManager.GetComponent<BehaviorManager>();
+        float distance = Vector3.Distance(ai.transform.position, ai.CurrentTarget.transform.position);
+        if (distance < MinRange && distance > MaxRange) return false;
+        
+        return true;
     }
 }

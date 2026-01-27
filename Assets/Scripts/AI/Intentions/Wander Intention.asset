@@ -12,5 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3d58b7343457c4b69a645f307c52749e, type: 3}
   m_Name: Wander Intention
   m_EditorClassIdentifier: Assembly-CSharp::WanderIntention
-  considerations:
-  - {fileID: 11400000, guid: 95543c244dfe9480ca5fea2afccd7387, type: 2}
+  considerations: []

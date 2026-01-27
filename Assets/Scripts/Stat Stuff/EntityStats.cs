@@ -201,8 +201,9 @@ public enum StatType
     Health,
     Strength,
     Speed,
-    Endurance,
+    Stamina,
     SummoningCapacity,
     BindingAffinity,
-    Corruption
+    Corruption,
+    Intelligence
 }

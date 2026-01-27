@@ -24,7 +24,6 @@ public class BehaviorManager : NetworkBehaviour
 
     private EndlessTerrain endlessTerrain;
 
-
     [Header("States")]
     private BaseBehaviorState currentState;
     public BaseBehaviorState CurrentState => currentState;
@@ -89,19 +88,14 @@ public class BehaviorManager : NetworkBehaviour
 
         _agent.enabled = true;
 
-        if (IsServer && isStatsConfigured)
-        {
-            DecideNextIntention();
-        }
+        if (isStatsConfigured && IsServer) SwitchState(IdleState);
     }
 
     private void StatsConfigured()
     {
         isStatsConfigured = true;
-        if (IsSpawned && IsServer)
-        {
-            DecideNextIntention();
-        }
+        
+        if (IsSpawned && IsServer) SwitchState(IdleState);
     }
 
     private void OnDisable()
@@ -148,16 +142,36 @@ public class BehaviorManager : NetworkBehaviour
         
     }
 
+
+    // Will return false if in no circumstances can the next intention be decided
+    private bool CanMakeNewDecision()
+    {
+        if (_combatManager.InAttack) return false;
+
+        return true;
+    }
+
     public void DecideNextIntention()
     {
+        if (!CanMakeNewDecision()) return;
+        
         lastIntentionDecisionTime = Time.time;
 
-        float bestScore = -1f;
+        // don't make this lower, because then we will consider attacks that have a score of zero if no other intentions work
+        float bestScore = 0f; 
         Intention bestIntention = null;
 
         foreach (var intention in availableIntentions)
         {
-            float score = intention.ScoreIntention(this);
+            float preIntelligenceScore = intention.ScoreIntention(this);
+
+            if (!_entityStats.TryGetStat(StatType.Intelligence, out NetStat intelligence)) return;
+            
+            // need to somehow multiply this with intelligence score to get more randomization for dumber enemies
+            float score = preIntelligenceScore * Random.Range(intelligence.CurrentValue, 1);
+
+            Debug.Log($"Intention:{intention.name}. Pre-intelligence score: {preIntelligenceScore} Score: {score} CanExecute: {intention.CanExecute(this)}");
+
             if (score > bestScore && intention.CanExecute(this))
             {
                 bestScore = score;
@@ -167,6 +181,7 @@ public class BehaviorManager : NetworkBehaviour
 
         if (bestIntention)
         {
+            Debug.Log($"Chose {bestIntention.name} intention!");
             currentIntention = bestIntention;
             currentIntention.Execute(this);
         }

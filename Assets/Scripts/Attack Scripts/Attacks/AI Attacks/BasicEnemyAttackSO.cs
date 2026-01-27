@@ -5,7 +5,6 @@ public class BasicEnemyAttackSO: EnemyAttackSO
 {
     public WeaponCategorySO WeaponCategorySO;
 
-
     public override void ExecuteAttack(CombatManager combatManager)
     {
         base.ExecuteAttack(combatManager);
