@@ -30,12 +30,18 @@ public abstract class EnemyAttackSO : BaseAttackSO
     public override bool CanExecuteAttack(CombatManager combatManager)
     {
         // check shared parent cases first
-        if (!base.CanExecuteAttack(combatManager)) return false;
+        if (!base.CanExecuteAttack(combatManager)) {
+            Debug.Log("Failed parent check!");
+            return false;
+        }
         
         // distance check
         BehaviorManager ai = combatManager.GetComponent<BehaviorManager>();
         float distance = Vector3.Distance(ai.transform.position, ai.CurrentTarget.transform.position);
-        if (distance < MinRange && distance > MaxRange) return false;
+        if (distance < MinRange || distance > MaxRange) {
+            Debug.Log("Failed child check!");
+            return false;
+        }
         
         return true;
     }

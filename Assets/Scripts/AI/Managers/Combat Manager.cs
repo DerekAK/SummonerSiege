@@ -4,7 +4,10 @@ using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.AddressableAssets;
-using NUnit.Framework;
+using System.Linq;
+using UnityEditor;
+using UnityEngine.Rendering;
+using System;
 
 public abstract class CombatManager: NetworkBehaviour
 {   
@@ -25,6 +28,8 @@ public abstract class CombatManager: NetworkBehaviour
 
     protected bool inAttack = false;
     public bool InAttack => inAttack;
+
+    private Dictionary<int, float> attackCooldownsDict = new();
 
     // Animator parameters shared between players and enemies
     // 1H
@@ -403,6 +408,28 @@ public abstract class CombatManager: NetworkBehaviour
         currentHitboxGroupIndex = 0;
     }
 
+    // ========== COOLDOWN ==========
+    public void StartAttackCooldown(BaseAttackSO attackSO)
+    {
+        if (attackSO.Cooldown <= 0) return;
+        attackCooldownsDict[attackSO.UniqueID] = Time.time + attackSO.Cooldown;
+    }
+
+    public bool IsAttackOnCooldown(BaseAttackSO attackSO)
+    {
+        if (!attackCooldownsDict.ContainsKey(attackSO.UniqueID)) return false;
+        return Time.time < attackCooldownsDict[attackSO.UniqueID];
+    }
+
+    public float GetRemainingCooldown(BaseAttackSO attackSO)
+    {
+        if (!attackCooldownsDict.ContainsKey(attackSO.UniqueID)) return 0;
+        float timeRemaining = attackCooldownsDict[attackSO.UniqueID] - Time.time;
+        return Math.Max(timeRemaining, 0);
+    }
+
+
+    // ========== ANIMATION EVENTS ==========
     public void AnimationEvent_EnableHitBoxes()
     {
         if (ChosenAttack == null || !IsServer) return;
@@ -433,8 +460,8 @@ public abstract class CombatManager: NetworkBehaviour
 
     public abstract void AnimationEvent_AttackFinished();
 
-    // ========== ABSTRACT METHODS ==========
     
+    // ========== ABSTRACT METHODS ==========
     protected abstract Task LoadDefaultAttackAnimations();
     protected abstract void ApplySpecialAttackClipToAnimator(AnimationClip clip);
 }

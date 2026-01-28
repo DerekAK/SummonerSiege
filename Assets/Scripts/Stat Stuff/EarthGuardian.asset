@@ -16,6 +16,6 @@ MonoBehaviour:
   - type: 0
     baseValue: 200
   - type: 2
-    baseValue: 40
+    baseValue: 10
   - type: 7
     baseValue: 0.5

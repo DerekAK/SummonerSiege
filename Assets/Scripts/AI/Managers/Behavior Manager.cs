@@ -264,7 +264,15 @@ public class BehaviorManager : NetworkBehaviour
     
     public void MoveTowardsTarget(Vector3 targetPosition)
     {
-        if (!CanMove()) _agent.isStopped = true;
+
+        float distanceToTarget = Vector3.Distance(targetPosition, transform.position);
+
+        if (distanceToTarget < _agent.stoppingDistance || !CanMove())
+        {
+            _agent.isStopped = true;
+            _agent.velocity = Vector3.zero;
+        }
+
 
         else if (!_jumpManager.InJump)
         {

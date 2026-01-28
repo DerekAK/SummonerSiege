@@ -41,7 +41,6 @@ public abstract class BaseAttackSO : ScriptableObject
     public float RotationSpeedFactor = 1f;
     public float StaminaRequired;
     public float Cooldown;
-    private bool isOnCooldown = false;
 
 
     [Header("2d list of hitboxes, each row is hitboxes activated at one animation event")]
@@ -126,33 +125,24 @@ public abstract class BaseAttackSO : ScriptableObject
     // shared logic for players and enemies
     public virtual bool CanExecuteAttack(CombatManager combatManager)
     {
+        Debug.Log("Checking if can execute attack!");
         // stamina check
         EntityStats entityStats = combatManager.GetComponent<EntityStats>();
         //if (!entityStats.TryGetStat(StatType.Stamina, out NetStat staminaStat)) return false;
         //if (staminaStat.CurrentValue < StaminaRequired) return false;
 
         // cooldown check
-        if (isOnCooldown) return false;
+        if (combatManager.IsAttackOnCooldown(this)) return false;
 
         return true;
     }
 
     public virtual void ExecuteAttack(CombatManager combatManager)
     {
-        combatManager.StartCoroutine(StartCooldownCoroutine());
+        Debug.Log("Executing an attack!");
+        combatManager.StartAttackCooldown(this);
     }
 
-    private IEnumerator StartCooldownCoroutine()
-    {
-        isOnCooldown = true;
-        float elapsedTime = 0;
-        while (elapsedTime < Cooldown)
-        {
-            elapsedTime += Time.deltaTime;
-            yield return null;
-        }
-        isOnCooldown = false;
-    }
 
     public virtual void OnAnimationEvent(int numEvent, CombatManager combatManager)
     {

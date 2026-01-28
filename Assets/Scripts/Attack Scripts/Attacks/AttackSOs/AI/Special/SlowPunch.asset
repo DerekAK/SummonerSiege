@@ -18,7 +18,7 @@ MonoBehaviour:
   MovementSpeedFactor: 1
   RotationSpeedFactor: 1
   StaminaRequired: 5
-  Cooldown: 10
+  Cooldown: 5
   HitboxGroups:
   - hitboxes:
     - bodyPart: 1
@@ -31,7 +31,7 @@ MonoBehaviour:
       damageTickRate: 0
       damageMultiplier: 1
   MinRange: 0
-  MaxRange: 6
+  MaxRange: 3
   considerations:
   - {fileID: 11400000, guid: b7ad63f553fd74fb1afab97345cb8730, type: 2}
   AnimationClipRef:

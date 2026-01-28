@@ -22,6 +22,7 @@ public class AttackIntention : Intention
             float score = attack.ScoreAttack(ai);
             if (score > highestScore && attack.CanExecuteAttack(ai.GetComponent<CombatManager>()))
             {
+                Debug.Log("highest score = " + score);
                 highestScore = score;
                 bestAttack = attack;
             }
